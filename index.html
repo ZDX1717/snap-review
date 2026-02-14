@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>通用大学生刷题系统</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>通用大学生刷题系统</h1>
+        </header>
+
+        <nav>
+            <button id="btn-home" class="nav-btn active">首页</button>
+            <button id="btn-quiz" class="nav-btn">开始刷题</button>
+            <button id="btn-errors" class="nav-btn">错题本</button>
+            <button id="btn-manage" class="nav-btn">题库管理</button>
+        </nav>
+
+        <main>
+            <section id="home-section" class="section active">
+                <h2>欢迎使用通用大学生刷题系统</h2>
+                <div class="info-card">
+                    <h3>系统功能</h3>
+                    <ul>
+                        <li>支持单选题、多选题等多种题型</li>
+                        <li>可导入自定义格式的题库</li>
+                        <li>带解释模式刷题，帮助理解</li>
+                        <li>自动记录错题，方便复习</li>
+                        <li>进度统计，了解学习情况</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="quiz-section" class="section">
+                <h2>开始刷题</h2>
+                <div id="quiz-settings" class="quiz-options">
+                    <h3>刷题设置</h3>
+                    <div class="option-group">
+                        <label>
+                            <input type="radio" name="quiz-mode" value="with-explanation" checked>
+                            带解释模式
+                        </label>
+                        <label>
+                            <input type="radio" name="quiz-mode" value="pure-question">
+                            纯题目模式
+                        </label>
+                    </div>
+
+                    <div class="option-group">
+                        <label>
+                            <input type="radio" name="question-type" value="all" checked>
+                            全部题目
+                        </label>
+                        <label>
+                            <input type="radio" name="question-type" value="single">
+                            仅单选题
+                        </label>
+                        <label>
+                            <input type="radio" name="question-type" value="multiple">
+                            仅多选题
+                        </label>
+                    </div>
+
+                    <div class="option-group">
+                        <label>
+                            <input type="checkbox" id="randomize" checked>
+                            随机出题顺序
+                        </label>
+                    </div>
+
+                    <div class="option-group">
+                        <label for="question-bank-select">选择题库：</label>
+                        <select id="question-bank-select" class="bank-select">
+                            <option value="all">全部题库</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button id="start-quiz-btn" class="action-btn">开始刷题</button>
+                <div id="quiz-status" class="status-message"></div>
+
+                <div id="quiz-container" class="quiz-container hidden">
+                    <div class="question-header">
+                        <span id="question-number">1/10</span>
+                        <span id="question-type">单选题</span>
+                    </div>
+
+                    <div class="question-content">
+                        <h3 id="question-text">题目内容</h3>
+                        <p id="question-explanation" class="explanation">题目解释</p>
+                    </div>
+
+                    <div class="options-container">
+                        <div class="option-item">
+                            <input type="radio" name="answer" id="option-a" value="A">
+                            <label for="option-a">
+                                <span class="option-label">A</span>
+                                <span class="option-text">选项A内容</span>
+                            </label>
+                            <p class="option-explanation">选项A的解释</p>
+                        </div>
+                        <div class="option-item">
+                            <input type="radio" name="answer" id="option-b" value="B">
+                            <label for="option-b">
+                                <span class="option-label">B</span>
+                                <span class="option-text">选项B内容</span>
+                            </label>
+                            <p class="option-explanation">选项B的解释</p>
+                        </div>
+                        <div class="option-item">
+                            <input type="radio" name="answer" id="option-c" value="C">
+                            <label for="option-c">
+                                <span class="option-label">C</span>
+                                <span class="option-text">选项C内容</span>
+                            </label>
+                            <p class="option-explanation">选项C的解释</p>
+                        </div>
+                        <div class="option-item">
+                            <input type="radio" name="answer" id="option-d" value="D">
+                            <label for="option-d">
+                                <span class="option-label">D</span>
+                                <span class="option-text">选项D内容</span>
+                            </label>
+                            <p class="option-explanation">选项D的解释</p>
+                        </div>
+                    </div>
+
+                    <div id="answer-feedback" class="answer-feedback hidden">
+                        <p id="answer-result"></p>
+                        <p id="answer-explanation"></p>
+                    </div>
+
+                    <div class="quiz-controls">
+                        <button id="submit-answer-btn" class="action-btn">提交答案</button>
+                        <button id="next-question-btn" class="action-btn hidden">下一题</button>
+                        <button id="end-quiz-btn" class="action-btn secondary">结束刷题</button>
+                    </div>
+                </div>
+
+                <div id="quiz-result" class="quiz-result hidden">
+                    <h3>刷题完成</h3>
+                    <p>总题数：<span id="total-questions">0</span></p>
+                    <p>正确：<span id="correct-answers">0</span></p>
+                    <p>错误：<span id="wrong-answers">0</span></p>
+                    <p>正确率：<span id="accuracy">0%</span></p>
+                    <button id="back-to-options-btn" class="action-btn">返回设置</button>
+                </div>
+            </section>
+
+            <section id="errors-section" class="section">
+                <h2>错题本</h2>
+                <div class="error-actions">
+                    <button id="clear-errors-btn" class="action-btn secondary">清空错题本</button>
+                    <button id="review-errors-btn" class="action-btn">复习错题</button>
+                </div>
+
+                <div id="errors-list" class="errors-list">
+                    <p class="empty-message">暂无错题记录</p>
+                </div>
+            </section>
+
+            <section id="manage-section" class="section">
+                <h2>题库管理</h2>
+
+                <div class="manage-layout">
+                    <!-- 左侧：题库列表 -->
+                    <div class="bank-list-panel">
+                        <div class="panel-header">
+                            <h3>我的题库</h3>
+                            <button id="create-bank-btn" class="action-btn small">创建新题库</button>
+                        </div>
+                        <div id="banks-list" class="banks-list">
+                            <p class="empty-message">暂无题库</p>
+                        </div>
+                    </div>
+
+                    <!-- 右侧：题库操作 -->
+                    <div class="bank-operations-panel">
+                        <div class="operation-card">
+                            <h3>导入题库</h3>
+                            <div class="upload-area">
+                                <input type="file" id="file-input" accept=".txt" />
+                                <button id="upload-btn">选择文件</button>
+                                <p id="file-name">未选择文件</p>
+                            </div>
+                            <div class="import-options">
+                                <div class="option-group">
+                                    <label>
+                                        <input type="radio" name="import-mode" value="append" checked>
+                                        追加到当前题库
+                                    </label>
+                                    <label>
+                                        <input type="radio" name="import-mode" value="replace">
+                                        替换当前题库
+                                    </label>
+                                </div>
+                            </div>
+                            <button id="import-btn" class="action-btn">导入题库</button>
+                            <div id="import-status" class="status-message"></div>
+                        </div>
+
+                        <div class="operation-card">
+                            <h3>导出题库</h3>
+                            <div class="export-options">
+                                <button id="export-current-btn" class="action-btn secondary">导出当前题库</button>
+                                <button id="export-all-btn" class="action-btn secondary">导出所有题库</button>
+                            </div>
+                        </div>
+
+                        <div class="operation-card">
+                            <h3>题库格式说明</h3>
+                            <p>题库文件采用简化的文本格式，容错性高，易于编辑：</p>
+                            <pre># 题目标题（可选）
+题目：题目内容
+A：选项A内容
+B：选项B内容
+C：选项C内容
+D：选项D内容
+答案：A
+
+# 可选字段
+题目解释：题目的解释说明
+解析：答案的详细解释
+类型：单选或多选（可省略，自动判断）
+
+# 多选题示例
+题目：以下哪些是编程语言？
+A：Python
+B：Java
+C：C++
+D：HTML
+答案：ABC</pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 创建题库模态框 -->
+                <div id="create-bank-modal" class="modal hidden">
+                    <div class="modal-content">
+                        <h3>创建新题库</h3>
+                        <div class="form-group">
+                            <label for="new-bank-name">题库名称：</label>
+                            <input type="text" id="new-bank-name" class="form-input" placeholder="请输入题库名称">
+                        </div>
+                        <div class="modal-actions">
+                            <button id="confirm-create-bank-btn" class="action-btn">确定</button>
+                            <button id="cancel-create-bank-btn" class="action-btn secondary">取消</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 重命名题库模态框 -->
+                <div id="rename-bank-modal" class="modal hidden">
+                    <div class="modal-content">
+                        <h3>重命名题库</h3>
+                        <div class="form-group">
+                            <label for="rename-bank-name">新名称：</label>
+                            <input type="text" id="rename-bank-name" class="form-input" placeholder="请输入新名称">
+                        </div>
+                        <div class="modal-actions">
+                            <button id="confirm-rename-bank-btn" class="action-btn">确定</button>
+                            <button id="cancel-rename-bank-btn" class="action-btn secondary">取消</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
