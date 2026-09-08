@@ -25,9 +25,9 @@
                 <div class="info-card">
                     <h3>系统功能</h3>
                     <ul>
-                        <li>支持单选题、多选题等多种题型</li>
+                        <li>支持单选题、多选题、判断题</li>
                         <li>可导入自定义格式的题库</li>
-                        <li>带解释模式刷题，帮助理解</li>
+                        <li>逐题模式边刷边学，套题模式模拟考试</li>
                         <li>自动记录错题，方便复习</li>
                         <li>进度统计，了解学习情况</li>
                     </ul>
@@ -40,12 +40,12 @@
                     <h3>刷题设置</h3>
                     <div class="option-group">
                         <label>
-                            <input type="radio" name="quiz-mode" value="with-explanation" checked>
-                            带解释模式
+                            <input type="radio" name="quiz-mode" value="immediate" checked>
+                            逐题模式（每题立即出答案，作答时显示解释）
                         </label>
                         <label>
-                            <input type="radio" name="quiz-mode" value="pure-question">
-                            纯题目模式
+                            <input type="radio" name="quiz-mode" value="exam">
+                            套题模式（整组作答，交卷后统一出答案，可模拟考试）
                         </label>
                     </div>
 
@@ -138,6 +138,7 @@
                     </div>
 
                     <div class="quiz-controls">
+                        <button id="prev-question-btn" class="action-btn secondary hidden">上一题</button>
                         <button id="submit-answer-btn" class="action-btn">提交答案</button>
                         <button id="next-question-btn" class="action-btn hidden">下一题</button>
                         <button id="end-quiz-btn" class="action-btn secondary">结束刷题</button>
@@ -149,7 +150,14 @@
                     <p>总题数：<span id="total-questions">0</span></p>
                     <p>正确：<span id="correct-answers">0</span></p>
                     <p>错误：<span id="wrong-answers">0</span></p>
+                    <p>未答：<span id="unanswered-count">0</span></p>
                     <p>正确率：<span id="accuracy">0%</span></p>
+                    <div class="review-toolbar">
+                        <label class="inline-label">
+                            <input type="checkbox" id="review-only-wrong"> 只看错题（含未作答）
+                        </label>
+                    </div>
+                    <div id="answer-review" class="answer-review"></div>
                     <button id="back-to-options-btn" class="action-btn">返回设置</button>
                 </div>
             </section>

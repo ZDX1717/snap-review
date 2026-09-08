@@ -6,7 +6,8 @@ let questionBank = []; // 当前题库（向后兼容）
 let errorQuestions = []; // 错题本
 let currentQuiz = []; // 当前刷题的题目列表
 let currentQuestionIndex = 0; // 当前题目索引
-let quizMode = 'with-explanation'; // 刷题模式
+let quizMode = 'immediate'; // 作答方式：'immediate' 逐题模式 | 'exam' 套题模式
+let userAnswers = []; // 每题作答记录（下标与 currentQuiz 对应）
 let correctCount = 0; // 正确题数
 let wrongCount = 0; // 错误题数
 let isAnswered = false; // 是否已回答当前题
@@ -79,6 +80,12 @@ const previewOverwrite = document.getElementById('preview-overwrite');
 const previewConfirmBtn = document.getElementById('preview-confirm-btn');
 const previewCancelBtn = document.getElementById('preview-cancel-btn');
 let previewData = []; // 预览中的待导入题目
+
+// 套题模式与答题回顾
+const prevQuestionBtn = document.getElementById('prev-question-btn');
+const unansweredCountEl = document.getElementById('unanswered-count');
+const answerReview = document.getElementById('answer-review');
+const reviewOnlyWrong = document.getElementById('review-only-wrong');
 
 // 初始化
 function init() {
@@ -223,6 +230,10 @@ function setupEventListeners() {
     previewSelectAll.addEventListener('change', togglePreviewSelectAll);
     previewConfirmBtn.addEventListener('click', commitPreviewImport);
     previewCancelBtn.addEventListener('click', () => hideModal(importPreviewModal));
+
+    // 套题模式翻页与答题回顾
+    prevQuestionBtn.addEventListener('click', prevQuestion);
+    reviewOnlyWrong.addEventListener('change', renderAnswerReview);
 }
 
 // 显示指定部分
@@ -629,6 +640,9 @@ function startQuiz() {
     currentQuestionIndex = 0;
     correctCount = 0;
     wrongCount = 0;
+    userAnswers = new Array(currentQuiz.length).fill('');
+    endQuizBtn.textContent = quizMode === 'exam' ? '交卷' : '结束刷题';
+    reviewOnlyWrong.checked = false;
     
     // 显示刷题容器
     quizContainer.classList.remove('hidden');
@@ -648,19 +662,19 @@ function displayQuestion() {
     questionType.textContent = question.type;
     questionText.textContent = question.content;
     
-    // 根据刷题模式显示题目解释
-    if (quizMode === 'with-explanation') {
+    // 题目解释：逐题模式作答时可见；套题模式交卷前隐藏（回顾时统一展示）
+    if (quizMode !== 'exam') {
         questionExplanation.textContent = question.explanation || '';
         questionExplanation.classList.remove('hidden');
     } else {
         questionExplanation.classList.add('hidden');
     }
     
-    // 显示选项
+    // 显示选项（容错：旧版错题记录可能缺字段）
     const optionsContainer = document.querySelector('.options-container');
     optionsContainer.innerHTML = '';
-    
-    Object.keys(question.options).sort().forEach(optionKey => {
+
+    Object.keys(question.options || {}).sort().forEach(optionKey => {
         const optionItem = document.createElement('div');
         optionItem.className = 'option-item';
         
@@ -697,8 +711,8 @@ function displayQuestion() {
         optionItem.appendChild(inputElement);
         optionItem.appendChild(label);
         
-        // 根据刷题模式显示选项解释
-        if (quizMode === 'with-explanation' && question.optionExplanations[optionKey]) {
+        // 选项解释：仅逐题模式作答时显示
+        if (quizMode !== 'exam' && (question.optionExplanations || {})[optionKey]) {
             const optionExplanation = document.createElement('p');
             optionExplanation.className = 'option-explanation';
             optionExplanation.textContent = question.optionExplanations[optionKey];
@@ -708,33 +722,59 @@ function displayQuestion() {
         optionsContainer.appendChild(optionItem);
     });
     
-    // 重置答题状态
+    // 恢复套题模式下保存的作答（翻页回来可修改）
+    const savedAnswer = userAnswers[currentQuestionIndex] || '';
+    if (savedAnswer) {
+        optionsContainer.querySelectorAll('input[name="answer"]').forEach(inp => {
+            inp.checked = question.type === '多选' ? savedAnswer.includes(inp.value) : inp.value === savedAnswer;
+        });
+    }
+
+    // 重置答题状态与按钮（逐题模式 vs 套题模式）
     isAnswered = false;
     answerFeedback.classList.add('hidden');
-    submitAnswerBtn.classList.remove('hidden');
-    nextQuestionBtn.classList.add('hidden');
+    if (quizMode === 'exam') {
+        // 套题模式：作答中不出反馈，可前后翻页
+        submitAnswerBtn.classList.add('hidden');
+        nextQuestionBtn.classList.remove('hidden');
+        if (currentQuestionIndex >= currentQuiz.length - 1) {
+            nextQuestionBtn.classList.add('hidden'); // 最后一题用"交卷"
+        }
+        if (currentQuestionIndex > 0) {
+            prevQuestionBtn.classList.remove('hidden');
+        } else {
+            prevQuestionBtn.classList.add('hidden');
+        }
+    } else {
+        prevQuestionBtn.classList.add('hidden');
+        submitAnswerBtn.classList.remove('hidden');
+        nextQuestionBtn.classList.add('hidden');
+    }
 }
 
-// 提交答案
-function submitAnswer() {
+// 读取当前题的用户作答（单选/判断返回字母，多选返回排序后的字母串，未选返回 ''）
+function collectUserAnswer() {
     const question = currentQuiz[currentQuestionIndex];
-    let userAnswer;
-    
     if (question.type !== '多选') { // 单选/判断题：单选框
         const selectedOption = document.querySelector('input[name="answer"]:checked');
-        if (!selectedOption) {
-            alert('请选择一个答案');
-            return;
-        }
-        userAnswer = selectedOption.value;
-    } else {
-        const selectedOptions = document.querySelectorAll('input[name="answer"]:checked');
-        if (selectedOptions.length === 0) {
-            alert('请至少选择一个答案');
-            return;
-        }
-        userAnswer = Array.from(selectedOptions).map(option => option.value).sort().join('');
+        return selectedOption ? selectedOption.value : '';
     }
+    const selectedOptions = document.querySelectorAll('input[name="answer"]:checked');
+    return Array.from(selectedOptions).map(option => option.value).sort().join('');
+}
+
+// 提交答案（逐题模式）
+function submitAnswer() {
+    const question = currentQuiz[currentQuestionIndex];
+    const userAnswer = collectUserAnswer();
+
+    if (!userAnswer) {
+        alert(question.type === '多选' ? '请至少选择一个答案' : '请选择一个答案');
+        return;
+    }
+
+    // 记录作答，供结果页逐题回顾
+    userAnswers[currentQuestionIndex] = userAnswer;
     
     // 检查答案是否正确（两侧都规范化后再比较）
     const isCorrect = normalizeAnswerString(userAnswer) === normalizeAnswerString(question.answer);
@@ -763,8 +803,20 @@ function submitAnswer() {
 
 // 下一题
 function nextQuestion() {
+    if (quizMode === 'exam') {
+        // 套题模式：先保存当前作答再翻页
+        userAnswers[currentQuestionIndex] = collectUserAnswer();
+        if (currentQuestionIndex >= currentQuiz.length - 1) {
+            finishExam();
+            return;
+        }
+        currentQuestionIndex++;
+        displayQuestion();
+        return;
+    }
+
     currentQuestionIndex++;
-    
+
     if (currentQuestionIndex >= currentQuiz.length) {
         // 刷题完成，显示结果
         showQuizResult();
@@ -774,23 +826,147 @@ function nextQuestion() {
     }
 }
 
-// 显示刷题结果
-function showQuizResult() {
+// 上一题（仅套题模式，已作答内容保留）
+function prevQuestion() {
+    if (quizMode !== 'exam' || currentQuestionIndex === 0) return;
+    userAnswers[currentQuestionIndex] = collectUserAnswer();
+    currentQuestionIndex--;
+    displayQuestion();
+}
+
+// 交卷（套题模式）：统一判分并生成逐题回顾
+function finishExam() {
+    userAnswers[currentQuestionIndex] = collectUserAnswer();
+
+    correctCount = 0;
+    wrongCount = 0;
+    let unanswered = 0;
+
+    currentQuiz.forEach((question, idx) => {
+        const ua = userAnswers[idx] || '';
+        if (!ua) {
+            unanswered++;
+            // 未作答按错题处理，便于之后复习
+            addToErrorBook(question, '未作答');
+        } else if (normalizeAnswerString(ua) === normalizeAnswerString(question.answer)) {
+            correctCount++;
+        } else {
+            wrongCount++;
+            addToErrorBook(question, ua);
+        }
+    });
+
+    showQuizResult(unanswered);
+}
+
+// 显示刷题结果（逐题模式结束/提前结束，或套题模式交卷后）
+function showQuizResult(examUnanswered) {
     quizContainer.classList.add('hidden');
     quizResult.classList.remove('hidden');
-    
-    // 已答题数：提前结束刷题时按实际已答题数计算正确率，而不是按总题数
-    const answeredCount = Math.min(currentQuestionIndex + (isAnswered ? 1 : 0), currentQuiz.length);
+
+    let denominator;
+    let unanswered = examUnanswered || 0;
+    if (quizMode === 'exam') {
+        // 套题模式：考试得分按总题数计算，未答数单独展示
+        denominator = currentQuiz.length;
+    } else {
+        // 逐题模式：提前结束时按实际已答题数计算正确率
+        denominator = Math.min(currentQuestionIndex + (isAnswered ? 1 : 0), currentQuiz.length);
+        unanswered = currentQuiz.length - denominator;
+    }
+
     totalQuestions.textContent = currentQuiz.length;
     correctAnswers.textContent = correctCount;
     wrongAnswers.textContent = wrongCount;
-    accuracy.textContent = answeredCount > 0
-        ? `${((correctCount / answeredCount) * 100).toFixed(1)}%（已答 ${answeredCount} 题）`
+    unansweredCountEl.textContent = unanswered;
+    accuracy.textContent = denominator > 0
+        ? (quizMode === 'exam'
+            ? `${((correctCount / denominator) * 100).toFixed(1)}%`
+            : `${((correctCount / denominator) * 100).toFixed(1)}%（已答 ${denominator} 题）`)
         : '0%';
+
+    renderAnswerReview();
 }
 
-// 结束刷题
+// 渲染逐题回顾（结果页：套题模式交卷后 / 逐题模式结束后）
+function renderAnswerReview() {
+    answerReview.innerHTML = '';
+    const onlyWrong = reviewOnlyWrong.checked;
+
+    currentQuiz.forEach((question, idx) => {
+        const ua = userAnswers[idx] || '';
+        const isCorrect = !!ua && normalizeAnswerString(ua) === normalizeAnswerString(question.answer);
+        if (onlyWrong && isCorrect) return; // 未作答视为错题，在"只看错题"中保留
+
+        const item = document.createElement('div');
+        item.className = 'review-item' + (!ua ? ' review-unanswered' : (isCorrect ? '' : ' review-wrong'));
+
+        const head = document.createElement('div');
+        head.className = 'review-head';
+
+        const num = document.createElement('span');
+        num.className = 'review-num';
+        num.textContent = `#${idx + 1}`;
+        head.appendChild(num);
+
+        const typeBadge = document.createElement('span');
+        typeBadge.className = 'badge';
+        typeBadge.textContent = question.type;
+        head.appendChild(typeBadge);
+
+        const resultBadge = document.createElement('span');
+        resultBadge.className = 'badge ' + (isCorrect ? 'ok-badge' : 'warn-badge');
+        resultBadge.textContent = !ua ? '未作答' : (isCorrect ? '回答正确' : '回答错误');
+        head.appendChild(resultBadge);
+        item.appendChild(head);
+
+        const stem = document.createElement('p');
+        stem.className = 'review-stem';
+        stem.textContent = question.content;
+        item.appendChild(stem);
+
+        const optKeys = Object.keys(question.options || {}).sort();
+        if (optKeys.length) {
+            const opts = document.createElement('div');
+            opts.className = 'review-options';
+            opts.textContent = optKeys.map(k => `${k}. ${question.options[k]}`).join('　');
+            item.appendChild(opts);
+        }
+
+        const answers = document.createElement('p');
+        answers.className = 'review-answers';
+        answers.textContent = `你的答案：${ua || '未作答'}　正确答案：${question.answer}`;
+        item.appendChild(answers);
+
+        if (question.analysis) {
+            const ana = document.createElement('p');
+            ana.className = 'review-analysis';
+            ana.textContent = `解析：${question.analysis}`;
+            item.appendChild(ana);
+        }
+        if (question.explanation) {
+            const exp = document.createElement('p');
+            exp.className = 'review-analysis';
+            exp.textContent = `题目解释：${question.explanation}`;
+            item.appendChild(exp);
+        }
+
+        answerReview.appendChild(item);
+    });
+}
+
+// 结束刷题（逐题模式）/ 交卷（套题模式）
 function endQuiz() {
+    if (quizMode === 'exam') {
+        const unanswered = userAnswers.filter(a => !a).length;
+        const message = unanswered > 0
+            ? `还有 ${unanswered} 题未作答，未作答的题将计入错题本。确定交卷吗？`
+            : '确定交卷吗？交卷后将统一判分。';
+        if (confirm(message)) {
+            finishExam();
+        }
+        return;
+    }
     if (confirm('确定要结束刷题吗？')) {
         showQuizResult();
     }
@@ -947,12 +1123,14 @@ function reviewErrors() {
         return;
     }
     
-    // 使用错题作为刷题内容
+    // 使用错题作为刷题内容（复习保持逐题模式，便于即时理解）
     currentQuiz = [...errorQuestions];
     currentQuestionIndex = 0;
     correctCount = 0;
     wrongCount = 0;
-    quizMode = 'with-explanation';
+    userAnswers = new Array(currentQuiz.length).fill('');
+    quizMode = 'immediate';
+    endQuizBtn.textContent = '结束刷题';
     
     // 显示刷题容器
     quizContainer.classList.remove('hidden');

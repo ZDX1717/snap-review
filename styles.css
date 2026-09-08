@@ -802,3 +802,86 @@ h3 {
 .question-content h3 {
     white-space: pre-line;
 }
+
+/* ==================== 套题模式 + 答题回顾 ==================== */
+
+.review-toolbar {
+    margin: 10px 0;
+    font-size: 13px;
+    color: #495057;
+}
+
+.answer-review {
+    max-height: 50vh;
+    overflow-y: auto;
+    text-align: left;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 8px;
+    background: #f8f9fa;
+    margin-bottom: 14px;
+}
+
+.review-item {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+}
+
+.review-item.review-wrong {
+    border-color: #dc3545;
+    background: #fff5f5;
+}
+
+.review-item.review-unanswered {
+    border-color: #ffc107;
+    background: #fffdf5;
+}
+
+.review-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.review-num {
+    font-weight: bold;
+    color: #4a6fa5;
+    font-size: 13px;
+}
+
+.badge.ok-badge {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.review-stem {
+    font-size: 14px;
+    color: #343a40;
+    margin: 4px 0;
+    white-space: pre-line;
+}
+
+.review-options {
+    font-size: 12px;
+    color: #6c757d;
+    margin: 6px 0;
+    line-height: 1.8;
+}
+
+.review-answers {
+    font-size: 13px;
+    color: #495057;
+    margin: 4px 0;
+}
+
+.review-analysis {
+    font-size: 12px;
+    color: #868e96;
+    margin: 4px 0 0;
+    line-height: 1.6;
+}
