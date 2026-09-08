@@ -1,4 +1,4 @@
-// 通用大学生刷题系统 JavaScript 代码
+// Zquiz · 期末周刷题 —— JavaScript 代码
 
 // 全局变量
 let questionBanks = {}; // 多个题库，key为题库名，value为题目数组
