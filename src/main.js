@@ -1,20 +1,17 @@
-// Zquiz · 期末周刷题 —— JavaScript 代码
+// Zquiz · 期末周刷题 —— 应用外壳(装配与界面交互)
+// 依赖方向:main → 业务模块 → parser/storage/state;禁止反向 import。
 
-// 全局变量
-let questionBanks = {}; // 多个题库，key为题库名，value为题目数组
-let questionBank = []; // 当前题库（向后兼容）
-let errorQuestions = []; // 错题本
-let currentQuiz = []; // 当前刷题的题目列表
-let currentQuestionIndex = 0; // 当前题目索引
-let quizMode = 'immediate'; // 作答方式：'immediate' 逐题模式 | 'exam' 套题模式
-let userAnswers = []; // 每题作答记录（下标与 currentQuiz 对应）
-let masteryRemovedInSession = 0; // 本轮刷题中因连对达标而移出错题本的题数
-let favoriteQuestions = []; // 收藏夹（手动精选的题目）
-let correctCount = 0; // 正确题数
-let wrongCount = 0; // 错误题数
-let isAnswered = false; // 是否已回答当前题
-let currentBankName = '默认题库'; // 当前题库名称
-let isAllBanksView = false; // 是否处于"全部题库"合并视图（此时 questionBank 是临时合并结果）
+import { state } from './state.js';
+import {
+    parseQuestionsText, finalizeQuestion, normalizeAnswerString,
+    questionDedupKey, shuffleArray, formatQuestionsForExport,
+} from './parser.js';
+import {
+    loadFromLocalStorage, saveToLocalStorage, loadCollapsedBanks,
+    saveCollapsedBanks, loadMasterySetting,
+} from './storage.js';
+
+// Zquiz · 期末周刷题 —— JavaScript 代码
 
 // DOM 元素
 const btnHome = document.getElementById('btn-home');
@@ -67,7 +64,6 @@ const confirmCreateBankBtn = document.getElementById('confirm-create-bank-btn');
 const cancelCreateBankBtn = document.getElementById('cancel-create-bank-btn');
 const confirmRenameBankBtn = document.getElementById('confirm-rename-bank-btn');
 const cancelRenameBankBtn = document.getElementById('cancel-rename-bank-btn');
-let currentRenameBank = null; // 当前正在重命名的题库名
 
 // 粘贴导入与预览向导
 const pasteInput = document.getElementById('paste-input');
@@ -82,7 +78,6 @@ const previewTargetBankSelect = document.getElementById('preview-target-bank');
 const previewOverwrite = document.getElementById('preview-overwrite');
 const previewConfirmBtn = document.getElementById('preview-confirm-btn');
 const previewCancelBtn = document.getElementById('preview-cancel-btn');
-let previewData = []; // 预览中的待导入题目
 
 // 套题模式与答题回顾
 const prevQuestionBtn = document.getElementById('prev-question-btn');
@@ -122,9 +117,6 @@ const editorDeleteBtn = document.getElementById('editor-delete-btn');
 const editorSaveBtn = document.getElementById('editor-save-btn');
 const editorCloseBtn = document.getElementById('editor-close-btn');
 const editorPosition = document.getElementById('editor-position');
-let editBankName = null;  // 正在编辑的题库名
-let editIndex = 0;        // 正在编辑的题目下标
-let editorDirty = false;  // 表单是否有未保存修改
 
 // 首页快捷入口
 const heroStartBtn = document.getElementById('hero-start-btn');
@@ -135,16 +127,16 @@ function init() {
     // 加载本地存储的数据
     loadFromLocalStorage();
     loadCollapsedBanks();
-    loadMasterySetting();
+    masteryThresholdSelect.value = String(loadMasterySetting());
 
     // 更新题库选择下拉框
     updateBankSelect();
 
     // 初始状态下拉框与实际加载的题库保持一致
     // （页面默认显示"全部题库"，但初始数据只加载了第一个题库，二者必须一致）
-    if (Object.keys(questionBanks).length > 0) {
-        isAllBanksView = false;
-        questionBankSelect.value = currentBankName;
+    if (Object.keys(state.questionBanks).length > 0) {
+        state.isAllBanksView = false;
+        questionBankSelect.value = state.currentBankName;
     }
     
     // 设置事件监听器
@@ -152,82 +144,6 @@ function init() {
     
     // 显示首页
     showSection('home');
-}
-
-// 从本地存储加载数据
-function loadFromLocalStorage() {
-    // 容错：存储数据损坏时重置对应部分，而不是让整个应用崩溃
-    try {
-        const savedBanks = localStorage.getItem('questionBanks');
-        if (savedBanks) {
-            const parsed = JSON.parse(savedBanks);
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-                questionBanks = parsed;
-                // 加载第一个题库作为当前题库
-                const bankNames = Object.keys(questionBanks);
-                if (bankNames.length > 0) {
-                    currentBankName = bankNames[0];
-                    questionBank = questionBanks[currentBankName];
-                }
-            }
-        } else {
-            // 向后兼容：如果有旧的questionBank数据，迁移到新的结构
-            const savedQuestions = localStorage.getItem('questionBank');
-            if (savedQuestions) {
-                const parsedQuestions = JSON.parse(savedQuestions);
-                if (Array.isArray(parsedQuestions)) {
-                    questionBank = parsedQuestions;
-                    questionBanks[currentBankName] = questionBank;
-                }
-            }
-        }
-    } catch (e) {
-        console.error('题库数据损坏，已重置：', e);
-        localStorage.removeItem('questionBanks');
-        localStorage.removeItem('questionBank');
-        questionBanks = {};
-        questionBank = [];
-    }
-
-    try {
-        const savedErrors = localStorage.getItem('errorQuestions');
-        if (savedErrors) {
-            const parsedErrors = JSON.parse(savedErrors);
-            if (Array.isArray(parsedErrors)) {
-                errorQuestions = parsedErrors;
-            }
-        }
-    } catch (e) {
-        console.error('错题本数据损坏，已重置：', e);
-        localStorage.removeItem('errorQuestions');
-        errorQuestions = [];
-    }
-
-    try {
-        const savedFavorites = localStorage.getItem('favoriteQuestions');
-        if (savedFavorites) {
-            const parsedFavorites = JSON.parse(savedFavorites);
-            if (Array.isArray(parsedFavorites)) {
-                favoriteQuestions = parsedFavorites;
-            }
-        }
-    } catch (e) {
-        console.error('收藏数据损坏，已重置：', e);
-        localStorage.removeItem('favoriteQuestions');
-        favoriteQuestions = [];
-    }
-}
-
-// 保存数据到本地存储
-function saveToLocalStorage() {
-    // 仅在选定具体题库时回写当前题库，
-    // 避免"全部题库"合并视图把合并结果覆盖写进某个真实题库（数据污染）
-    if (!isAllBanksView) {
-        questionBanks[currentBankName] = questionBank;
-    }
-    localStorage.setItem('questionBanks', JSON.stringify(questionBanks));
-    localStorage.setItem('errorQuestions', JSON.stringify(errorQuestions));
-    localStorage.setItem('favoriteQuestions', JSON.stringify(favoriteQuestions));
 }
 
 // 设置事件监听器
@@ -248,16 +164,16 @@ function setupEventListeners() {
         const selectedBank = this.value;
         if (selectedBank === 'all') {
             // 合并所有题库为临时视图（此视图下保存时不会回写题库数据）
-            isAllBanksView = true;
-            questionBank = [];
-            Object.values(questionBanks).forEach(bank => {
-                questionBank = [...questionBank, ...bank];
+            state.isAllBanksView = true;
+            state.questionBank = [];
+            Object.values(state.questionBanks).forEach(bank => {
+                state.questionBank = [...state.questionBank, ...bank];
             });
         } else {
             // 选择特定题库
-            isAllBanksView = false;
-            currentBankName = selectedBank;
-            questionBank = questionBanks[selectedBank];
+            state.isAllBanksView = false;
+            state.currentBankName = selectedBank;
+            state.questionBank = state.questionBanks[selectedBank];
         }
     });
     
@@ -280,15 +196,15 @@ function setupEventListeners() {
 
     // 错题移出规则设置
     masteryThresholdSelect.addEventListener('change', function() {
-        masteryThreshold = parseInt(this.value, 10) || 0;
-        localStorage.setItem('masteryThresholdSetting', String(masteryThreshold));
+        state.masteryThreshold = parseInt(this.value, 10) || 0;
+        localStorage.setItem('masteryThresholdSetting', String(state.masteryThreshold));
         updateErrorsList();
     });
 
     // 复习范围选择
     confirmReviewScopeBtn.addEventListener('click', () => {
         const { banks, types } = getScopeSelection();
-        const questions = errorQuestions.filter(
+        const questions = state.errorQuestions.filter(
             q => banks.has(q.bankName || '未知题库') && types.has(q.type)
         );
         if (questions.length === 0) {
@@ -310,11 +226,11 @@ function setupEventListeners() {
     editorDeleteBtn.addEventListener('click', editorDeleteCurrent);
     editorAddOption.addEventListener('click', () => editorMutateOptions(1));
     editorRemoveOption.addEventListener('click', () => editorMutateOptions(-1));
-    editorType.addEventListener('change', () => { editorDirty = true; editorRenderOptions(); });
-    editorStem.addEventListener('input', () => { editorDirty = true; });
-    editorAnswer.addEventListener('input', () => { editorDirty = true; });
-    editorExplanation.addEventListener('input', () => { editorDirty = true; });
-    editorAnalysis.addEventListener('input', () => { editorDirty = true; });
+    editorType.addEventListener('change', () => { state.editorDirty = true; editorRenderOptions(); });
+    editorStem.addEventListener('input', () => { state.editorDirty = true; });
+    editorAnswer.addEventListener('input', () => { state.editorDirty = true; });
+    editorExplanation.addEventListener('input', () => { state.editorDirty = true; });
+    editorAnalysis.addEventListener('input', () => { state.editorDirty = true; });
 
     // 题库管理
     createBankBtn.addEventListener('click', () => showModal(createBankModal));
@@ -323,7 +239,7 @@ function setupEventListeners() {
     cancelRenameBankBtn.addEventListener('click', () => hideModal(renameBankModal));
     confirmRenameBankBtn.addEventListener('click', renameBank);
     exportAllBtn.addEventListener('click', exportAllBanks);
-    exportCurrentBtn.addEventListener('click', () => exportBank(currentBankName));
+    exportCurrentBtn.addEventListener('click', () => exportBank(state.currentBankName));
 
     // 粘贴导入
     pasteInput.addEventListener('paste', handlePasteEvent);
@@ -395,7 +311,7 @@ function updateBankSelect() {
     questionBankSelect.innerHTML = '<option value="all">全部题库</option>';
 
     // 添加所有题库选项
-    Object.keys(questionBanks).forEach(bankName => {
+    Object.keys(state.questionBanks).forEach(bankName => {
         const option = document.createElement('option');
         option.value = bankName;
         option.textContent = bankName;
@@ -403,7 +319,7 @@ function updateBankSelect() {
     });
 
     // 恢复之前选中的值（如果还存在）
-    if (currentValue && (currentValue === 'all' || questionBanks[currentValue])) {
+    if (currentValue && (currentValue === 'all' || state.questionBanks[currentValue])) {
         questionBankSelect.value = currentValue;
     }
 }
@@ -443,271 +359,6 @@ function importQuestions() {
 //   D. 判断题：  答案为 对/错/√/×/正确/错误，自动配 A正确/B错误 两个选项
 // 每题输出置信度，供导入预览向导提示需要人工确认的题。
 
-const OPTION_LINE_RE = /^\s*([A-Ha-h])\s*[.、:：．)）,，]\s*(.+)$/;
-const OPTION_EXPLAIN_RE = /^\s*([A-Ha-h])\s*解释\s*[:：]\s*(.+)$/;
-const QUESTION_NUM_RE = /^(\d{1,3})\s*[.、)）．]\s*(.*)$/;
-const JUDGE_QUESTION_RE = /^判断题\s*[:：]\s*(.*)$/;
-const TITLE_RE = /^#\s*(.*)$/;
-const ANALYSIS_RE = /^(?:答案解析|解析)\s*[:：]\s*(.+)$/;
-const EXPLAIN_RE = /^(?:题目解释|题干解释)\s*[:：]\s*(.+)$/;
-const TYPE_RE = /^(?:类型|题型)\s*[:：]\s*(.+)$/;
-const QUESTION_FIELD_RE = /^题目\s*[:：]\s*(.*)$/;
-// 整行答案（必须带冒号，避免把普通句子误判成答案行）
-const FULL_ANSWER_RE = /^(?:【?参考答案】?|【?标准答案】?|【?正确答案】?|【?答案】?|答案)\s*[:：]\s*(.+?)\s*[。.]?$/;
-// 空格分隔的纯答案行，如"答案 A" / "参考答案 B"
-const FULL_ANSWER_SPACED_RE = /^(?:【?参考答案】?|【?标准答案】?|【?正确答案】?|【?答案】?|答案)\s+((?:[A-Ha-h√×对错]+)(?:[\s、,，]+[A-Ha-h√×对错]+)*)\s*[。.]?$/;
-// 行尾行内答案（家族C），要求"答案"前是行首、空白或中文标点，避免误伤选项文字
-// 分组1=前导字符(裁剪时保留),分组2=答案内容（支持多字母，如"答案：AB"）
-const INLINE_ANSWER_RE = /(^|[\s(（,，;；。？！：、])(?:【?参考答案】?|【?标准答案】?|【?正确答案】?|【?答案】?|答案)\s*[:：]?\s*((?:正确|错误)|[A-Ha-h√×对错](?:[\s、,，]*[A-Ha-h√×对错])*)\s*[。.]?\s*$/;const JUDGE_TRUE_RE = /^(对|正确|√|T|Y)$/i;
-const JUDGE_FALSE_RE = /^(错|错误|×|X|F|N)$/i;
-
-// 拆分行内选项（家族C）："题干 A.xx B.yy C.zz" → { stem, options }
-// 要求至少两个选项且从 A 开始连续编号，避免把题干中"A、B两类"这类文字误拆
-function splitInlineOptions(text) {
-    // 分组1=前导字符(题干裁剪时保留),分组2=选项字母
-    const re = /(^|[\s(（,，;；。？！：、…""''「」『』（）【】《》<>])\s*([A-Ha-h])\s*[.、:：．)）]\s*/g;
-    const markers = [];
-    let m;
-    while ((m = re.exec(text)) !== null) {
-        markers.push({
-            key: m[2].toUpperCase(),
-            stemEnd: m.index + m[1].length,
-            textStart: re.lastIndex,
-        });
-    }
-    if (markers.length < 2 || markers[0].key !== 'A') return null;
-    for (let i = 0; i < markers.length; i++) {
-        if (markers[i].key !== String.fromCharCode(65 + i)) return null;
-    }
-    const options = {};
-    markers.forEach((mk, i) => {
-        const end = i + 1 < markers.length ? markers[i + 1].stemEnd : text.length;
-        options[mk.key] = text.slice(mk.textStart, end).replace(/\s+/g, ' ').trim();
-    });
-    const stem = text.slice(0, markers[0].stemEnd).replace(/\s+/g, ' ').trim();
-    return { stem, options };
-}
-
-// 题型/答案/选项的最终规范化（导入与预览提交时都会调用，幂等）
-function finalizeQuestion(q) {
-    q.title = (q.title || '').trim();
-    q.content = (q.content || '').trim();
-    q.analysis = (q.analysis || '').trim();
-    q.explanation = (q.explanation || '').trim();
-    const rawAnswer = (q.answer || '').toUpperCase().replace(/\s+/g, '');
-
-    const hint = (q.type || '').replace(/题$/, '');
-    const isJudge = hint === '判断' || JUDGE_TRUE_RE.test(rawAnswer) || JUDGE_FALSE_RE.test(rawAnswer);
-
-    if (isJudge) {
-        q.type = '判断';
-        const meaningful = Object.values(q.options).some(v => v && v.length > 2);
-        if (!meaningful) {
-            // 统一选项为 A正确 / B错误，保证刷题界面与判分一致
-            q.options = { A: '正确', B: '错误' };
-        }
-        if (JUDGE_TRUE_RE.test(rawAnswer)) q.answer = 'A';
-        else if (JUDGE_FALSE_RE.test(rawAnswer)) q.answer = 'B';
-        else if (/^[AB]$/.test(rawAnswer)) q.answer = rawAnswer;
-        else q.answer = '';
-    } else {
-        q.answer = rawAnswer.replace(/[^A-H]/g, '');
-        q.type = q.answer.length > 1 ? '多选' : '单选';
-    }
-
-    // 置信度：预览时用于提示"需要人工看一眼"的题
-    let conf = 1.0;
-    const optCount = Object.keys(q.options).length;
-    if (!q.answer) conf -= 0.5;
-    if (optCount === 0) conf -= 0.4;
-    else if (optCount < 2) conf -= 0.3;
-    if (!q.analysis) conf -= 0.1;
-    q.confidence = Math.max(0, Math.min(1, conf));
-    q.raw = Array.isArray(q.raw) ? q.raw.join('\n') : (q.raw || '');
-
-    if (!q.content) return null; // 没有题干的散行直接丢弃
-    return q;
-}
-
-// 查重指纹：题干（去空白）+ 全部选项文本。同一题重新导入（即使改了答案）会被识别为重复；
-// 题干相同但选项不同的题（如"下列说法正确的是()"）不会被误判
-function questionDedupKey(q) {
-    const stem = (q.content || '').replace(/\s+/g, '');
-    const opts = Object.keys(q.options || {}).sort()
-        .map(k => k + ':' + (q.options[k] || '').replace(/\s+/g, ''))
-        .join('');
-    return stem + '|' + opts;
-}
-
-// 主解析器：逐行状态机，同时覆盖家族 A/B/C/D
-function parseQuestionsText(content) {
-    const questions = [];
-    const lines = String(content).replace(/\r\n?/g, '\n').split('\n');
-    let cur = null;
-
-    const newQuestion = () => {
-        cur = {
-            title: '', content: '', explanation: '', options: {}, optionExplanations: {},
-            answer: '', analysis: '', type: '', confidence: 1.0, raw: []
-        };
-    };
-    const flush = () => {
-        if (!cur) return;
-        const q = finalizeQuestion(cur);
-        if (q) questions.push(q);
-        cur = null;
-    };
-
-    for (const rawLine of lines) {
-        const line = rawLine.replace(/\s+$/, '').trim();
-        if (!line) continue;
-
-        // 1. "# 标题" → 新题开始
-        const titleM = line.match(TITLE_RE);
-        if (titleM) {
-            flush();
-            newQuestion();
-            cur.title = titleM[1].trim();
-            cur.raw.push(rawLine);
-            continue;
-        }
-
-        // 2. 剥离行尾行内答案（家族C："…… 答案：B"）
-        let body = line;
-        let inlineAnswer = null;
-        const ansM = body.match(INLINE_ANSWER_RE);
-        if (ansM) {
-            inlineAnswer = ansM[2];
-            // 裁剪时保留前导字符（如"？"），避免题干丢失标点
-            body = body.slice(0, ansM.index + ansM[1].length).trim();
-        }
-
-        // 3. 字段行（顺序重要：题目解释/解析 必须先于 题目/答案 判断）
-        const explainM = body.match(EXPLAIN_RE);
-        if (explainM) {
-            if (!cur) newQuestion();
-            cur.explanation = explainM[1].trim();
-            cur.raw.push(rawLine);
-            continue;
-        }
-        const analysisM = body.match(ANALYSIS_RE);
-        if (analysisM) {
-            if (!cur) newQuestion();
-            cur.analysis = analysisM[1].trim();
-            cur.raw.push(rawLine);
-            continue;
-        }
-        const typeM = body.match(TYPE_RE);
-        if (typeM) {
-            if (!cur) newQuestion();
-            cur.type = typeM[1].trim();
-            cur.raw.push(rawLine);
-            continue;
-        }
-        const fieldM = body.match(QUESTION_FIELD_RE);
-        if (fieldM) {
-            if (cur && cur.content) flush(); // 家族A连续两题之间靠"题目："分隔
-            if (!cur) newQuestion();
-            cur.content = fieldM[1].trim();
-            if (inlineAnswer) cur.answer = inlineAnswer;
-            cur.raw.push(rawLine);
-            continue;
-        }
-
-        // 3.5 整行答案
-        const fullAnsM = body.match(FULL_ANSWER_RE) || body.match(FULL_ANSWER_SPACED_RE);
-        if (fullAnsM) {
-            if (!cur) newQuestion();
-            cur.answer = fullAnsM[1].trim();
-            cur.raw.push(rawLine);
-            continue;
-        }
-
-        // 4. "1. 题干"编号行 → 新题（家族B/C）
-        const numM = body.match(QUESTION_NUM_RE);
-        if (numM) {
-            const afterNum = numM[2].trim();
-            const split = splitInlineOptions(afterNum);
-            flush();
-            newQuestion();
-            cur.raw.push(rawLine);
-            if (split) {
-                cur.content = split.stem;   // 家族C：题干 + 行内选项
-                cur.options = split.options;
-            } else {
-                cur.content = afterNum;     // 家族B：仅题干，选项在后续行
-            }
-            if (inlineAnswer) cur.answer = inlineAnswer;
-            continue;
-        }
-
-        // 5. "判断题：xxx" 开头
-        const judgeM = body.match(JUDGE_QUESTION_RE);
-        if (judgeM) {
-            flush();
-            newQuestion();
-            cur.raw.push(rawLine);
-            cur.content = judgeM[1].trim();
-            cur.type = '判断';
-            if (inlineAnswer) cur.answer = inlineAnswer;
-            continue;
-        }
-
-        // 6. 选项解释行（A解释：xxx）
-        const opExM = body.match(OPTION_EXPLAIN_RE);
-        if (opExM) {
-            if (!cur) newQuestion();
-            cur.optionExplanations[opExM[1].toUpperCase()] = opExM[2].trim();
-            cur.raw.push(rawLine);
-            continue;
-        }
-
-        // 7. 选项行（A. xxx / A：xxx / A、xxx）
-        const opM = body.match(OPTION_LINE_RE);
-        if (opM) {
-            if (!cur) newQuestion();
-            // 选项行内还跟着更多选项时（如"A. 21 B.80 C.443 D.22"），按行内选项拆分
-            const lineSplit = splitInlineOptions(body);
-            if (lineSplit && Object.keys(lineSplit.options).length > 1) {
-                Object.assign(cur.options, lineSplit.options);
-                if (!cur.content && lineSplit.stem) cur.content = lineSplit.stem;
-            } else {
-                cur.options[opM[1].toUpperCase()] = opM[2].trim();
-            }
-            if (inlineAnswer) cur.answer = inlineAnswer;
-            cur.raw.push(rawLine);
-            continue;
-        }
-
-        // 8. 整行就是答案（行内答案剥离后 body 为空）
-        if (inlineAnswer) {
-            if (!cur) newQuestion();
-            cur.answer = inlineAnswer;
-            cur.raw.push(rawLine);
-            continue;
-        }
-
-        // 9. 其他 → 题干续行（多行题干）；续行里跟行内选项的也支持；没有当前题的散行丢弃
-        if (cur) {
-            const contSplit = splitInlineOptions(line);
-            if (contSplit && Object.keys(contSplit.options).length > 1) {
-                // 续行形如"其中正确的是 A. 21 B.80 C.443 D.22"
-                Object.assign(cur.options, contSplit.options);
-                if (contSplit.stem) {
-                    cur.content = cur.content ? cur.content + '\n' + contSplit.stem : contSplit.stem;
-                }
-            } else if (cur.content) {
-                cur.content += '\n' + line;
-            } else if (!cur.answer && Object.keys(cur.options).length === 0) {
-                cur.content = line;
-            }
-            cur.raw.push(rawLine);
-        }
-    }
-    flush();
-    return questions;
-}
-
 // 显示导入状态
 function showImportStatus(message, type) {
     importStatus.textContent = message;
@@ -722,25 +373,25 @@ function showImportStatus(message, type) {
 
 // 开始刷题
 function startQuiz() {
-    if (questionBank.length === 0) {
+    if (state.questionBank.length === 0) {
         showQuizStatus('请先导入题库', 'error');
         return;
     }
     
     // 获取刷题设置
-    quizMode = document.querySelector('input[name="quiz-mode"]:checked').value;
+    state.quizMode = document.querySelector('input[name="quiz-mode"]:checked').value;
     const questionType = document.querySelector('input[name="question-type"]:checked').value;
     const randomize = document.getElementById('randomize').checked;
     
     // 筛选题目
-    let filteredQuestions = [...questionBank];
+    let filteredQuestions = [...state.questionBank];
     
     if (questionType === 'single') {
-        filteredQuestions = questionBank.filter(q => q.type === '单选');
+        filteredQuestions = state.questionBank.filter(q => q.type === '单选');
     } else if (questionType === 'multiple') {
-        filteredQuestions = questionBank.filter(q => q.type === '多选');
+        filteredQuestions = state.questionBank.filter(q => q.type === '多选');
     } else if (questionType === 'judge') {
-        filteredQuestions = questionBank.filter(q => q.type === '判断');
+        filteredQuestions = state.questionBank.filter(q => q.type === '判断');
     }
     
     if (filteredQuestions.length === 0) {
@@ -754,14 +405,14 @@ function startQuiz() {
     }
     
     // 初始化刷题状态
-    currentQuiz = filteredQuestions;
-    currentQuestionIndex = 0;
-    correctCount = 0;
-    wrongCount = 0;
-    userAnswers = new Array(currentQuiz.length).fill('');
-    endQuizBtn.textContent = quizMode === 'exam' ? '交卷' : '结束刷题';
+    state.currentQuiz = filteredQuestions;
+    state.currentQuestionIndex = 0;
+    state.correctCount = 0;
+    state.wrongCount = 0;
+    state.userAnswers = new Array(state.currentQuiz.length).fill('');
+    endQuizBtn.textContent = state.quizMode === 'exam' ? '交卷' : '结束刷题';
     reviewOnlyWrong.checked = false;
-    masteryRemovedInSession = 0;
+    state.masteryRemovedInSession = 0;
     
     // 显示刷题容器
     quizContainer.classList.remove('hidden');
@@ -774,15 +425,15 @@ function startQuiz() {
 
 // 显示题目
 function displayQuestion() {
-    const question = currentQuiz[currentQuestionIndex];
+    const question = state.currentQuiz[state.currentQuestionIndex];
     
     // 更新题目信息
-    questionNumber.textContent = `${currentQuestionIndex + 1}/${currentQuiz.length}`;
+    questionNumber.textContent = `${state.currentQuestionIndex + 1}/${state.currentQuiz.length}`;
     questionType.textContent = question.type;
     questionText.textContent = question.content;
     
     // 题目解释：逐题模式作答时可见；套题模式交卷前隐藏（回顾时统一展示）
-    if (quizMode !== 'exam') {
+    if (state.quizMode !== 'exam') {
         questionExplanation.textContent = question.explanation || '';
         questionExplanation.classList.remove('hidden');
     } else {
@@ -831,7 +482,7 @@ function displayQuestion() {
         optionItem.appendChild(label);
         
         // 选项解释：仅逐题模式作答时显示
-        if (quizMode !== 'exam' && (question.optionExplanations || {})[optionKey]) {
+        if (state.quizMode !== 'exam' && (question.optionExplanations || {})[optionKey]) {
             const optionExplanation = document.createElement('p');
             optionExplanation.className = 'option-explanation';
             optionExplanation.textContent = question.optionExplanations[optionKey];
@@ -842,7 +493,7 @@ function displayQuestion() {
     });
     
     // 恢复套题模式下保存的作答（翻页回来可修改）
-    const savedAnswer = userAnswers[currentQuestionIndex] || '';
+    const savedAnswer = state.userAnswers[state.currentQuestionIndex] || '';
     if (savedAnswer) {
         optionsContainer.querySelectorAll('input[name="answer"]').forEach(inp => {
             inp.checked = question.type === '多选' ? savedAnswer.includes(inp.value) : inp.value === savedAnswer;
@@ -853,16 +504,16 @@ function displayQuestion() {
     updateFavoriteButton();
 
     // 重置答题状态与按钮（逐题模式 vs 套题模式）
-    isAnswered = false;
+    state.isAnswered = false;
     answerFeedback.classList.add('hidden');
-    if (quizMode === 'exam') {
+    if (state.quizMode === 'exam') {
         // 套题模式：作答中不出反馈，可前后翻页
         submitAnswerBtn.classList.add('hidden');
         nextQuestionBtn.classList.remove('hidden');
-        if (currentQuestionIndex >= currentQuiz.length - 1) {
+        if (state.currentQuestionIndex >= state.currentQuiz.length - 1) {
             nextQuestionBtn.classList.add('hidden'); // 最后一题用"交卷"
         }
-        if (currentQuestionIndex > 0) {
+        if (state.currentQuestionIndex > 0) {
             prevQuestionBtn.classList.remove('hidden');
         } else {
             prevQuestionBtn.classList.add('hidden');
@@ -876,7 +527,7 @@ function displayQuestion() {
 
 // 读取当前题的用户作答（单选/判断返回字母，多选返回排序后的字母串，未选返回 ''）
 function collectUserAnswer() {
-    const question = currentQuiz[currentQuestionIndex];
+    const question = state.currentQuiz[state.currentQuestionIndex];
     if (question.type !== '多选') { // 单选/判断题：单选框
         const selectedOption = document.querySelector('input[name="answer"]:checked');
         return selectedOption ? selectedOption.value : '';
@@ -887,7 +538,7 @@ function collectUserAnswer() {
 
 // 提交答案（逐题模式）
 function submitAnswer() {
-    const question = currentQuiz[currentQuestionIndex];
+    const question = state.currentQuiz[state.currentQuestionIndex];
     const userAnswer = collectUserAnswer();
 
     if (!userAnswer) {
@@ -896,7 +547,7 @@ function submitAnswer() {
     }
 
     // 记录作答，供结果页逐题回顾
-    userAnswers[currentQuestionIndex] = userAnswer;
+    state.userAnswers[state.currentQuestionIndex] = userAnswer;
     
     // 检查答案是否正确（两侧都规范化后再比较）
     const isCorrect = normalizeAnswerString(userAnswer) === normalizeAnswerString(question.answer);
@@ -904,21 +555,21 @@ function submitAnswer() {
     // 更新答题统计与错题闭环
     let removedFromErrorBook = 0;
     if (isCorrect) {
-        correctCount++;
+        state.correctCount++;
     } else {
-        wrongCount++;
+        state.wrongCount++;
 
         // 将错题添加到错题本
         addToErrorBook(question, userAnswer);
     }
     // 已在错题本中的题：答对累计连对（达阈值自动移出），答错清零
     removedFromErrorBook += updateErrorStreak(question, isCorrect, userAnswer);
-    masteryRemovedInSession += removedFromErrorBook;
+    state.masteryRemovedInSession += removedFromErrorBook;
 
     // 显示答案反馈
     answerResult.textContent = isCorrect
         ? (removedFromErrorBook > 0
-            ? `回答正确！已连对 ${masteryThreshold} 次，移出错题本 🎉`
+            ? `回答正确！已连对 ${state.masteryThreshold} 次，移出错题本 🎉`
             : '回答正确！')
         : `回答错误！正确答案是：${question.answer}`;
     answerResult.className = isCorrect ? 'correct-answer' : 'wrong-answer';
@@ -926,28 +577,28 @@ function submitAnswer() {
     answerFeedback.classList.remove('hidden');
     
     // 更新按钮状态
-    isAnswered = true;
+    state.isAnswered = true;
     submitAnswerBtn.classList.add('hidden');
     nextQuestionBtn.classList.remove('hidden');
 }
 
 // 下一题
 function nextQuestion() {
-    if (quizMode === 'exam') {
+    if (state.quizMode === 'exam') {
         // 套题模式：先保存当前作答再翻页
-        userAnswers[currentQuestionIndex] = collectUserAnswer();
-        if (currentQuestionIndex >= currentQuiz.length - 1) {
+        state.userAnswers[state.currentQuestionIndex] = collectUserAnswer();
+        if (state.currentQuestionIndex >= state.currentQuiz.length - 1) {
             finishExam();
             return;
         }
-        currentQuestionIndex++;
+        state.currentQuestionIndex++;
         displayQuestion();
         return;
     }
 
-    currentQuestionIndex++;
+    state.currentQuestionIndex++;
 
-    if (currentQuestionIndex >= currentQuiz.length) {
+    if (state.currentQuestionIndex >= state.currentQuiz.length) {
         // 刷题完成，显示结果
         showQuizResult();
     } else {
@@ -958,35 +609,35 @@ function nextQuestion() {
 
 // 上一题（仅套题模式，已作答内容保留）
 function prevQuestion() {
-    if (quizMode !== 'exam' || currentQuestionIndex === 0) return;
-    userAnswers[currentQuestionIndex] = collectUserAnswer();
-    currentQuestionIndex--;
+    if (state.quizMode !== 'exam' || state.currentQuestionIndex === 0) return;
+    state.userAnswers[state.currentQuestionIndex] = collectUserAnswer();
+    state.currentQuestionIndex--;
     displayQuestion();
 }
 
 // 交卷（套题模式）：统一判分并生成逐题回顾
 function finishExam() {
-    userAnswers[currentQuestionIndex] = collectUserAnswer();
+    state.userAnswers[state.currentQuestionIndex] = collectUserAnswer();
 
-    correctCount = 0;
-    wrongCount = 0;
+    state.correctCount = 0;
+    state.wrongCount = 0;
     let unanswered = 0;
 
-    currentQuiz.forEach((question, idx) => {
-        const ua = userAnswers[idx] || '';
+    state.currentQuiz.forEach((question, idx) => {
+        const ua = state.userAnswers[idx] || '';
         const isCorrect = !!ua && normalizeAnswerString(ua) === normalizeAnswerString(question.answer);
         if (!ua) {
             unanswered++;
             // 未作答按错题处理，便于之后复习
             addToErrorBook(question, '未作答');
         } else if (isCorrect) {
-            correctCount++;
+            state.correctCount++;
         } else {
-            wrongCount++;
+            state.wrongCount++;
             addToErrorBook(question, ua);
         }
         // 错题闭环：已在错题本中的题，答对累计连对（达阈值移出）/ 答错清零
-        masteryRemovedInSession += updateErrorStreak(question, isCorrect, ua);
+        state.masteryRemovedInSession += updateErrorStreak(question, isCorrect, ua);
     });
 
     showQuizResult(unanswered);
@@ -999,30 +650,30 @@ function showQuizResult(examUnanswered) {
 
     let denominator;
     let unanswered = examUnanswered || 0;
-    if (quizMode === 'exam') {
+    if (state.quizMode === 'exam') {
         // 套题模式：考试得分按总题数计算，未答数单独展示
-        denominator = currentQuiz.length;
+        denominator = state.currentQuiz.length;
     } else {
         // 逐题模式：提前结束时按实际已答题数计算正确率
-        denominator = Math.min(currentQuestionIndex + (isAnswered ? 1 : 0), currentQuiz.length);
-        unanswered = currentQuiz.length - denominator;
+        denominator = Math.min(state.currentQuestionIndex + (state.isAnswered ? 1 : 0), state.currentQuiz.length);
+        unanswered = state.currentQuiz.length - denominator;
     }
 
-    totalQuestions.textContent = currentQuiz.length;
-    correctAnswers.textContent = correctCount;
-    wrongAnswers.textContent = wrongCount;
+    totalQuestions.textContent = state.currentQuiz.length;
+    correctAnswers.textContent = state.correctCount;
+    wrongAnswers.textContent = state.wrongCount;
     unansweredCountEl.textContent = unanswered;
     accuracy.textContent = denominator > 0
-        ? (quizMode === 'exam'
-            ? `${((correctCount / denominator) * 100).toFixed(1)}%`
-            : `${((correctCount / denominator) * 100).toFixed(1)}%（已答 ${denominator} 题）`)
+        ? (state.quizMode === 'exam'
+            ? `${((state.correctCount / denominator) * 100).toFixed(1)}%`
+            : `${((state.correctCount / denominator) * 100).toFixed(1)}%（已答 ${denominator} 题）`)
         : '0%';
 
     // 错题闭环提示：本轮因连对达标移出错题本的题
-    if (masteryRemovedInSession > 0) {
-        masteryNote.textContent = masteryThreshold === 1
-            ? `本轮共有 ${masteryRemovedInSession} 题答对后已移出错题本 🎉`
-            : `本轮共有 ${masteryRemovedInSession} 题连续答对 ${masteryThreshold} 次，已自动移出错题本 🎉`;
+    if (state.masteryRemovedInSession > 0) {
+        masteryNote.textContent = state.masteryThreshold === 1
+            ? `本轮共有 ${state.masteryRemovedInSession} 题答对后已移出错题本 🎉`
+            : `本轮共有 ${state.masteryRemovedInSession} 题连续答对 ${state.masteryThreshold} 次，已自动移出错题本 🎉`;
         masteryNote.classList.remove('hidden');
     } else {
         masteryNote.classList.add('hidden');
@@ -1036,8 +687,8 @@ function renderAnswerReview() {
     answerReview.innerHTML = '';
     const onlyWrong = reviewOnlyWrong.checked;
 
-    currentQuiz.forEach((question, idx) => {
-        const ua = userAnswers[idx] || '';
+    state.currentQuiz.forEach((question, idx) => {
+        const ua = state.userAnswers[idx] || '';
         const isCorrect = !!ua && normalizeAnswerString(ua) === normalizeAnswerString(question.answer);
         if (onlyWrong && isCorrect) return; // 未作答视为错题，在"只看错题"中保留
 
@@ -1100,8 +751,8 @@ function renderAnswerReview() {
 
 // 结束刷题（逐题模式）/ 交卷（套题模式）
 function endQuiz() {
-    if (quizMode === 'exam') {
-        const unanswered = userAnswers.filter(a => !a).length;
+    if (state.quizMode === 'exam') {
+        const unanswered = state.userAnswers.filter(a => !a).length;
         const message = unanswered > 0
             ? `还有 ${unanswered} 题未作答，未作答的题将计入错题本。确定交卷吗？`
             : '确定交卷吗？交卷后将统一判分。';
@@ -1124,16 +775,16 @@ function backToQuizOptions() {
 // 添加到错题本
 function addToErrorBook(question, userAnswer) {
     // 检查题目是否已在错题本中
-    const existingIndex = errorQuestions.findIndex(
+    const existingIndex = state.errorQuestions.findIndex(
         q => q.content === question.content
     );
 
     if (existingIndex === -1) {
         // 添加新错题
-        errorQuestions.push({
+        state.errorQuestions.push({
             ...question,
             userAnswer,
-            bankName: currentBankName,
+            bankName: state.currentBankName,
             correctStreak: 0, // 连对次数：复习/刷题中答对累计，达阈值自动移出
             timestamp: new Date().toISOString()
         });
@@ -1143,27 +794,24 @@ function addToErrorBook(question, userAnswer) {
     }
 }
 
-// 错题巩固闭环阈值：同一题连续答对 N 次自动移出错题本；0 = 关闭自动移出
-let masteryThreshold = 2;
-
 // 错题闭环：已入错题本的题答对 → 连对次数+1（达阈值自动移出，返回移出数）；
 // 答错 → 连对次数清零并更新作答记录；不在错题本中的题 → 无操作
 function updateErrorStreak(question, isCorrect, userAnswer) {
-    if (masteryThreshold === 0) return 0; // 用户关闭了自动移出
-    const idx = errorQuestions.findIndex(q => q.content === question.content);
+    if (state.masteryThreshold === 0) return 0; // 用户关闭了自动移出
+    const idx = state.errorQuestions.findIndex(q => q.content === question.content);
     if (idx === -1) return 0;
 
     if (isCorrect) {
-        const streak = (errorQuestions[idx].correctStreak || 0) + 1;
-        if (streak >= masteryThreshold) {
-            errorQuestions.splice(idx, 1);
+        const streak = (state.errorQuestions[idx].correctStreak || 0) + 1;
+        if (streak >= state.masteryThreshold) {
+            state.errorQuestions.splice(idx, 1);
             saveToLocalStorage();
             return 1;
         }
-        errorQuestions[idx].correctStreak = streak;
+        state.errorQuestions[idx].correctStreak = streak;
     } else {
-        errorQuestions[idx].correctStreak = 0;
-        errorQuestions[idx].userAnswer = userAnswer || errorQuestions[idx].userAnswer;
+        state.errorQuestions[idx].correctStreak = 0;
+        state.errorQuestions[idx].userAnswer = userAnswer || state.errorQuestions[idx].userAnswer;
     }
     saveToLocalStorage();
     return 0;
@@ -1173,17 +821,17 @@ function updateErrorStreak(question, isCorrect, userAnswer) {
 
 // 切换收藏状态（按题干匹配），返回是否为新增收藏
 function toggleFavorite(question, bankName) {
-    const idx = favoriteQuestions.findIndex(q => q.content === question.content);
+    const idx = state.favoriteQuestions.findIndex(q => q.content === question.content);
     let added;
     if (idx === -1) {
-        favoriteQuestions.push({
+        state.favoriteQuestions.push({
             ...question,
             bankName: bankName || '未知题库',
             timestamp: new Date().toISOString()
         });
         added = true;
     } else {
-        favoriteQuestions.splice(idx, 1);
+        state.favoriteQuestions.splice(idx, 1);
         added = false;
     }
     saveToLocalStorage();
@@ -1192,16 +840,16 @@ function toggleFavorite(question, bankName) {
 
 // 刷题界面：收藏/取消收藏当前题
 function toggleFavoriteCurrent() {
-    const question = currentQuiz[currentQuestionIndex];
+    const question = state.currentQuiz[state.currentQuestionIndex];
     if (!question) return;
-    toggleFavorite(question, isAllBanksView ? '未知题库' : currentBankName);
+    toggleFavorite(question, state.isAllBanksView ? '未知题库' : state.currentBankName);
     updateFavoriteButton();
 }
 
 // 刷新收藏按钮状态（★ 已收藏 / ☆ 收藏）
 function updateFavoriteButton() {
-    const question = currentQuiz[currentQuestionIndex];
-    const isFav = !!question && favoriteQuestions.some(f => f.content === question.content);
+    const question = state.currentQuiz[state.currentQuestionIndex];
+    const isFav = !!question && state.favoriteQuestions.some(f => f.content === question.content);
     favoriteBtn.textContent = isFav ? '★ 已收藏' : '☆ 收藏';
     if (isFav) {
         favoriteBtn.classList.add('active');
@@ -1212,14 +860,14 @@ function updateFavoriteButton() {
 
 // 刷新收藏夹列表
 function updateFavoritesList() {
-    if (favoriteQuestions.length === 0) {
+    if (state.favoriteQuestions.length === 0) {
         favoritesList.innerHTML = '<p class="empty-message">暂无收藏题目，刷题时点击题目右上角的"☆ 收藏"即可加入</p>';
         return;
     }
 
     favoritesList.innerHTML = '';
 
-    favoriteQuestions.forEach((question, index) => {
+    state.favoriteQuestions.forEach((question, index) => {
         const item = document.createElement('div');
         item.className = 'error-item';
 
@@ -1266,7 +914,7 @@ function updateFavoritesList() {
         removeBtn.className = 'delete-btn';
         removeBtn.textContent = '取消收藏';
         removeBtn.addEventListener('click', () => {
-            favoriteQuestions.splice(index, 1);
+            state.favoriteQuestions.splice(index, 1);
             saveToLocalStorage();
             updateFavoritesList();
         });
@@ -1278,18 +926,18 @@ function updateFavoritesList() {
 
 // 复习收藏：以逐题模式过一遍收藏题
 function reviewFavorites() {
-    if (favoriteQuestions.length === 0) {
+    if (state.favoriteQuestions.length === 0) {
         alert('收藏夹是空的，刷题时点击"☆ 收藏"即可加入');
         return;
     }
 
-    currentQuiz = [...favoriteQuestions];
-    currentQuestionIndex = 0;
-    correctCount = 0;
-    wrongCount = 0;
-    userAnswers = new Array(currentQuiz.length).fill('');
-    masteryRemovedInSession = 0;
-    quizMode = 'immediate';
+    state.currentQuiz = [...state.favoriteQuestions];
+    state.currentQuestionIndex = 0;
+    state.correctCount = 0;
+    state.wrongCount = 0;
+    state.userAnswers = new Array(state.currentQuiz.length).fill('');
+    state.masteryRemovedInSession = 0;
+    state.quizMode = 'immediate';
     endQuizBtn.textContent = '结束刷题';
 
     showSection('quiz');
@@ -1301,31 +949,9 @@ function reviewFavorites() {
 }
 
 // 更新错题列表
-// 错题本分组展开状态（true = 已展开），持久化到 localStorage；缺省 = 折叠
-let expandedBanks = {};
-
-function loadCollapsedBanks() {
-    try {
-        const saved = localStorage.getItem('errorBookExpandedBanks');
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-                expandedBanks = parsed;
-            }
-        }
-    } catch (e) {
-        expandedBanks = {};
-    }
-}
-
-function saveCollapsedBanks() {
-    try {
-        localStorage.setItem('errorBookExpandedBanks', JSON.stringify(expandedBanks));
-    } catch (e) { /* 存储异常时静默降级：展开状态不持久化 */ }
-}
 
 function updateErrorsList() {
-    if (errorQuestions.length === 0) {
+    if (state.errorQuestions.length === 0) {
         errorsList.innerHTML = '<p class="empty-message">暂无错题记录</p>';
         toggleAllBanksBtn.classList.add('hidden');
         return;
@@ -1336,7 +962,7 @@ function updateErrorsList() {
 
     // 按题库分类错题
     const errorsByBank = {};
-    errorQuestions.forEach((question, index) => {
+    state.errorQuestions.forEach((question, index) => {
         const bankName = question.bankName || '未知题库';
         if (!errorsByBank[bankName]) {
             errorsByBank[bankName] = [];
@@ -1349,7 +975,7 @@ function updateErrorsList() {
 
     // 显示每个题库的错题（可折叠分组，默认折叠）
     bankNames.forEach(bankName => {
-        const isCollapsed = !expandedBanks[bankName]; // 缺省折叠
+        const isCollapsed = !state.expandedBanks[bankName]; // 缺省折叠
 
         const group = document.createElement('div');
         group.className = 'bank-group';
@@ -1380,8 +1006,8 @@ function updateErrorsList() {
         bankContainer.className = 'bank-errors' + (isCollapsed ? ' collapsed' : '');
 
         toggle.addEventListener('click', () => {
-            const nowExpanded = !expandedBanks[bankName];
-            expandedBanks[bankName] = nowExpanded;
+            const nowExpanded = !state.expandedBanks[bankName];
+            state.expandedBanks[bankName] = nowExpanded;
             saveCollapsedBanks();
             if (nowExpanded) {
                 bankContainer.classList.remove('collapsed');
@@ -1453,10 +1079,10 @@ function updateErrorsList() {
         errorItem.appendChild(type);
         errorItem.appendChild(correctAnswer);
         errorItem.appendChild(yourAnswer);
-        if ((question.correctStreak || 0) > 0 && masteryThreshold > 0) {
+        if ((question.correctStreak || 0) > 0 && state.masteryThreshold > 0) {
             const mastery = document.createElement('p');
             mastery.className = 'mastery-note';
-            mastery.textContent = `已连对 ${question.correctStreak} 次，再答对 ${masteryThreshold - question.correctStreak} 次自动移出错题本`;
+            mastery.textContent = `已连对 ${question.correctStreak} 次，再答对 ${state.masteryThreshold - question.correctStreak} 次自动移出错题本`;
             errorItem.appendChild(mastery);
         }
         errorItem.appendChild(analysis);
@@ -1473,19 +1099,19 @@ function updateErrorsList() {
 
 // 根据当前展开/折叠状态更新"全部展开/全部折叠"按钮文案（展示将要执行的动作）
 function updateToggleAllBanksLabel(bankNameList) {
-    const names = bankNameList || new Set(errorQuestions.map(q => q.bankName || '未知题库'));
+    const names = bankNameList || new Set(state.errorQuestions.map(q => q.bankName || '未知题库'));
     const list = Array.isArray(names) ? names : [...names];
     if (list.length === 0) return;
-    const anyExpanded = list.some(name => !!expandedBanks[name]);
+    const anyExpanded = list.some(name => !!state.expandedBanks[name]);
     toggleAllBanksBtn.textContent = anyExpanded ? '全部折叠' : '全部展开';
 }
 
 // 全部展开 / 全部折叠
 function toggleAllBanks() {
-    const bankNames = new Set(errorQuestions.map(q => q.bankName || '未知题库'));
-    const anyExpanded = [...bankNames].some(name => !!expandedBanks[name]);
+    const bankNames = new Set(state.errorQuestions.map(q => q.bankName || '未知题库'));
+    const anyExpanded = [...bankNames].some(name => !!state.expandedBanks[name]);
     // 有展开的组 → 全部折叠；全部已折叠 → 全部展开
-    bankNames.forEach(name => { expandedBanks[name] = !anyExpanded; });
+    bankNames.forEach(name => { state.expandedBanks[name] = !anyExpanded; });
     saveCollapsedBanks();
     updateErrorsList();
 }
@@ -1493,7 +1119,7 @@ function toggleAllBanks() {
 // 删除错题
 function deleteError(index) {
     if (confirm('确定要删除这道错题吗？')) {
-        errorQuestions.splice(index, 1);
+        state.errorQuestions.splice(index, 1);
         saveToLocalStorage();
         updateErrorsList();
     }
@@ -1502,7 +1128,7 @@ function deleteError(index) {
 // 清空错题本
 function clearErrors() {
     if (confirm('确定要清空所有错题吗？')) {
-        errorQuestions = [];
+        state.errorQuestions = [];
         saveToLocalStorage();
         updateErrorsList();
     }
@@ -1511,33 +1137,26 @@ function clearErrors() {
 // 复习错题
 // ==================== 题库编辑器 ====================
 
-// 加载错题移出规则设置
-function loadMasterySetting() {
-    const saved = parseInt(localStorage.getItem('masteryThresholdSetting'), 10);
-    masteryThreshold = [0, 1, 2, 3].includes(saved) ? saved : 2;
-    if (masteryThresholdSelect) masteryThresholdSelect.value = String(masteryThreshold);
-}
-
 // 打开题库编辑器
 function editBank(bankName) {
-    if (!questionBanks[bankName]) return;
-    editBankName = bankName;
-    editIndex = 0;
-    editorDirty = false;
+    if (!state.questionBanks[bankName]) return;
+    state.editBankName = bankName;
+    state.editIndex = 0;
+    state.editorDirty = false;
     editBankTitle.textContent = `编辑题库：${bankName}`;
     renderBankEditor();
     showModal(editBankModal);
 }
 
 function currentEditBank() {
-    return (editBankName && questionBanks[editBankName]) || [];
+    return (state.editBankName && state.questionBanks[state.editBankName]) || [];
 }
 
 // 未保存修改守卫：返回 true 表示可以继续（已放弃或无修改）
 function editorGuard() {
-    if (!editorDirty) return true;
+    if (!state.editorDirty) return true;
     if (confirm('当前题目的修改尚未保存，确定放弃吗？')) {
-        editorDirty = false;
+        state.editorDirty = false;
         return true;
     }
     return false;
@@ -1551,17 +1170,17 @@ function renderBankEditor() {
     questions.forEach((q, idx) => {
         const item = document.createElement('button');
         item.type = 'button';
-        item.className = 'editor-list-item' + (idx === editIndex ? ' selected' : '');
+        item.className = 'editor-list-item' + (idx === state.editIndex ? ' selected' : '');
         item.textContent = `${idx + 1}. ${(q.content || '（无题干）').slice(0, 22)}`;
         item.addEventListener('click', () => {
             if (!editorGuard()) return;
-            editIndex = idx;
+            state.editIndex = idx;
             renderBankEditor();
         });
         editorQuestionList.appendChild(item);
     });
 
-    if (questions.length === 0 || !questions[editIndex]) {
+    if (questions.length === 0 || !questions[state.editIndex]) {
         editorForm.classList.add('hidden');
         editorEmpty.classList.remove('hidden');
         editorPosition.textContent = '';
@@ -1574,7 +1193,7 @@ function renderBankEditor() {
 
 // 渲染当前题表单
 function editorRenderForm() {
-    const q = currentEditBank()[editIndex];
+    const q = currentEditBank()[state.editIndex];
     if (!q) return;
 
     editorStem.value = q.content || '';
@@ -1583,19 +1202,19 @@ function editorRenderForm() {
     editorExplanation.value = q.explanation || '';
     editorAnalysis.value = q.analysis || '';
     editorRenderOptions();
-    editorPosition.textContent = `第 ${editIndex + 1} / ${currentEditBank().length} 题`;
-    editorDirty = false;
+    editorPosition.textContent = `第 ${state.editIndex + 1} / ${currentEditBank().length} 题`;
+    state.editorDirty = false;
 
     // 列表选中态
     Array.from(editorQuestionList.children).forEach((el, idx) => {
-        if (idx === editIndex) el.classList.add('selected');
+        if (idx === state.editIndex) el.classList.add('selected');
         else el.classList.remove('selected');
     });
 }
 
 // 渲染选项编辑行（判断题固定 A正确/B错误）
 function editorRenderOptions() {
-    const q = currentEditBank()[editIndex];
+    const q = currentEditBank()[state.editIndex];
     if (!q) return;
 
     editorOptions.innerHTML = '';
@@ -1634,7 +1253,7 @@ function editorRenderOptions() {
         input.className = 'editor-option-input';
         input.dataset.letter = letter;
         input.value = source[letter] || '';
-        input.addEventListener('input', () => { editorDirty = true; });
+        input.addEventListener('input', () => { state.editorDirty = true; });
         row.appendChild(label);
         row.appendChild(input);
         editorOptions.appendChild(row);
@@ -1653,7 +1272,7 @@ function editorCollectOptions() {
 // 增删末尾选项
 function editorMutateOptions(delta) {
     if (editorType.value === '判断') return;
-    const q = currentEditBank()[editIndex];
+    const q = currentEditBank()[state.editIndex];
     if (!q) return;
     const opts = editorCollectOptions();
     const letters = Object.keys(opts).sort();
@@ -1674,14 +1293,14 @@ function editorMutateOptions(delta) {
             .split('').filter(l => opts[l]).join('');
     }
     q.options = opts;
-    editorDirty = true;
+    state.editorDirty = true;
     editorRenderOptions();
 }
 
 // 保存当前题（silent=true 时不弹提示），返回是否成功
 function editorSaveCurrent(silent) {
     const questions = currentEditBank();
-    const q = questions[editIndex];
+    const q = questions[state.editIndex];
     if (!q) return false;
 
     const stem = editorStem.value.trim();
@@ -1720,7 +1339,7 @@ function editorSaveCurrent(silent) {
     q.analysis = editorAnalysis.value.trim();
 
     saveToLocalStorage();
-    editorDirty = false;
+    state.editorDirty = false;
     renderBankEditor();
     if (!silent) alert('本题已保存');
     return true;
@@ -1734,9 +1353,9 @@ function editorAddQuestion() {
         content: '', type: '单选', options: { A: '', B: '', C: '', D: '' }, answer: '',
         explanation: '', analysis: '', optionExplanations: {}, confidence: 1, raw: ''
     });
-    editIndex = questions.length - 1;
+    state.editIndex = questions.length - 1;
     renderBankEditor();
-    editorDirty = true;
+    state.editorDirty = true;
     editorStem.focus();
 }
 
@@ -1744,12 +1363,12 @@ function editorAddQuestion() {
 function editorDeleteCurrent() {
     const questions = currentEditBank();
     if (questions.length === 0) return;
-    if (editorDirty && !confirm('当前题目的修改尚未保存，确定放弃并删除吗？')) return;
-    if (!confirm(`确定删除第 ${editIndex + 1} 题吗？此操作不可恢复！`)) return;
-    questions.splice(editIndex, 1);
+    if (state.editorDirty && !confirm('当前题目的修改尚未保存，确定放弃并删除吗？')) return;
+    if (!confirm(`确定删除第 ${state.editIndex + 1} 题吗？此操作不可恢复！`)) return;
+    questions.splice(state.editIndex, 1);
     saveToLocalStorage();
-    editorDirty = false;
-    if (editIndex >= questions.length) editIndex = Math.max(0, questions.length - 1);
+    state.editorDirty = false;
+    if (state.editIndex >= questions.length) state.editIndex = Math.max(0, questions.length - 1);
     renderBankEditor();
     updateBanksList();
     updateBankSelect();
@@ -1758,10 +1377,10 @@ function editorDeleteCurrent() {
 // 编辑器内切换题目
 function editorNavigate(delta) {
     const questions = currentEditBank();
-    const target = editIndex + delta;
+    const target = state.editIndex + delta;
     if (target < 0 || target >= questions.length) return;
     if (!editorGuard()) return;
-    editIndex = target;
+    state.editIndex = target;
     renderBankEditor();
 }
 
@@ -1771,30 +1390,30 @@ function editorClose() {
     const questions = currentEditBank();
     const kept = questions.filter(q => (q.content || '').trim() || (q.answer || '').trim());
     if (kept.length !== questions.length) {
-        questionBanks[editBankName] = kept;
-        if (currentBankName === editBankName) questionBank = kept;
+        state.questionBanks[state.editBankName] = kept;
+        if (state.currentBankName === state.editBankName) state.questionBank = kept;
         saveToLocalStorage();
         refreshQuestionBankView();
     }
-    editBankName = null;
-    editIndex = 0;
-    editorDirty = false;
+    state.editBankName = null;
+    state.editIndex = 0;
+    state.editorDirty = false;
     hideModal(editBankModal);
     updateBanksList();
 }
 
 // 复习错题：先选择范围（按题库/题型），再进入复习
 function reviewErrors() {
-    if (errorQuestions.length === 0) {
+    if (state.errorQuestions.length === 0) {
         alert('错题本中没有题目');
         return;
     }
 
     // 填充题库勾选（默认全选，带题数）
     scopeBanks.innerHTML = '';
-    const bankNames = [...new Set(errorQuestions.map(q => q.bankName || '未知题库'))];
+    const bankNames = [...new Set(state.errorQuestions.map(q => q.bankName || '未知题库'))];
     bankNames.forEach(name => {
-        const count = errorQuestions.filter(q => (q.bankName || '未知题库') === name).length;
+        const count = state.errorQuestions.filter(q => (q.bankName || '未知题库') === name).length;
         const label = document.createElement('label');
         label.className = 'inline-label';
         const cb = document.createElement('input');
@@ -1825,7 +1444,7 @@ function getScopeSelection() {
 // 刷新范围选择摘要
 function updateScopeSummary() {
     const { banks, types } = getScopeSelection();
-    const count = errorQuestions.filter(
+    const count = state.errorQuestions.filter(
         q => banks.has(q.bankName || '未知题库') && types.has(q.type)
     ).length;
     scopeSummary.textContent = `已选中 ${count} 题`;
@@ -1833,13 +1452,13 @@ function updateScopeSummary() {
 
 // 开始一场复习会话
 function startReviewSession(questions) {
-    currentQuiz = [...questions];
-    currentQuestionIndex = 0;
-    correctCount = 0;
-    wrongCount = 0;
-    userAnswers = new Array(currentQuiz.length).fill('');
-    masteryRemovedInSession = 0;
-    quizMode = 'immediate';
+    state.currentQuiz = [...questions];
+    state.currentQuestionIndex = 0;
+    state.correctCount = 0;
+    state.wrongCount = 0;
+    state.userAnswers = new Array(state.currentQuiz.length).fill('');
+    state.masteryRemovedInSession = 0;
+    state.quizMode = 'immediate';
     endQuizBtn.textContent = '结束刷题';
 
     showSection('quiz'); // 切换到刷题页面
@@ -1850,35 +1469,13 @@ function startReviewSession(questions) {
     displayQuestion();
 }
 
-// 规范化选项答案：统一大写、只保留选项字母、去重并排序（用于判分比较，
-// 避免"CA"vs"AC"、"A、B"vs"AB"这类写法差异导致误判）
-function normalizeAnswerString(answer) {
-    return (answer || '')
-        .toUpperCase()
-        .replace(/[^A-H]/g, '')
-        .split('')
-        .filter((ch, idx, arr) => arr.indexOf(ch) === idx)
-        .sort()
-        .join('');
-}
-
 // 重建当前题目视图：在"全部题库"合并视图下题库发生增删改后调用
 function refreshQuestionBankView() {
-    if (!isAllBanksView) return;
-    questionBank = [];
-    Object.values(questionBanks).forEach(bank => {
-        questionBank = [...questionBank, ...bank];
+    if (!state.isAllBanksView) return;
+    state.questionBank = [];
+    Object.values(state.questionBanks).forEach(bank => {
+        state.questionBank = [...state.questionBank, ...bank];
     });
-}
-
-// 打乱数组
-function shuffleArray(array) {
-    const newArray = [...array];
-    for (let i = newArray.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-    }
-    return newArray;
 }
 
 // 显示刷题状态
@@ -1960,24 +1557,24 @@ function parsePastedText() {
 
 // 打开预览：questions 为解析结果数组
 function openImportPreview(questions) {
-    previewData = questions.map(q => ({ q, include: true, warnings: [] }));
+    state.previewData = questions.map(q => ({ q, include: true, warnings: [] }));
     renderPreview();
     showModal(importPreviewModal);
 }
 
 function updatePreviewTargetBanks() {
     previewTargetBankSelect.innerHTML = '';
-    Object.keys(questionBanks).forEach(name => {
+    Object.keys(state.questionBanks).forEach(name => {
         const opt = document.createElement('option');
         opt.value = name;
-        opt.textContent = `${name}（${(questionBanks[name] || []).length} 题）`;
+        opt.textContent = `${name}（${(state.questionBanks[name] || []).length} 题）`;
         previewTargetBankSelect.appendChild(opt);
     });
     const newOpt = document.createElement('option');
     newOpt.value = '__new__';
     newOpt.textContent = '＋ 新建题库…';
     previewTargetBankSelect.appendChild(newOpt);
-    if (Object.keys(questionBanks).length === 0) {
+    if (Object.keys(state.questionBanks).length === 0) {
         previewTargetBankSelect.value = '__new__';
     }
 }
@@ -1985,10 +1582,10 @@ function updatePreviewTargetBanks() {
 function renderPreview() {
     previewList.innerHTML = '';
     const bankKeys = new Set();
-    Object.values(questionBanks).forEach(bank => (bank || []).forEach(q => bankKeys.add(questionDedupKey(q))));
+    Object.values(state.questionBanks).forEach(bank => (bank || []).forEach(q => bankKeys.add(questionDedupKey(q))));
 
     let warnCount = 0;
-    previewData.forEach((item, idx) => {
+    state.previewData.forEach((item, idx) => {
         const q = item.q;
         const warnings = [];
         if (!q.answer) warnings.push('缺答案');
@@ -2078,16 +1675,16 @@ function renderPreview() {
 }
 
 function updatePreviewSummary(warnCount) {
-    const total = previewData.length;
-    const included = previewData.filter(i => i.include).length;
+    const total = state.previewData.length;
+    const included = state.previewData.filter(i => i.include).length;
     const warns = (typeof warnCount === 'number')
         ? warnCount
-        : previewData.filter(i => i.warnings && i.warnings.length).length;
+        : state.previewData.filter(i => i.warnings && i.warnings.length).length;
     previewSummary.textContent = `共解析 ${total} 题，已勾选 ${included} 题，${warns} 题含警告需要留意`;
 }
 
 function togglePreviewSelectAll() {
-    previewData.forEach(i => { i.include = previewSelectAll.checked; });
+    state.previewData.forEach(i => { i.include = previewSelectAll.checked; });
     renderPreview();
 }
 
@@ -2099,10 +1696,10 @@ function commitPreviewImport() {
         if (!name) return;
         targetName = name;
     }
-    if (!questionBanks[targetName]) questionBanks[targetName] = [];
+    if (!state.questionBanks[targetName]) state.questionBanks[targetName] = [];
 
     const overwrite = previewOverwrite.checked;
-    if (overwrite && questionBanks[targetName].length > 0 &&
+    if (overwrite && state.questionBanks[targetName].length > 0 &&
         !confirm(`确定清空题库"${targetName}"并导入新题目吗？此操作不可恢复！`)) {
         return;
     }
@@ -2111,7 +1708,7 @@ function commitPreviewImport() {
     const items = [];
     const seen = new Set();
     let droppedNoAnswer = 0;
-    for (const item of previewData) {
+    for (const item of state.previewData) {
         if (!item.include) continue;
         const clone = JSON.parse(JSON.stringify(item.q));
         const finalized = finalizeQuestion(clone);
@@ -2124,7 +1721,7 @@ function commitPreviewImport() {
     }
 
     // 与目标题库查重
-    const existingKeys = new Set((overwrite ? [] : questionBanks[targetName]).map(questionDedupKey));
+    const existingKeys = new Set((overwrite ? [] : state.questionBanks[targetName]).map(questionDedupKey));
     const finalItems = previewSkipDupes.checked
         ? items.filter(q => !existingKeys.has(questionDedupKey(q)))
         : items;
@@ -2137,15 +1734,15 @@ function commitPreviewImport() {
     }
 
     if (overwrite) {
-        questionBanks[targetName] = finalItems;
+        state.questionBanks[targetName] = finalItems;
     } else {
-        questionBanks[targetName].push(...finalItems);
+        state.questionBanks[targetName].push(...finalItems);
     }
 
     // 切换到目标题库
-    isAllBanksView = false;
-    currentBankName = targetName;
-    questionBank = questionBanks[targetName];
+    state.isAllBanksView = false;
+    state.currentBankName = targetName;
+    state.questionBank = state.questionBanks[targetName];
 
     saveToLocalStorage();
     updateBankSelect();
@@ -2165,7 +1762,7 @@ function commitPreviewImport() {
 
 // 更新题库列表
 function updateBanksList() {
-    const bankNames = Object.keys(questionBanks);
+    const bankNames = Object.keys(state.questionBanks);
 
     if (bankNames.length === 0) {
         banksList.innerHTML = '<p class="empty-message">暂无题库</p>';
@@ -2185,7 +1782,7 @@ function updateBanksList() {
         bankTitle.textContent = bankName;
 
         const bankCount = document.createElement('p');
-        const questions = questionBanks[bankName] || [];
+        const questions = state.questionBanks[bankName] || [];
         bankCount.textContent = `题目数量：${questions.length}`;
 
         const bankActions = document.createElement('div');
@@ -2245,7 +1842,7 @@ function hideModal(modal) {
         newBankNameInput.value = '';
     } else if (modal === renameBankModal) {
         renameBankNameInput.value = '';
-        currentRenameBank = null;
+        state.currentRenameBank = null;
     }
 }
 
@@ -2258,15 +1855,15 @@ function createNewBank() {
         return;
     }
 
-    if (questionBanks[bankName]) {
+    if (state.questionBanks[bankName]) {
         alert('该题库已存在');
         return;
     }
 
-    questionBanks[bankName] = [];
-    currentBankName = bankName;
-    questionBank = questionBanks[bankName];
-    isAllBanksView = false;
+    state.questionBanks[bankName] = [];
+    state.currentBankName = bankName;
+    state.questionBank = state.questionBanks[bankName];
+    state.isAllBanksView = false;
 
     saveToLocalStorage();
     updateBankSelect();
@@ -2279,7 +1876,7 @@ function createNewBank() {
 
 // 显示重命名模态框
 function showRenameModal(bankName) {
-    currentRenameBank = bankName;
+    state.currentRenameBank = bankName;
     renameBankNameInput.value = bankName;
     showModal(renameBankModal);
 }
@@ -2293,22 +1890,22 @@ function renameBank() {
         return;
     }
 
-    if (newName === currentRenameBank) {
+    if (newName === state.currentRenameBank) {
         hideModal(renameBankModal);
         return;
     }
 
-    if (questionBanks[newName]) {
+    if (state.questionBanks[newName]) {
         alert('该题库名称已存在');
         return;
     }
 
-    questionBanks[newName] = questionBanks[currentRenameBank];
-    delete questionBanks[currentRenameBank];
+    state.questionBanks[newName] = state.questionBanks[state.currentRenameBank];
+    delete state.questionBanks[state.currentRenameBank];
 
-    if (currentBankName === currentRenameBank) {
-        currentBankName = newName;
-        questionBank = questionBanks[currentBankName];
+    if (state.currentBankName === state.currentRenameBank) {
+        state.currentBankName = newName;
+        state.questionBank = state.questionBanks[state.currentBankName];
     }
 
     saveToLocalStorage();
@@ -2326,19 +1923,19 @@ function deleteBank(bankName) {
         return;
     }
 
-    if (currentBankName === bankName) {
-        const bankNames = Object.keys(questionBanks).filter(name => name !== bankName);
+    if (state.currentBankName === bankName) {
+        const bankNames = Object.keys(state.questionBanks).filter(name => name !== bankName);
         if (bankNames.length > 0) {
-            currentBankName = bankNames[0];
-            questionBank = questionBanks[currentBankName];
+            state.currentBankName = bankNames[0];
+            state.questionBank = state.questionBanks[state.currentBankName];
         } else {
-            currentBankName = '默认题库';
-            questionBank = [];
-            questionBanks[currentBankName] = questionBank;
+            state.currentBankName = '默认题库';
+            state.questionBank = [];
+            state.questionBanks[state.currentBankName] = state.questionBank;
         }
     }
 
-    delete questionBanks[bankName];
+    delete state.questionBanks[bankName];
 
     saveToLocalStorage();
     refreshQuestionBankView();
@@ -2350,7 +1947,7 @@ function deleteBank(bankName) {
 
 // 题库一键去重：按"题干+选项"指纹清理重复题（保留最早导入的版本）
 function dedupBank(bankName) {
-    const questions = questionBanks[bankName] || [];
+    const questions = state.questionBanks[bankName] || [];
     const seen = new Set();
     const kept = [];
     questions.forEach(q => {
@@ -2367,9 +1964,9 @@ function dedupBank(bankName) {
     if (!confirm(`发现 ${removed} 道重复题目（按题干+选项判断，保留最早导入的版本），确定清理吗？`)) {
         return;
     }
-    questionBanks[bankName] = kept;
-    if (currentBankName === bankName) {
-        questionBank = kept;
+    state.questionBanks[bankName] = kept;
+    if (state.currentBankName === bankName) {
+        state.questionBank = kept;
     }
     saveToLocalStorage();
     refreshQuestionBankView();
@@ -2380,7 +1977,7 @@ function dedupBank(bankName) {
 
 // 导出单个题库
 function exportBank(bankName) {
-    const questions = questionBanks[bankName];
+    const questions = state.questionBanks[bankName];
     if (!questions || questions.length === 0) {
         alert('该题库为空，无法导出');
         return;
@@ -2392,7 +1989,7 @@ function exportBank(bankName) {
 
 // 导出所有题库
 function exportAllBanks() {
-    const bankNames = Object.keys(questionBanks);
+    const bankNames = Object.keys(state.questionBanks);
     if (bankNames.length === 0) {
         alert('暂无题库可导出');
         return;
@@ -2400,7 +1997,7 @@ function exportAllBanks() {
 
     let allContent = '';
     bankNames.forEach(bankName => {
-        const questions = questionBanks[bankName];
+        const questions = state.questionBanks[bankName];
         if (questions && questions.length > 0) {
             allContent += `# 题库：${bankName}\n\n`;
             allContent += formatQuestionsForExport(questions);
@@ -2414,31 +2011,6 @@ function exportAllBanks() {
     }
 
     downloadFile('所有题库.txt', allContent);
-}
-
-// 格式化题目用于导出
-function formatQuestionsForExport(questions) {
-    return questions.map(q => {
-        let text = '';
-        if (q.title) text += `# ${q.title}\n`;
-        text += `题目：${q.content}\n`;
-
-        Object.keys(q.options || {}).sort().forEach(key => {
-            text += `${key}：${q.options[key]}\n`;
-        });
-
-        text += `答案：${q.answer}\n`;
-
-        if (q.explanation) text += `题目解释：${q.explanation}\n`;
-        if (q.analysis) text += `解析：${q.analysis}\n`;
-        if (q.type) text += `类型：${q.type}\n`;
-
-        Object.keys(q.optionExplanations || {}).sort().forEach(key => {
-            text += `${key}解释：${q.optionExplanations[key]}\n`;
-        });
-
-        return text;
-    }).join('\n');
 }
 
 // 下载文件
@@ -2456,3 +2028,190 @@ function downloadFile(filename, content) {
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', init);
+
+// ==================== 测试钩子(仅 Node vm 测试环境挂载) ====================
+// 浏览器中 window 存在,本代码不执行,不污染任何全局。
+if (typeof window === 'undefined') {
+    globalThis.__zquiz = {
+        state,
+        addToErrorBook,
+        backToQuizOptions,
+        clearErrors,
+        collectUserAnswer,
+        commitPreviewImport,
+        createNewBank,
+        currentEditBank,
+        dedupBank,
+        deleteBank,
+        deleteError,
+        displayQuestion,
+        downloadFile,
+        editBank,
+        editorAddQuestion,
+        editorClose,
+        editorCollectOptions,
+        editorDeleteCurrent,
+        editorGuard,
+        editorMutateOptions,
+        editorNavigate,
+        editorRenderForm,
+        editorRenderOptions,
+        editorSaveCurrent,
+        endQuiz,
+        exportAllBanks,
+        exportBank,
+        finalizeQuestion,
+        finishExam,
+        formatQuestionsForExport,
+        getScopeSelection,
+        handleFileSelect,
+        handlePasteEvent,
+        hideModal,
+        htmlToLines,
+        importQuestions,
+        init,
+        loadCollapsedBanks,
+        loadFromLocalStorage,
+        loadMasterySetting,
+        nextQuestion,
+        normalizeAnswerString,
+        openImportPreview,
+        parsePastedText,
+        parseQuestionsText,
+        prevQuestion,
+        questionDedupKey,
+        refreshQuestionBankView,
+        renameBank,
+        renderAnswerReview,
+        renderBankEditor,
+        renderPreview,
+        reviewErrors,
+        reviewFavorites,
+        saveCollapsedBanks,
+        saveToLocalStorage,
+        setupEventListeners,
+        showImportStatus,
+        showModal,
+        showQuizResult,
+        showQuizStatus,
+        showRenameModal,
+        showSection,
+        shuffleArray,
+        startQuiz,
+        startReviewSession,
+        submitAnswer,
+        toggleAllBanks,
+        toggleFavorite,
+        toggleFavoriteCurrent,
+        togglePreviewSelectAll,
+        updateBankSelect,
+        updateBanksList,
+        updateErrorStreak,
+        updateErrorsList,
+        updateFavoriteButton,
+        updateFavoritesList,
+        updatePreviewSummary,
+        updatePreviewTargetBanks,
+        updateScopeSummary,
+        updateToggleAllBanksLabel,
+            accuracy,
+        answerExplanation,
+        answerFeedback,
+        answerResult,
+        answerReview,
+        backToOptionsBtn,
+        banksList,
+        btnErrors,
+        btnFavorites,
+        btnHome,
+        btnManage,
+        btnQuiz,
+        cancelCreateBankBtn,
+        cancelRenameBankBtn,
+        cancelReviewScopeBtn,
+        clearErrorsBtn,
+        confirmCreateBankBtn,
+        confirmRenameBankBtn,
+        confirmReviewScopeBtn,
+        correctAnswers,
+        createBankBtn,
+        createBankModal,
+        editBankModal,
+        editBankTitle,
+        editorAddBtn,
+        editorAddOption,
+        editorAnalysis,
+        editorAnswer,
+        editorCloseBtn,
+        editorDeleteBtn,
+        editorEmpty,
+        editorExplanation,
+        editorForm,
+        editorNextBtn,
+        editorOptions,
+        editorPosition,
+        editorPrevBtn,
+        editorQuestionList,
+        editorRemoveOption,
+        editorSaveBtn,
+        editorStem,
+        editorType,
+        endQuizBtn,
+        errorsList,
+        errorsSection,
+        exportAllBtn,
+        exportCurrentBtn,
+        favoriteBtn,
+        favoritesList,
+        fileInput,
+        fileName,
+        heroImportBtn,
+        heroStartBtn,
+        homeSection,
+        importBtn,
+        importPreviewModal,
+        importStatus,
+        manageSection,
+        masteryNote,
+        masteryThresholdSelect,
+        newBankNameInput,
+        nextQuestionBtn,
+        pasteClearBtn,
+        pasteInput,
+        pasteParseBtn,
+        prevQuestionBtn,
+        previewCancelBtn,
+        previewConfirmBtn,
+        previewList,
+        previewOverwrite,
+        previewSelectAll,
+        previewSkipDupes,
+        previewSummary,
+        previewTargetBankSelect,
+        questionBankSelect,
+        questionExplanation,
+        questionNumber,
+        questionText,
+        questionType,
+        quizContainer,
+        quizResult,
+        quizSection,
+        quizSettings,
+        quizStatus,
+        renameBankModal,
+        renameBankNameInput,
+        reviewErrorsBtn,
+        reviewFavoritesBtn,
+        reviewOnlyWrong,
+        reviewScopeModal,
+        scopeBanks,
+        scopeSummary,
+        startQuizBtn,
+        submitAnswerBtn,
+        toggleAllBanksBtn,
+        totalQuestions,
+        unansweredCountEl,
+        uploadBtn,
+        wrongAnswers,
+};
+}
