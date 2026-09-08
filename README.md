@@ -21,7 +21,7 @@
 
 ## 快速上手
 
-1. 打开在线地址（或下载本仓库后直接用浏览器打开 `index.html`）
+1. 打开在线地址；本地运行请先起一个静态服务（如 `python3 -m http.server`）再访问（ES Module 不支持 file:// 直开）
 2. 进入「题库管理」，把题目粘贴到"粘贴导入"框 → 点击"解析并预览" → 检查无误后选择题库导入
 3. 进入「开始刷题」，选择作答方式（逐题 / 套题）和题型，开始刷题
 4. 做错或没答的题自动进入「错题本」，考前来一轮错题回顾
@@ -96,10 +96,24 @@ D解释：矛盾存在于一切事物中，贯穿事物发展全过程。
 
 ## 文件说明
 
-- `index.html`: 主页面（含首页介绍、刷题、错题本、题库管理）
-- `styles.css`: 样式
-- `app.js`: 全部逻辑（多格式解析器 / 导入预览 / 逐题与套题刷题 / 错题本 / 题库管理）
-- `README.md`: 使用说明
+```
+index.html            主页面（首页介绍 / 刷题 / 错题本 / 收藏夹 / 题库管理）
+styles.css            样式
+src/
+  main.js             应用装配入口：事件绑定 + 页面调度
+  state.js            共享状态（全站唯一可变数据容器）
+  parser.js           纯函数解析核心（多格式解析 / 答案规范化 / 判分指纹）
+  storage.js          存储层（唯一触碰 localStorage 的模块，含损坏降级）
+  quiz.js             刷题（逐题 / 套题 / 判分 / 逐题回顾 / 复习范围）
+  errorbook.js        错题闭环与错题本渲染
+  favorites.js        收藏夹
+  bank.js             题库管理 / 导入预览 / 题库编辑器 / 导出
+  dom.js              通用 DOM 工具（模态框开关 / 文件下载）
+tests/                Node 内置 test runner 的回归套件（62 组断言）
+.github/workflows/    CI：push/PR 自动回归
+```
+
+模块依赖方向：`main → 业务模块 → parser/storage/state`，`parser/state` 零依赖，禁止反向引用。
 
 ## 数据与隐私
 
@@ -109,9 +123,10 @@ D解释：矛盾存在于一切事物中，贯穿事物发展全过程。
 
 ## 技术栈
 
-- HTML5 / CSS3 / 原生 JavaScript (ES6+)，零依赖、零构建
-- LocalStorage API
-- GitHub Pages 托管
+- HTML5 / CSS3 / 原生 JavaScript (ES6+)，运行时零依赖、零构建
+- ES Modules 多模块架构（纯核 parser + 存储层 + 业务模块）
+- Node 内置 test runner + GitHub Actions CI
+- LocalStorage API；GitHub Pages 托管
 
 ## 版本规则
 
@@ -123,6 +138,7 @@ D解释：矛盾存在于一切事物中，贯穿事物发展全过程。
 
 ## 更新记录
 
+- **0.7.0** — 单文件重构为 ES Modules 多模块（parser/state/storage/quiz/errorbook/favorites/bank/dom/main）；测试入仓并接入 GitHub Actions；应用更名 Zquiz
 - **0.6.1** — 修复复习范围弹窗被隐藏 section 连带隐藏的问题；所有模态框移出 section
 - **0.6.0** — 错题移出规则可配置（含关闭）、复习错题可选范围（题库×题型）、题库可视化编辑器
 - **0.5.0** — 错题本闭环（连对 2 次自动移出）、收藏夹、去重指纹升级（题干+选项）+ 题库一键去重

@@ -21,6 +21,18 @@ export function makeEl() {
     };
 }
 
+// 扫描 src/*.js 收集所有 DOM 常量(名字 → 元素 id),供注入 __zquiz 供测试驱动
+function collectDomPairs() {
+    const pairs = [];
+    for (const f of ['state.js', 'parser.js', 'storage.js', 'main.js', 'dom.js', 'errorbook.js', 'favorites.js', 'quiz.js', 'bank.js']) {
+        const srcText = readFileSync(path.join(SRC, f), 'utf8');
+        for (const m of srcText.matchAll(/const (\w+) = document\.getElementById\('([\w-]+)'\)/g)) {
+            pairs.push([m[1], m[2]]);
+        }
+    }
+    return pairs;
+}
+
 export async function loadApp({ confirmResult = true, promptValue = 'x' } = {}) {
     const alerts = [];
     const elements = {};
@@ -63,6 +75,14 @@ export async function loadApp({ confirmResult = true, promptValue = 'x' } = {}) 
         return mod;
     }
     await loadModule('main.js');
+
+    // 把模块内部的 DOM 常量对象挂到 __zquiz(与模块共享同一实例,测试可直接驱动)
+    const domConsts = {};
+    for (const [name, id] of collectDomPairs()) {
+        if (elements[id]) domConsts[name] = elements[id];
+    }
+    sandbox.__inject = domConsts;
+    vm.runInContext('Object.assign(globalThis.__zquiz, __inject)', context);
 
     // with(state) 让测试表达式继续用迁移前的裸状态名;with(__zquiz) 提供内部函数。
     // 表达式模式失败(含 let/const 的多语句)时回退到语句模式。

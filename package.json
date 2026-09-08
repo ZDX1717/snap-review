@@ -5,6 +5,6 @@
   "description": "Zquiz · 期末周刷题 — 纯前端刷题工具",
   "type": "module",
   "scripts": {
-    "test": "node --experimental-vm-modules --test tests/"
+    "test": "node --experimental-vm-modules --test"
   }
 }

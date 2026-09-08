@@ -3,8 +3,8 @@
 
 import { state } from './state.js';
 
-export // 从本地存储加载数据
-function loadFromLocalStorage() {
+// 从本地存储加载数据
+export function loadFromLocalStorage() {
     // 容错：存储数据损坏时重置对应部分，而不是让整个应用崩溃
     try {
         const savedBanks = localStorage.getItem('questionBanks');
@@ -67,8 +67,8 @@ function loadFromLocalStorage() {
     }
 }
 
-export // 保存数据到本地存储
-function saveToLocalStorage() {
+// 保存数据到本地存储
+export function saveToLocalStorage() {
     // 仅在选定具体题库时回写当前题库，
     // 避免"全部题库"合并视图把合并结果覆盖写进某个真实题库（数据污染）
     if (!state.isAllBanksView) {
@@ -99,8 +99,8 @@ export function saveCollapsedBanks() {
     } catch (e) { /* 存储异常时静默降级：展开状态不持久化 */ }
 }
 
-export // 加载错题移出规则设置
-function loadMasterySetting() {
+// 加载错题移出规则设置
+export function loadMasterySetting() {
     const saved = parseInt(localStorage.getItem('masteryThresholdSetting'), 10);
     state.masteryThreshold = [0, 1, 2, 3].includes(saved) ? saved : 2;
     return state.masteryThreshold;

@@ -31,13 +31,13 @@ export const JUDGE_TRUE_RE = /^(对|正确|√|T|Y)$/i;
 export const JUDGE_FALSE_RE = /^(错|错误|×|X|F|N)$/i;
 
 
-export // 整行答案（必须带冒号，避免把普通句子误判成答案行）
+// 整行答案（必须带冒号，避免把普通句子误判成答案行）
 // 空格分隔的纯答案行，如"答案 A" / "参考答案 B"
 // 行尾行内答案（家族C），要求"答案"前是行首、空白或中文标点，避免误伤选项文字
 // 分组1=前导字符(裁剪时保留),分组2=答案内容（支持多字母，如"答案：AB"）
 // 拆分行内选项（家族C）："题干 A.xx B.yy C.zz" → { stem, options }
 // 要求至少两个选项且从 A 开始连续编号，避免把题干中"A、B两类"这类文字误拆
-function splitInlineOptions(text) {
+export function splitInlineOptions(text) {
     // 分组1=前导字符(题干裁剪时保留),分组2=选项字母
     const re = /(^|[\s(（,，;；。？！：、…""''「」『』（）【】《》<>])\s*([A-Ha-h])\s*[.、:：．)）]\s*/g;
     const markers = [];
@@ -62,8 +62,8 @@ function splitInlineOptions(text) {
     return { stem, options };
 }
 
-export // 题型/答案/选项的最终规范化（导入与预览提交时都会调用，幂等）
-function finalizeQuestion(q) {
+// 题型/答案/选项的最终规范化（导入与预览提交时都会调用，幂等）
+export function finalizeQuestion(q) {
     q.title = (q.title || '').trim();
     q.content = (q.content || '').trim();
     q.analysis = (q.analysis || '').trim();
@@ -103,9 +103,9 @@ function finalizeQuestion(q) {
     return q;
 }
 
-export // 查重指纹：题干（去空白）+ 全部选项文本。同一题重新导入（即使改了答案）会被识别为重复；
+// 查重指纹：题干（去空白）+ 全部选项文本。同一题重新导入（即使改了答案）会被识别为重复；
 // 题干相同但选项不同的题（如"下列说法正确的是()"）不会被误判
-function questionDedupKey(q) {
+export function questionDedupKey(q) {
     const stem = (q.content || '').replace(/\s+/g, '');
     const opts = Object.keys(q.options || {}).sort()
         .map(k => k + ':' + (q.options[k] || '').replace(/\s+/g, ''))
@@ -113,8 +113,8 @@ function questionDedupKey(q) {
     return stem + '|' + opts;
 }
 
-export // 主解析器：逐行状态机，同时覆盖家族 A/B/C/D
-function parseQuestionsText(content) {
+// 主解析器：逐行状态机，同时覆盖家族 A/B/C/D
+export function parseQuestionsText(content) {
     const questions = [];
     const lines = String(content).replace(/\r\n?/g, '\n').split('\n');
     let cur = null;
@@ -282,9 +282,9 @@ function parseQuestionsText(content) {
     return questions;
 }
 
-export // 规范化选项答案：统一大写、只保留选项字母、去重并排序（用于判分比较，
+// 规范化选项答案：统一大写、只保留选项字母、去重并排序（用于判分比较，
 // 避免"CA"vs"AC"、"A、B"vs"AB"这类写法差异导致误判）
-function normalizeAnswerString(answer) {
+export function normalizeAnswerString(answer) {
     return (answer || '')
         .toUpperCase()
         .replace(/[^A-H]/g, '')
@@ -294,8 +294,8 @@ function normalizeAnswerString(answer) {
         .join('');
 }
 
-export // 打乱数组
-function shuffleArray(array) {
+// 打乱数组
+export function shuffleArray(array) {
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -304,8 +304,8 @@ function shuffleArray(array) {
     return newArray;
 }
 
-export // 格式化题目用于导出
-function formatQuestionsForExport(questions) {
+// 格式化题目用于导出
+export function formatQuestionsForExport(questions) {
     return questions.map(q => {
         let text = '';
         if (q.title) text += `# ${q.title}\n`;
