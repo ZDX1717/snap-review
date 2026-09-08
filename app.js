@@ -87,6 +87,10 @@ const unansweredCountEl = document.getElementById('unanswered-count');
 const answerReview = document.getElementById('answer-review');
 const reviewOnlyWrong = document.getElementById('review-only-wrong');
 
+// 首页快捷入口
+const heroStartBtn = document.getElementById('hero-start-btn');
+const heroImportBtn = document.getElementById('hero-import-btn');
+
 // 初始化
 function init() {
     // 加载本地存储的数据
@@ -234,6 +238,10 @@ function setupEventListeners() {
     // 套题模式翻页与答题回顾
     prevQuestionBtn.addEventListener('click', prevQuestion);
     reviewOnlyWrong.addEventListener('change', renderAnswerReview);
+
+    // 首页快捷入口
+    heroStartBtn.addEventListener('click', () => showSection('quiz'));
+    heroImportBtn.addEventListener('click', () => showSection('manage'));
 }
 
 // 显示指定部分

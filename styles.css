@@ -885,3 +885,64 @@ h3 {
     margin: 4px 0 0;
     line-height: 1.6;
 }
+
+/* ==================== 首页介绍 ==================== */
+
+.home-hero {
+    text-align: center;
+    padding: 26px 8px 8px;
+}
+
+.hero-sub {
+    color: #6c757d;
+    font-size: 15px;
+    max-width: 580px;
+    margin: 10px auto 18px;
+    line-height: 1.8;
+}
+
+.hero-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.feature-card {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 16px 18px;
+}
+
+.feature-card h3 {
+    font-size: 15px;
+    color: #343a40;
+    margin-bottom: 8px;
+}
+
+.feature-card p {
+    font-size: 13px;
+    color: #6c757d;
+    line-height: 1.75;
+}
+
+.quick-start ol {
+    padding-left: 20px;
+    margin-top: 6px;
+}
+
+.quick-start li {
+    margin-bottom: 8px;
+    color: #495057;
+    font-size: 14px;
+    line-height: 1.7;
+}
