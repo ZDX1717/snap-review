@@ -333,10 +333,8 @@ const FULL_ANSWER_RE = /^(?:【?参考答案】?|【?标准答案】?|【?正确
 // 空格分隔的纯答案行，如"答案 A" / "参考答案 B"
 const FULL_ANSWER_SPACED_RE = /^(?:【?参考答案】?|【?标准答案】?|【?正确答案】?|【?答案】?|答案)\s+((?:[A-Ha-h√×对错]+)(?:[\s、,，]+[A-Ha-h√×对错]+)*)\s*[。.]?$/;
 // 行尾行内答案（家族C），要求"答案"前是行首、空白或中文标点，避免误伤选项文字
-// 分组1=前导字符(裁剪时保留),分组2=答案内容
-const INLINE_ANSWER_RE = /(^|[\s(（,，;；。？！：、])(?:【?参考答案】?|【?标准答案】?|【?正确答案】?|【?答案】?|答案)\s*[:：]?\s*((?:正确|错误)|[A-Ha-h√×对错])\s*[。.]?\s*$/;
-
-const JUDGE_TRUE_RE = /^(对|正确|√|T|Y)$/i;
+// 分组1=前导字符(裁剪时保留),分组2=答案内容（支持多字母，如"答案：AB"）
+const INLINE_ANSWER_RE = /(^|[\s(（,，;；。？！：、])(?:【?参考答案】?|【?标准答案】?|【?正确答案】?|【?答案】?|答案)\s*[:：]?\s*((?:正确|错误)|[A-Ha-h√×对错](?:[\s、,，]*[A-Ha-h√×对错])*)\s*[。.]?\s*$/;const JUDGE_TRUE_RE = /^(对|正确|√|T|Y)$/i;
 const JUDGE_FALSE_RE = /^(错|错误|×|X|F|N)$/i;
 
 // 拆分行内选项（家族C）："题干 A.xx B.yy C.zz" → { stem, options }
@@ -539,7 +537,14 @@ function parseQuestionsText(content) {
         const opM = body.match(OPTION_LINE_RE);
         if (opM) {
             if (!cur) newQuestion();
-            cur.options[opM[1].toUpperCase()] = opM[2].trim();
+            // 选项行内还跟着更多选项时（如"A. 21 B.80 C.443 D.22"），按行内选项拆分
+            const lineSplit = splitInlineOptions(body);
+            if (lineSplit && Object.keys(lineSplit.options).length > 1) {
+                Object.assign(cur.options, lineSplit.options);
+                if (!cur.content && lineSplit.stem) cur.content = lineSplit.stem;
+            } else {
+                cur.options[opM[1].toUpperCase()] = opM[2].trim();
+            }
             if (inlineAnswer) cur.answer = inlineAnswer;
             cur.raw.push(rawLine);
             continue;
@@ -553,9 +558,16 @@ function parseQuestionsText(content) {
             continue;
         }
 
-        // 9. 其他 → 题干续行（多行题干）；没有当前题的散行丢弃
+        // 9. 其他 → 题干续行（多行题干）；续行里跟行内选项的也支持；没有当前题的散行丢弃
         if (cur) {
-            if (cur.content) {
+            const contSplit = splitInlineOptions(line);
+            if (contSplit && Object.keys(contSplit.options).length > 1) {
+                // 续行形如"其中正确的是 A. 21 B.80 C.443 D.22"
+                Object.assign(cur.options, contSplit.options);
+                if (contSplit.stem) {
+                    cur.content = cur.content ? cur.content + '\n' + contSplit.stem : contSplit.stem;
+                }
+            } else if (cur.content) {
                 cur.content += '\n' + line;
             } else if (!cur.answer && Object.keys(cur.options).length === 0) {
                 cur.content = line;
