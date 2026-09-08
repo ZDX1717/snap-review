@@ -16,6 +16,7 @@
             <button id="btn-home" class="nav-btn active">首页</button>
             <button id="btn-quiz" class="nav-btn">开始刷题</button>
             <button id="btn-errors" class="nav-btn">错题本</button>
+            <button id="btn-favorites" class="nav-btn">收藏夹</button>
             <button id="btn-manage" class="nav-btn">题库管理</button>
         </nav>
 
@@ -122,6 +123,7 @@
                     <div class="question-header">
                         <span id="question-number">1/10</span>
                         <span id="question-type">单选题</span>
+                        <button id="favorite-btn" class="favorite-btn" title="收藏本题，可在收藏夹查看">☆ 收藏</button>
                     </div>
 
                     <div class="question-content">
@@ -184,6 +186,7 @@
                     <p>错误：<span id="wrong-answers">0</span></p>
                     <p>未答：<span id="unanswered-count">0</span></p>
                     <p>正确率：<span id="accuracy">0%</span></p>
+                    <p id="mastery-note" class="mastery-note hidden"></p>
                     <div class="review-toolbar">
                         <label class="inline-label">
                             <input type="checkbox" id="review-only-wrong"> 只看错题（含未作答）
@@ -204,6 +207,16 @@
 
                 <div id="errors-list" class="errors-list">
                     <p class="empty-message">暂无错题记录</p>
+                </div>
+            </section>
+
+            <section id="favorites-section" class="section">
+                <h2>收藏夹</h2>
+                <div class="error-actions">
+                    <button id="review-favorites-btn" class="action-btn">复习收藏</button>
+                </div>
+                <div id="favorites-list" class="errors-list">
+                    <p class="empty-message">暂无收藏题目</p>
                 </div>
             </section>
 

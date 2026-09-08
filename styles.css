@@ -981,3 +981,46 @@ h3 {
     font-size: 14px;
     line-height: 1.7;
 }
+
+/* ==================== 收藏夹 + 错题闭环提示 ==================== */
+
+.favorite-btn {
+    margin-left: auto;
+    background: none;
+    border: 1px solid #dee2e6;
+    border-radius: 14px;
+    padding: 3px 12px;
+    font-size: 13px;
+    color: #6c757d;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.favorite-btn:hover {
+    border-color: #f0a500;
+    color: #f0a500;
+}
+
+.favorite-btn.active {
+    background: #fff8e1;
+    border-color: #f0a500;
+    color: #f0a500;
+    font-weight: 600;
+}
+
+.favorite-meta {
+    font-size: 12px;
+    color: #adb5bd;
+    margin-bottom: 8px;
+}
+
+.mastery-note {
+    color: #28a745;
+    font-size: 14px;
+}
+
+.error-item .mastery-note {
+    font-size: 12px;
+    margin: 6px 0 0;
+}

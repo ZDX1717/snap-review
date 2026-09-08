@@ -8,6 +8,8 @@ let currentQuiz = []; // 当前刷题的题目列表
 let currentQuestionIndex = 0; // 当前题目索引
 let quizMode = 'immediate'; // 作答方式：'immediate' 逐题模式 | 'exam' 套题模式
 let userAnswers = []; // 每题作答记录（下标与 currentQuiz 对应）
+let masteryRemovedInSession = 0; // 本轮刷题中因连对达标而移出错题本的题数
+let favoriteQuestions = []; // 收藏夹（手动精选的题目）
 let correctCount = 0; // 正确题数
 let wrongCount = 0; // 错误题数
 let isAnswered = false; // 是否已回答当前题
@@ -87,6 +89,11 @@ const prevQuestionBtn = document.getElementById('prev-question-btn');
 const unansweredCountEl = document.getElementById('unanswered-count');
 const answerReview = document.getElementById('answer-review');
 const reviewOnlyWrong = document.getElementById('review-only-wrong');
+const masteryNote = document.getElementById('mastery-note');
+const favoriteBtn = document.getElementById('favorite-btn');
+const btnFavorites = document.getElementById('btn-favorites');
+const favoritesList = document.getElementById('favorites-list');
+const reviewFavoritesBtn = document.getElementById('review-favorites-btn');
 
 // 首页快捷入口
 const heroStartBtn = document.getElementById('hero-start-btn');
@@ -163,6 +170,20 @@ function loadFromLocalStorage() {
         localStorage.removeItem('errorQuestions');
         errorQuestions = [];
     }
+
+    try {
+        const savedFavorites = localStorage.getItem('favoriteQuestions');
+        if (savedFavorites) {
+            const parsedFavorites = JSON.parse(savedFavorites);
+            if (Array.isArray(parsedFavorites)) {
+                favoriteQuestions = parsedFavorites;
+            }
+        }
+    } catch (e) {
+        console.error('收藏数据损坏，已重置：', e);
+        localStorage.removeItem('favoriteQuestions');
+        favoriteQuestions = [];
+    }
 }
 
 // 保存数据到本地存储
@@ -174,6 +195,7 @@ function saveToLocalStorage() {
     }
     localStorage.setItem('questionBanks', JSON.stringify(questionBanks));
     localStorage.setItem('errorQuestions', JSON.stringify(errorQuestions));
+    localStorage.setItem('favoriteQuestions', JSON.stringify(favoriteQuestions));
 }
 
 // 设置事件监听器
@@ -218,6 +240,11 @@ function setupEventListeners() {
     clearErrorsBtn.addEventListener('click', clearErrors);
     reviewErrorsBtn.addEventListener('click', reviewErrors);
     toggleAllBanksBtn.addEventListener('click', toggleAllBanks);
+
+    // 收藏夹
+    btnFavorites.addEventListener('click', () => showSection('favorites'));
+    reviewFavoritesBtn.addEventListener('click', reviewFavorites);
+    favoriteBtn.addEventListener('click', toggleFavoriteCurrent);
 
     // 题库管理
     createBankBtn.addEventListener('click', () => showModal(createBankModal));
@@ -268,6 +295,11 @@ function showSection(sectionName) {
     // 如果是错题本部分，更新错题列表
     if (sectionName === 'errors') {
         updateErrorsList();
+    }
+
+    // 如果是收藏夹部分，更新收藏列表
+    if (sectionName === 'favorites') {
+        updateFavoritesList();
     }
 
     // 如果是题库管理部分，更新题库列表
@@ -427,9 +459,14 @@ function finalizeQuestion(q) {
     return q;
 }
 
-// 查重键：题干（去空白）+ 规范化答案
+// 查重指纹：题干（去空白）+ 全部选项文本。同一题重新导入（即使改了答案）会被识别为重复；
+// 题干相同但选项不同的题（如"下列说法正确的是()"）不会被误判
 function questionDedupKey(q) {
-    return (q.content || '').replace(/\s+/g, '') + '|' + (q.answer || '').toUpperCase().replace(/[^A-H]/g, '');
+    const stem = (q.content || '').replace(/\s+/g, '');
+    const opts = Object.keys(q.options || {}).sort()
+        .map(k => k + ':' + (q.options[k] || '').replace(/\s+/g, ''))
+        .join('');
+    return stem + '|' + opts;
 }
 
 // 主解析器：逐行状态机，同时覆盖家族 A/B/C/D
@@ -654,6 +691,7 @@ function startQuiz() {
     userAnswers = new Array(currentQuiz.length).fill('');
     endQuizBtn.textContent = quizMode === 'exam' ? '交卷' : '结束刷题';
     reviewOnlyWrong.checked = false;
+    masteryRemovedInSession = 0;
     
     // 显示刷题容器
     quizContainer.classList.remove('hidden');
@@ -741,6 +779,9 @@ function displayQuestion() {
         });
     }
 
+    // 刷新收藏按钮状态
+    updateFavoriteButton();
+
     // 重置答题状态与按钮（逐题模式 vs 套题模式）
     isAnswered = false;
     answerFeedback.classList.add('hidden');
@@ -790,18 +831,26 @@ function submitAnswer() {
     // 检查答案是否正确（两侧都规范化后再比较）
     const isCorrect = normalizeAnswerString(userAnswer) === normalizeAnswerString(question.answer);
     
-    // 更新答题统计
+    // 更新答题统计与错题闭环
+    let removedFromErrorBook = 0;
     if (isCorrect) {
         correctCount++;
     } else {
         wrongCount++;
-        
+
         // 将错题添加到错题本
         addToErrorBook(question, userAnswer);
     }
-    
+    // 已在错题本中的题：答对累计连对（达阈值自动移出），答错清零
+    removedFromErrorBook += updateErrorStreak(question, isCorrect, userAnswer);
+    masteryRemovedInSession += removedFromErrorBook;
+
     // 显示答案反馈
-    answerResult.textContent = isCorrect ? '回答正确！' : `回答错误！正确答案是：${question.answer}`;
+    answerResult.textContent = isCorrect
+        ? (removedFromErrorBook > 0
+            ? `回答正确！已连对 ${MASTERY_STREAK} 次，移出错题本 🎉`
+            : '回答正确！')
+        : `回答错误！正确答案是：${question.answer}`;
     answerResult.className = isCorrect ? 'correct-answer' : 'wrong-answer';
     answerExplanation.textContent = question.analysis || '';
     answerFeedback.classList.remove('hidden');
@@ -855,16 +904,19 @@ function finishExam() {
 
     currentQuiz.forEach((question, idx) => {
         const ua = userAnswers[idx] || '';
+        const isCorrect = !!ua && normalizeAnswerString(ua) === normalizeAnswerString(question.answer);
         if (!ua) {
             unanswered++;
             // 未作答按错题处理，便于之后复习
             addToErrorBook(question, '未作答');
-        } else if (normalizeAnswerString(ua) === normalizeAnswerString(question.answer)) {
+        } else if (isCorrect) {
             correctCount++;
         } else {
             wrongCount++;
             addToErrorBook(question, ua);
         }
+        // 错题闭环：已在错题本中的题，答对累计连对（达阈值移出）/ 答错清零
+        masteryRemovedInSession += updateErrorStreak(question, isCorrect, ua);
     });
 
     showQuizResult(unanswered);
@@ -895,6 +947,14 @@ function showQuizResult(examUnanswered) {
             ? `${((correctCount / denominator) * 100).toFixed(1)}%`
             : `${((correctCount / denominator) * 100).toFixed(1)}%（已答 ${denominator} 题）`)
         : '0%';
+
+    // 错题闭环提示：本轮因连对达标移出错题本的题
+    if (masteryRemovedInSession > 0) {
+        masteryNote.textContent = `本轮共有 ${masteryRemovedInSession} 题连续答对 ${MASTERY_STREAK} 次，已自动移出错题本 🎉`;
+        masteryNote.classList.remove('hidden');
+    } else {
+        masteryNote.classList.add('hidden');
+    }
 
     renderAnswerReview();
 }
@@ -995,19 +1055,176 @@ function addToErrorBook(question, userAnswer) {
     const existingIndex = errorQuestions.findIndex(
         q => q.content === question.content
     );
-    
+
     if (existingIndex === -1) {
         // 添加新错题
         errorQuestions.push({
             ...question,
             userAnswer,
             bankName: currentBankName,
+            correctStreak: 0, // 连对次数：复习/刷题中答对累计，达阈值自动移出
             timestamp: new Date().toISOString()
         });
-        
+
         // 保存到本地存储
         saveToLocalStorage();
     }
+}
+
+// 错题巩固闭环阈值：同一题连续答对 N 次自动移出错题本
+const MASTERY_STREAK = 2;
+
+// 错题闭环：已入错题本的题答对 → 连对次数+1（达阈值自动移出，返回移出数）；
+// 答错 → 连对次数清零并更新作答记录；不在错题本中的题 → 无操作
+function updateErrorStreak(question, isCorrect, userAnswer) {
+    const idx = errorQuestions.findIndex(q => q.content === question.content);
+    if (idx === -1) return 0;
+
+    if (isCorrect) {
+        const streak = (errorQuestions[idx].correctStreak || 0) + 1;
+        if (streak >= MASTERY_STREAK) {
+            errorQuestions.splice(idx, 1);
+            saveToLocalStorage();
+            return 1;
+        }
+        errorQuestions[idx].correctStreak = streak;
+    } else {
+        errorQuestions[idx].correctStreak = 0;
+        errorQuestions[idx].userAnswer = userAnswer || errorQuestions[idx].userAnswer;
+    }
+    saveToLocalStorage();
+    return 0;
+}
+
+// ==================== 收藏夹 ====================
+
+// 切换收藏状态（按题干匹配），返回是否为新增收藏
+function toggleFavorite(question, bankName) {
+    const idx = favoriteQuestions.findIndex(q => q.content === question.content);
+    let added;
+    if (idx === -1) {
+        favoriteQuestions.push({
+            ...question,
+            bankName: bankName || '未知题库',
+            timestamp: new Date().toISOString()
+        });
+        added = true;
+    } else {
+        favoriteQuestions.splice(idx, 1);
+        added = false;
+    }
+    saveToLocalStorage();
+    return added;
+}
+
+// 刷题界面：收藏/取消收藏当前题
+function toggleFavoriteCurrent() {
+    const question = currentQuiz[currentQuestionIndex];
+    if (!question) return;
+    toggleFavorite(question, isAllBanksView ? '未知题库' : currentBankName);
+    updateFavoriteButton();
+}
+
+// 刷新收藏按钮状态（★ 已收藏 / ☆ 收藏）
+function updateFavoriteButton() {
+    const question = currentQuiz[currentQuestionIndex];
+    const isFav = !!question && favoriteQuestions.some(f => f.content === question.content);
+    favoriteBtn.textContent = isFav ? '★ 已收藏' : '☆ 收藏';
+    if (isFav) {
+        favoriteBtn.classList.add('active');
+    } else {
+        favoriteBtn.classList.remove('active');
+    }
+}
+
+// 刷新收藏夹列表
+function updateFavoritesList() {
+    if (favoriteQuestions.length === 0) {
+        favoritesList.innerHTML = '<p class="empty-message">暂无收藏题目，刷题时点击题目右上角的"☆ 收藏"即可加入</p>';
+        return;
+    }
+
+    favoritesList.innerHTML = '';
+
+    favoriteQuestions.forEach((question, index) => {
+        const item = document.createElement('div');
+        item.className = 'error-item';
+
+        const title = document.createElement('h4');
+        title.textContent = question.content;
+        item.appendChild(title);
+
+        const meta = document.createElement('p');
+        meta.className = 'favorite-meta';
+        meta.textContent = `来源：${question.bankName || '未知题库'} · ${question.type || ''}`;
+        item.appendChild(meta);
+
+        if (question.options && Object.keys(question.options).length > 0) {
+            const optionsDiv = document.createElement('div');
+            optionsDiv.className = 'error-options';
+            Object.keys(question.options).sort().forEach(key => {
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'error-option';
+                const optionLabel = document.createElement('span');
+                optionLabel.className = 'option-label';
+                optionLabel.textContent = `${key}：`;
+                const optionText = document.createElement('span');
+                optionText.className = 'option-text';
+                optionText.textContent = question.options[key];
+                optionDiv.appendChild(optionLabel);
+                optionDiv.appendChild(optionText);
+                optionsDiv.appendChild(optionDiv);
+            });
+            item.appendChild(optionsDiv);
+        }
+
+        const correctAnswer = document.createElement('p');
+        correctAnswer.className = 'correct-answer';
+        correctAnswer.textContent = `正确答案：${question.answer}`;
+        item.appendChild(correctAnswer);
+
+        if (question.analysis) {
+            const analysis = document.createElement('p');
+            analysis.textContent = `解析：${question.analysis}`;
+            item.appendChild(analysis);
+        }
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'delete-btn';
+        removeBtn.textContent = '取消收藏';
+        removeBtn.addEventListener('click', () => {
+            favoriteQuestions.splice(index, 1);
+            saveToLocalStorage();
+            updateFavoritesList();
+        });
+        item.appendChild(removeBtn);
+
+        favoritesList.appendChild(item);
+    });
+}
+
+// 复习收藏：以逐题模式过一遍收藏题
+function reviewFavorites() {
+    if (favoriteQuestions.length === 0) {
+        alert('收藏夹是空的，刷题时点击"☆ 收藏"即可加入');
+        return;
+    }
+
+    currentQuiz = [...favoriteQuestions];
+    currentQuestionIndex = 0;
+    correctCount = 0;
+    wrongCount = 0;
+    userAnswers = new Array(currentQuiz.length).fill('');
+    masteryRemovedInSession = 0;
+    quizMode = 'immediate';
+    endQuizBtn.textContent = '结束刷题';
+
+    showSection('quiz');
+    quizContainer.classList.remove('hidden');
+    quizResult.classList.add('hidden');
+    quizSettings.classList.add('hidden');
+
+    displayQuestion();
 }
 
 // 更新错题列表
@@ -1163,6 +1380,12 @@ function updateErrorsList() {
         errorItem.appendChild(type);
         errorItem.appendChild(correctAnswer);
         errorItem.appendChild(yourAnswer);
+        if ((question.correctStreak || 0) > 0) {
+            const mastery = document.createElement('p');
+            mastery.className = 'mastery-note';
+            mastery.textContent = `已连对 ${question.correctStreak} 次，再答对 ${MASTERY_STREAK - question.correctStreak} 次自动移出错题本`;
+            errorItem.appendChild(mastery);
+        }
         errorItem.appendChild(analysis);
         errorItem.appendChild(deleteBtn);
 
@@ -1225,8 +1448,10 @@ function reviewErrors() {
     correctCount = 0;
     wrongCount = 0;
     userAnswers = new Array(currentQuiz.length).fill('');
+    masteryRemovedInSession = 0;
     quizMode = 'immediate';
     endQuizBtn.textContent = '结束刷题';
+    showSection('quiz'); // 切换到刷题页面（修复：此前复习不显示界面）
     
     // 显示刷题容器
     quizContainer.classList.remove('hidden');
@@ -1594,7 +1819,13 @@ function updateBanksList() {
         exportBtn.textContent = '导出';
         exportBtn.addEventListener('click', () => exportBank(bankName));
 
+        const dedupBtn = document.createElement('button');
+        dedupBtn.className = 'action-btn secondary';
+        dedupBtn.textContent = '去重';
+        dedupBtn.addEventListener('click', () => dedupBank(bankName));
+
         bankActions.appendChild(renameBtn);
+        bankActions.appendChild(dedupBtn);
         bankActions.appendChild(deleteBtn);
         bankActions.appendChild(exportBtn);
 
@@ -1721,6 +1952,36 @@ function deleteBank(bankName) {
     updateBanksList();
 
     alert('题库删除成功');
+}
+
+// 题库一键去重：按"题干+选项"指纹清理重复题（保留最早导入的版本）
+function dedupBank(bankName) {
+    const questions = questionBanks[bankName] || [];
+    const seen = new Set();
+    const kept = [];
+    questions.forEach(q => {
+        const key = questionDedupKey(q);
+        if (seen.has(key)) return;
+        seen.add(key);
+        kept.push(q);
+    });
+    const removed = questions.length - kept.length;
+    if (removed === 0) {
+        alert('该题库没有重复题目');
+        return;
+    }
+    if (!confirm(`发现 ${removed} 道重复题目（按题干+选项判断，保留最早导入的版本），确定清理吗？`)) {
+        return;
+    }
+    questionBanks[bankName] = kept;
+    if (currentBankName === bankName) {
+        questionBank = kept;
+    }
+    saveToLocalStorage();
+    refreshQuestionBankView();
+    updateBanksList();
+    updateBankSelect();
+    alert(`已清理 ${removed} 道重复题目`);
 }
 
 // 导出单个题库
