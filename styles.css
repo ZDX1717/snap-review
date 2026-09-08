@@ -1024,3 +1024,157 @@ h3 {
     font-size: 12px;
     margin: 6px 0 0;
 }
+
+/* ==================== 错题移出规则 + 复习范围 + 题库编辑器 ==================== */
+
+.mastery-config {
+    margin: 10px 0 14px;
+    font-size: 14px;
+    color: #495057;
+}
+
+.mastery-config select {
+    padding: 4px 8px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.scope-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin-top: 6px;
+}
+
+.scope-summary {
+    color: #4a6fa5;
+    font-size: 14px;
+    margin: 12px 0;
+}
+
+/* 编辑器布局 */
+.editor-layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 14px;
+    margin-top: 12px;
+}
+
+.editor-list-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.editor-question-list {
+    flex: 1;
+    max-height: 46vh;
+    overflow-y: auto;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    background: #f8f9fa;
+    padding: 6px;
+}
+
+.editor-list-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: #495057;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.editor-list-item:hover {
+    background: #eef2f7;
+}
+
+.editor-list-item.selected {
+    background: #e3ecf7;
+    color: #2c5282;
+    font-weight: 600;
+}
+
+.editor-form-panel {
+    min-width: 0;
+}
+
+#editor-form .form-group {
+    margin-bottom: 12px;
+}
+
+#editor-form textarea,
+.editor-option-input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 13px;
+    font-family: inherit;
+    line-height: 1.5;
+}
+
+#editor-form textarea:focus,
+.editor-option-input:focus,
+#editor-answer:focus {
+    outline: none;
+    border-color: #4a6fa5;
+}
+
+.editor-inline-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.editor-inline-row select {
+    padding: 4px 8px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.editor-option-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.editor-option-letter {
+    font-weight: 600;
+    color: #4a6fa5;
+    width: 20px;
+}
+
+.editor-option-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.editor-nav-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 14px 0;
+    flex-wrap: wrap;
+}
+
+.editor-position {
+    font-size: 13px;
+    color: #868e96;
+}
+
+@media (max-width: 768px) {
+    .editor-layout {
+        grid-template-columns: 1fr;
+    }
+}

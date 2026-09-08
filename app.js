@@ -94,6 +94,37 @@ const favoriteBtn = document.getElementById('favorite-btn');
 const btnFavorites = document.getElementById('btn-favorites');
 const favoritesList = document.getElementById('favorites-list');
 const reviewFavoritesBtn = document.getElementById('review-favorites-btn');
+const masteryThresholdSelect = document.getElementById('mastery-threshold-select');
+// 复习范围选择
+const reviewScopeModal = document.getElementById('review-scope-modal');
+const scopeBanks = document.getElementById('scope-banks');
+const scopeSummary = document.getElementById('scope-summary');
+const confirmReviewScopeBtn = document.getElementById('confirm-review-scope-btn');
+const cancelReviewScopeBtn = document.getElementById('cancel-review-scope-btn');
+// 题库编辑器
+const editBankModal = document.getElementById('edit-bank-modal');
+const editBankTitle = document.getElementById('edit-bank-title');
+const editorQuestionList = document.getElementById('editor-question-list');
+const editorForm = document.getElementById('editor-form');
+const editorEmpty = document.getElementById('editor-empty');
+const editorAddBtn = document.getElementById('editor-add-btn');
+const editorStem = document.getElementById('editor-stem');
+const editorType = document.getElementById('editor-type');
+const editorAnswer = document.getElementById('editor-answer');
+const editorOptions = document.getElementById('editor-options');
+const editorAddOption = document.getElementById('editor-add-option');
+const editorRemoveOption = document.getElementById('editor-remove-option');
+const editorExplanation = document.getElementById('editor-explanation');
+const editorAnalysis = document.getElementById('editor-analysis');
+const editorPrevBtn = document.getElementById('editor-prev-btn');
+const editorNextBtn = document.getElementById('editor-next-btn');
+const editorDeleteBtn = document.getElementById('editor-delete-btn');
+const editorSaveBtn = document.getElementById('editor-save-btn');
+const editorCloseBtn = document.getElementById('editor-close-btn');
+const editorPosition = document.getElementById('editor-position');
+let editBankName = null;  // 正在编辑的题库名
+let editIndex = 0;        // 正在编辑的题目下标
+let editorDirty = false;  // 表单是否有未保存修改
 
 // 首页快捷入口
 const heroStartBtn = document.getElementById('hero-start-btn');
@@ -104,6 +135,7 @@ function init() {
     // 加载本地存储的数据
     loadFromLocalStorage();
     loadCollapsedBanks();
+    loadMasterySetting();
 
     // 更新题库选择下拉框
     updateBankSelect();
@@ -245,6 +277,44 @@ function setupEventListeners() {
     btnFavorites.addEventListener('click', () => showSection('favorites'));
     reviewFavoritesBtn.addEventListener('click', reviewFavorites);
     favoriteBtn.addEventListener('click', toggleFavoriteCurrent);
+
+    // 错题移出规则设置
+    masteryThresholdSelect.addEventListener('change', function() {
+        masteryThreshold = parseInt(this.value, 10) || 0;
+        localStorage.setItem('masteryThresholdSetting', String(masteryThreshold));
+        updateErrorsList();
+    });
+
+    // 复习范围选择
+    confirmReviewScopeBtn.addEventListener('click', () => {
+        const { banks, types } = getScopeSelection();
+        const questions = errorQuestions.filter(
+            q => banks.has(q.bankName || '未知题库') && types.has(q.type)
+        );
+        if (questions.length === 0) {
+            alert('所选范围内没有错题，请调整范围');
+            return;
+        }
+        hideModal(reviewScopeModal);
+        startReviewSession(questions);
+    });
+    cancelReviewScopeBtn.addEventListener('click', () => hideModal(reviewScopeModal));
+    reviewScopeModal.addEventListener('change', updateScopeSummary);
+
+    // 题库编辑器
+    editorAddBtn.addEventListener('click', editorAddQuestion);
+    editorSaveBtn.addEventListener('click', () => editorSaveCurrent(false));
+    editorCloseBtn.addEventListener('click', editorClose);
+    editorPrevBtn.addEventListener('click', () => editorNavigate(-1));
+    editorNextBtn.addEventListener('click', () => editorNavigate(1));
+    editorDeleteBtn.addEventListener('click', editorDeleteCurrent);
+    editorAddOption.addEventListener('click', () => editorMutateOptions(1));
+    editorRemoveOption.addEventListener('click', () => editorMutateOptions(-1));
+    editorType.addEventListener('change', () => { editorDirty = true; editorRenderOptions(); });
+    editorStem.addEventListener('input', () => { editorDirty = true; });
+    editorAnswer.addEventListener('input', () => { editorDirty = true; });
+    editorExplanation.addEventListener('input', () => { editorDirty = true; });
+    editorAnalysis.addEventListener('input', () => { editorDirty = true; });
 
     // 题库管理
     createBankBtn.addEventListener('click', () => showModal(createBankModal));
@@ -848,7 +918,7 @@ function submitAnswer() {
     // 显示答案反馈
     answerResult.textContent = isCorrect
         ? (removedFromErrorBook > 0
-            ? `回答正确！已连对 ${MASTERY_STREAK} 次，移出错题本 🎉`
+            ? `回答正确！已连对 ${masteryThreshold} 次，移出错题本 🎉`
             : '回答正确！')
         : `回答错误！正确答案是：${question.answer}`;
     answerResult.className = isCorrect ? 'correct-answer' : 'wrong-answer';
@@ -950,7 +1020,9 @@ function showQuizResult(examUnanswered) {
 
     // 错题闭环提示：本轮因连对达标移出错题本的题
     if (masteryRemovedInSession > 0) {
-        masteryNote.textContent = `本轮共有 ${masteryRemovedInSession} 题连续答对 ${MASTERY_STREAK} 次，已自动移出错题本 🎉`;
+        masteryNote.textContent = masteryThreshold === 1
+            ? `本轮共有 ${masteryRemovedInSession} 题答对后已移出错题本 🎉`
+            : `本轮共有 ${masteryRemovedInSession} 题连续答对 ${masteryThreshold} 次，已自动移出错题本 🎉`;
         masteryNote.classList.remove('hidden');
     } else {
         masteryNote.classList.add('hidden');
@@ -1071,18 +1143,19 @@ function addToErrorBook(question, userAnswer) {
     }
 }
 
-// 错题巩固闭环阈值：同一题连续答对 N 次自动移出错题本
-const MASTERY_STREAK = 2;
+// 错题巩固闭环阈值：同一题连续答对 N 次自动移出错题本；0 = 关闭自动移出
+let masteryThreshold = 2;
 
 // 错题闭环：已入错题本的题答对 → 连对次数+1（达阈值自动移出，返回移出数）；
 // 答错 → 连对次数清零并更新作答记录；不在错题本中的题 → 无操作
 function updateErrorStreak(question, isCorrect, userAnswer) {
+    if (masteryThreshold === 0) return 0; // 用户关闭了自动移出
     const idx = errorQuestions.findIndex(q => q.content === question.content);
     if (idx === -1) return 0;
 
     if (isCorrect) {
         const streak = (errorQuestions[idx].correctStreak || 0) + 1;
-        if (streak >= MASTERY_STREAK) {
+        if (streak >= masteryThreshold) {
             errorQuestions.splice(idx, 1);
             saveToLocalStorage();
             return 1;
@@ -1380,10 +1453,10 @@ function updateErrorsList() {
         errorItem.appendChild(type);
         errorItem.appendChild(correctAnswer);
         errorItem.appendChild(yourAnswer);
-        if ((question.correctStreak || 0) > 0) {
+        if ((question.correctStreak || 0) > 0 && masteryThreshold > 0) {
             const mastery = document.createElement('p');
             mastery.className = 'mastery-note';
-            mastery.textContent = `已连对 ${question.correctStreak} 次，再答对 ${MASTERY_STREAK - question.correctStreak} 次自动移出错题本`;
+            mastery.textContent = `已连对 ${question.correctStreak} 次，再答对 ${masteryThreshold - question.correctStreak} 次自动移出错题本`;
             errorItem.appendChild(mastery);
         }
         errorItem.appendChild(analysis);
@@ -1436,14 +1509,331 @@ function clearErrors() {
 }
 
 // 复习错题
+// ==================== 题库编辑器 ====================
+
+// 加载错题移出规则设置
+function loadMasterySetting() {
+    const saved = parseInt(localStorage.getItem('masteryThresholdSetting'), 10);
+    masteryThreshold = [0, 1, 2, 3].includes(saved) ? saved : 2;
+    if (masteryThresholdSelect) masteryThresholdSelect.value = String(masteryThreshold);
+}
+
+// 打开题库编辑器
+function editBank(bankName) {
+    if (!questionBanks[bankName]) return;
+    editBankName = bankName;
+    editIndex = 0;
+    editorDirty = false;
+    editBankTitle.textContent = `编辑题库：${bankName}`;
+    renderBankEditor();
+    showModal(editBankModal);
+}
+
+function currentEditBank() {
+    return (editBankName && questionBanks[editBankName]) || [];
+}
+
+// 未保存修改守卫：返回 true 表示可以继续（已放弃或无修改）
+function editorGuard() {
+    if (!editorDirty) return true;
+    if (confirm('当前题目的修改尚未保存，确定放弃吗？')) {
+        editorDirty = false;
+        return true;
+    }
+    return false;
+}
+
+// 渲染编辑器整体（题目列表 + 当前题表单）
+function renderBankEditor() {
+    const questions = currentEditBank();
+
+    editorQuestionList.innerHTML = '';
+    questions.forEach((q, idx) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'editor-list-item' + (idx === editIndex ? ' selected' : '');
+        item.textContent = `${idx + 1}. ${(q.content || '（无题干）').slice(0, 22)}`;
+        item.addEventListener('click', () => {
+            if (!editorGuard()) return;
+            editIndex = idx;
+            renderBankEditor();
+        });
+        editorQuestionList.appendChild(item);
+    });
+
+    if (questions.length === 0 || !questions[editIndex]) {
+        editorForm.classList.add('hidden');
+        editorEmpty.classList.remove('hidden');
+        editorPosition.textContent = '';
+        return;
+    }
+    editorForm.classList.remove('hidden');
+    editorEmpty.classList.add('hidden');
+    editorRenderForm();
+}
+
+// 渲染当前题表单
+function editorRenderForm() {
+    const q = currentEditBank()[editIndex];
+    if (!q) return;
+
+    editorStem.value = q.content || '';
+    editorType.value = q.type === '多选' ? '多选' : (q.type === '判断' ? '判断' : '单选');
+    editorAnswer.value = q.answer || '';
+    editorExplanation.value = q.explanation || '';
+    editorAnalysis.value = q.analysis || '';
+    editorRenderOptions();
+    editorPosition.textContent = `第 ${editIndex + 1} / ${currentEditBank().length} 题`;
+    editorDirty = false;
+
+    // 列表选中态
+    Array.from(editorQuestionList.children).forEach((el, idx) => {
+        if (idx === editIndex) el.classList.add('selected');
+        else el.classList.remove('selected');
+    });
+}
+
+// 渲染选项编辑行（判断题固定 A正确/B错误）
+function editorRenderOptions() {
+    const q = currentEditBank()[editIndex];
+    if (!q) return;
+
+    editorOptions.innerHTML = '';
+    if (editorType.value === '判断') {
+        ['正确', '错误'].forEach((text, i) => {
+            const row = document.createElement('div');
+            row.className = 'editor-option-row';
+            const label = document.createElement('span');
+            label.className = 'editor-option-letter';
+            label.textContent = i === 0 ? 'A' : 'B';
+            const input = document.createElement('input');
+            input.className = 'editor-option-input';
+            input.value = text;
+            input.disabled = true;
+            row.appendChild(label);
+            row.appendChild(input);
+            editorOptions.appendChild(row);
+        });
+        editorAddOption.classList.add('hidden');
+        editorRemoveOption.classList.add('hidden');
+        return;
+    }
+
+    editorAddOption.classList.remove('hidden');
+    editorRemoveOption.classList.remove('hidden');
+    const source = (q.options && Object.keys(q.options).length > 0)
+        ? q.options
+        : { A: '', B: '', C: '', D: '' };
+    Object.keys(source).sort().forEach(letter => {
+        const row = document.createElement('div');
+        row.className = 'editor-option-row';
+        const label = document.createElement('span');
+        label.className = 'editor-option-letter';
+        label.textContent = letter;
+        const input = document.createElement('input');
+        input.className = 'editor-option-input';
+        input.dataset.letter = letter;
+        input.value = source[letter] || '';
+        input.addEventListener('input', () => { editorDirty = true; });
+        row.appendChild(label);
+        row.appendChild(input);
+        editorOptions.appendChild(row);
+    });
+}
+
+// 从表单 DOM 收集当前选项
+function editorCollectOptions() {
+    const opts = {};
+    editorOptions.querySelectorAll('input.editor-option-input').forEach(inp => {
+        if (!inp.disabled) opts[inp.dataset.letter] = inp.value;
+    });
+    return opts;
+}
+
+// 增删末尾选项
+function editorMutateOptions(delta) {
+    if (editorType.value === '判断') return;
+    const q = currentEditBank()[editIndex];
+    if (!q) return;
+    const opts = editorCollectOptions();
+    const letters = Object.keys(opts).sort();
+    if (delta > 0) {
+        if (letters.length >= 8) {
+            alert('选项最多 8 个（A-H）');
+            return;
+        }
+        opts[String.fromCharCode(65 + letters.length)] = '';
+    } else {
+        if (letters.length <= 2) {
+            alert('至少保留 2 个选项');
+            return;
+        }
+        const removedLetter = letters[letters.length - 1];
+        delete opts[removedLetter];
+        editorAnswer.value = normalizeAnswerString(editorAnswer.value)
+            .split('').filter(l => opts[l]).join('');
+    }
+    q.options = opts;
+    editorDirty = true;
+    editorRenderOptions();
+}
+
+// 保存当前题（silent=true 时不弹提示），返回是否成功
+function editorSaveCurrent(silent) {
+    const questions = currentEditBank();
+    const q = questions[editIndex];
+    if (!q) return false;
+
+    const stem = editorStem.value.trim();
+    const type = editorType.value;
+    let answer = (editorAnswer.value || '').toUpperCase().replace(/\s+/g, '');
+    let options;
+
+    if (type === '判断') {
+        options = { A: '正确', B: '错误' };
+        // 允许填 对/错/√/× 等写法
+        if (/^(对|正确|√|T|Y)$/.test(answer) || answer === '') answer = 'A';
+        else if (/^(错|错误|×|X|F|N)$/.test(answer)) answer = 'B';
+        answer = answer.replace(/[^AB]/g, '') || 'A';
+    } else {
+        options = editorCollectOptions();
+        Object.keys(options).forEach(l => {
+            if (!options[l].trim()) delete options[l];
+        });
+        answer = normalizeAnswerString(answer).split('').filter(l => options[l]).join('');
+    }
+
+    if (!stem) {
+        if (!silent) alert('题干不能为空');
+        return false;
+    }
+    if (!answer) {
+        if (!silent) alert('答案无效：请填写有效选项字母（如 A 或 ABC）');
+        return false;
+    }
+
+    q.content = stem;
+    q.type = type;
+    q.options = options;
+    q.answer = answer;
+    q.explanation = editorExplanation.value.trim();
+    q.analysis = editorAnalysis.value.trim();
+
+    saveToLocalStorage();
+    editorDirty = false;
+    renderBankEditor();
+    if (!silent) alert('本题已保存');
+    return true;
+}
+
+// 新增题目（空题，未保存前关闭会被清理）
+function editorAddQuestion() {
+    if (!editorGuard()) return;
+    const questions = currentEditBank();
+    questions.push({
+        content: '', type: '单选', options: { A: '', B: '', C: '', D: '' }, answer: '',
+        explanation: '', analysis: '', optionExplanations: {}, confidence: 1, raw: ''
+    });
+    editIndex = questions.length - 1;
+    renderBankEditor();
+    editorDirty = true;
+    editorStem.focus();
+}
+
+// 删除当前题
+function editorDeleteCurrent() {
+    const questions = currentEditBank();
+    if (questions.length === 0) return;
+    if (editorDirty && !confirm('当前题目的修改尚未保存，确定放弃并删除吗？')) return;
+    if (!confirm(`确定删除第 ${editIndex + 1} 题吗？此操作不可恢复！`)) return;
+    questions.splice(editIndex, 1);
+    saveToLocalStorage();
+    editorDirty = false;
+    if (editIndex >= questions.length) editIndex = Math.max(0, questions.length - 1);
+    renderBankEditor();
+    updateBanksList();
+    updateBankSelect();
+}
+
+// 编辑器内切换题目
+function editorNavigate(delta) {
+    const questions = currentEditBank();
+    const target = editIndex + delta;
+    if (target < 0 || target >= questions.length) return;
+    if (!editorGuard()) return;
+    editIndex = target;
+    renderBankEditor();
+}
+
+// 关闭编辑器（清理未保存的空题）
+function editorClose() {
+    if (!editorGuard()) return;
+    const questions = currentEditBank();
+    const kept = questions.filter(q => (q.content || '').trim() || (q.answer || '').trim());
+    if (kept.length !== questions.length) {
+        questionBanks[editBankName] = kept;
+        if (currentBankName === editBankName) questionBank = kept;
+        saveToLocalStorage();
+        refreshQuestionBankView();
+    }
+    editBankName = null;
+    editIndex = 0;
+    editorDirty = false;
+    hideModal(editBankModal);
+    updateBanksList();
+}
+
+// 复习错题：先选择范围（按题库/题型），再进入复习
 function reviewErrors() {
     if (errorQuestions.length === 0) {
         alert('错题本中没有题目');
         return;
     }
-    
-    // 使用错题作为刷题内容（复习保持逐题模式，便于即时理解）
-    currentQuiz = [...errorQuestions];
+
+    // 填充题库勾选（默认全选，带题数）
+    scopeBanks.innerHTML = '';
+    const bankNames = [...new Set(errorQuestions.map(q => q.bankName || '未知题库'))];
+    bankNames.forEach(name => {
+        const count = errorQuestions.filter(q => (q.bankName || '未知题库') === name).length;
+        const label = document.createElement('label');
+        label.className = 'inline-label';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.name = 'scope-bank';
+        cb.value = name;
+        cb.checked = true;
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(` ${name}（${count} 题）`));
+        scopeBanks.appendChild(label);
+    });
+
+    updateScopeSummary();
+    showModal(reviewScopeModal);
+}
+
+// 读取范围选择
+function getScopeSelection() {
+    const banks = new Set(
+        Array.from(document.querySelectorAll('input[name="scope-bank"]:checked')).map(cb => cb.value)
+    );
+    const types = new Set(
+        Array.from(document.querySelectorAll('input[name="scope-type"]:checked')).map(cb => cb.value)
+    );
+    return { banks, types };
+}
+
+// 刷新范围选择摘要
+function updateScopeSummary() {
+    const { banks, types } = getScopeSelection();
+    const count = errorQuestions.filter(
+        q => banks.has(q.bankName || '未知题库') && types.has(q.type)
+    ).length;
+    scopeSummary.textContent = `已选中 ${count} 题`;
+}
+
+// 开始一场复习会话
+function startReviewSession(questions) {
+    currentQuiz = [...questions];
     currentQuestionIndex = 0;
     correctCount = 0;
     wrongCount = 0;
@@ -1451,14 +1841,12 @@ function reviewErrors() {
     masteryRemovedInSession = 0;
     quizMode = 'immediate';
     endQuizBtn.textContent = '结束刷题';
-    showSection('quiz'); // 切换到刷题页面（修复：此前复习不显示界面）
-    
-    // 显示刷题容器
+
+    showSection('quiz'); // 切换到刷题页面
     quizContainer.classList.remove('hidden');
     quizResult.classList.add('hidden');
     quizSettings.classList.add('hidden');
-    
-    // 显示第一道题
+
     displayQuestion();
 }
 
@@ -1803,6 +2191,11 @@ function updateBanksList() {
         const bankActions = document.createElement('div');
         bankActions.className = 'bank-actions';
 
+        const editBtn = document.createElement('button');
+        editBtn.className = 'action-btn secondary';
+        editBtn.textContent = '编辑';
+        editBtn.addEventListener('click', () => editBank(bankName));
+
         const renameBtn = document.createElement('button');
         renameBtn.className = 'action-btn secondary';
         renameBtn.textContent = '重命名';
@@ -1824,6 +2217,7 @@ function updateBanksList() {
         dedupBtn.textContent = '去重';
         dedupBtn.addEventListener('click', () => dedupBank(bankName));
 
+        bankActions.appendChild(editBtn);
         bankActions.appendChild(renameBtn);
         bankActions.appendChild(dedupBtn);
         bankActions.appendChild(deleteBtn);
