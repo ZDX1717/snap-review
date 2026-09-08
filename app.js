@@ -11,6 +11,7 @@ let correctCount = 0; // 正确题数
 let wrongCount = 0; // 错误题数
 let isAnswered = false; // 是否已回答当前题
 let currentBankName = '默认题库'; // 当前题库名称
+let isAllBanksView = false; // 是否处于"全部题库"合并视图（此时 questionBank 是临时合并结果）
 
 // DOM 元素
 const btnHome = document.getElementById('btn-home');
@@ -71,6 +72,13 @@ function init() {
 
     // 更新题库选择下拉框
     updateBankSelect();
+
+    // 初始状态下拉框与实际加载的题库保持一致
+    // （页面默认显示"全部题库"，但初始数据只加载了第一个题库，二者必须一致）
+    if (Object.keys(questionBanks).length > 0) {
+        isAllBanksView = false;
+        questionBankSelect.value = currentBankName;
+    }
     
     // 设置事件监听器
     setupEventListeners();
@@ -81,34 +89,61 @@ function init() {
 
 // 从本地存储加载数据
 function loadFromLocalStorage() {
-    const savedBanks = localStorage.getItem('questionBanks');
-    const savedErrors = localStorage.getItem('errorQuestions');
-    
-    if (savedBanks) {
-        questionBanks = JSON.parse(savedBanks);
-        // 加载第一个题库作为当前题库
-        const bankNames = Object.keys(questionBanks);
-        if (bankNames.length > 0) {
-            currentBankName = bankNames[0];
-            questionBank = questionBanks[currentBankName];
+    // 容错：存储数据损坏时重置对应部分，而不是让整个应用崩溃
+    try {
+        const savedBanks = localStorage.getItem('questionBanks');
+        if (savedBanks) {
+            const parsed = JSON.parse(savedBanks);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                questionBanks = parsed;
+                // 加载第一个题库作为当前题库
+                const bankNames = Object.keys(questionBanks);
+                if (bankNames.length > 0) {
+                    currentBankName = bankNames[0];
+                    questionBank = questionBanks[currentBankName];
+                }
+            }
+        } else {
+            // 向后兼容：如果有旧的questionBank数据，迁移到新的结构
+            const savedQuestions = localStorage.getItem('questionBank');
+            if (savedQuestions) {
+                const parsedQuestions = JSON.parse(savedQuestions);
+                if (Array.isArray(parsedQuestions)) {
+                    questionBank = parsedQuestions;
+                    questionBanks[currentBankName] = questionBank;
+                }
+            }
         }
-    } else {
-        // 向后兼容：如果有旧的questionBank数据，迁移到新的结构
-        const savedQuestions = localStorage.getItem('questionBank');
-        if (savedQuestions) {
-            questionBank = JSON.parse(savedQuestions);
-            questionBanks[currentBankName] = questionBank;
-        }
+    } catch (e) {
+        console.error('题库数据损坏，已重置：', e);
+        localStorage.removeItem('questionBanks');
+        localStorage.removeItem('questionBank');
+        questionBanks = {};
+        questionBank = [];
     }
-    
-    if (savedErrors) {
-        errorQuestions = JSON.parse(savedErrors);
+
+    try {
+        const savedErrors = localStorage.getItem('errorQuestions');
+        if (savedErrors) {
+            const parsedErrors = JSON.parse(savedErrors);
+            if (Array.isArray(parsedErrors)) {
+                errorQuestions = parsedErrors;
+            }
+        }
+    } catch (e) {
+        console.error('错题本数据损坏，已重置：', e);
+        localStorage.removeItem('errorQuestions');
+        errorQuestions = [];
     }
 }
 
 // 保存数据到本地存储
 function saveToLocalStorage() {
-    questionBanks[currentBankName] = questionBank;
+    // 仅在选定具体题库时回写当前题库，
+    // 避免"全部题库"合并视图把合并结果覆盖写进某个真实题库（数据污染）
+    if (!isAllBanksView) {
+        questionBanks[currentBankName] = questionBank;
+    }
     localStorage.setItem('questionBanks', JSON.stringify(questionBanks));
     localStorage.setItem('errorQuestions', JSON.stringify(errorQuestions));
 }
@@ -130,13 +165,15 @@ function setupEventListeners() {
     questionBankSelect.addEventListener('change', function() {
         const selectedBank = this.value;
         if (selectedBank === 'all') {
-            // 合并所有题库
+            // 合并所有题库为临时视图（此视图下保存时不会回写题库数据）
+            isAllBanksView = true;
             questionBank = [];
             Object.values(questionBanks).forEach(bank => {
                 questionBank = [...questionBank, ...bank];
             });
         } else {
             // 选择特定题库
+            isAllBanksView = false;
             currentBankName = selectedBank;
             questionBank = questionBanks[selectedBank];
         }
@@ -247,6 +284,10 @@ function importQuestions() {
         const bankName = file.name.replace(/\.[^/.]+$/, '');
         
         if (importMode === 'replace') {
+            if (isAllBanksView) {
+                showImportStatus('当前为"全部题库"视图，请先在刷题设置的"选择题库"中选定一个具体题库，再使用替换模式', 'error');
+                return;
+            }
             // 替换当前题库
             questionBank = importedQuestions;
             questionBanks[currentBankName] = questionBank;
@@ -260,8 +301,10 @@ function importQuestions() {
                 questionBanks[bankName] = importedQuestions;
             }
             // 切换到新导入的题库
+            isAllBanksView = false;
             currentBankName = bankName;
             questionBank = questionBanks[currentBankName];
+            questionBankSelect.value = bankName;
         }
         
         // 保存到本地存储
@@ -350,9 +393,9 @@ function parseQuestions(content) {
             }
         });
         
-        // 自动判断题型（根据答案长度）
+        // 自动判断题型（按答案中实际选项字母数判断，兼容"A、B"这类带分隔符的写法）
         if (question.answer) {
-            question.type = question.answer.length > 1 ? '多选' : '单选';
+            question.type = normalizeAnswerString(question.answer).length > 1 ? '多选' : '单选';
         }
 
         // 只有当题目有内容且有答案时才添加到题库
@@ -519,8 +562,8 @@ function submitAnswer() {
         userAnswer = Array.from(selectedOptions).map(option => option.value).sort().join('');
     }
     
-    // 检查答案是否正确
-    const isCorrect = userAnswer === question.answer;
+    // 检查答案是否正确（两侧都规范化后再比较）
+    const isCorrect = normalizeAnswerString(userAnswer) === normalizeAnswerString(question.answer);
     
     // 更新答题统计
     if (isCorrect) {
@@ -562,10 +605,14 @@ function showQuizResult() {
     quizContainer.classList.add('hidden');
     quizResult.classList.remove('hidden');
     
+    // 已答题数：提前结束刷题时按实际已答题数计算正确率，而不是按总题数
+    const answeredCount = Math.min(currentQuestionIndex + (isAnswered ? 1 : 0), currentQuiz.length);
     totalQuestions.textContent = currentQuiz.length;
     correctAnswers.textContent = correctCount;
     wrongAnswers.textContent = wrongCount;
-    accuracy.textContent = `${((correctCount / currentQuiz.length) * 100).toFixed(1)}%`;
+    accuracy.textContent = answeredCount > 0
+        ? `${((correctCount / answeredCount) * 100).toFixed(1)}%（已答 ${answeredCount} 题）`
+        : '0%';
 }
 
 // 结束刷题
@@ -742,6 +789,27 @@ function reviewErrors() {
     displayQuestion();
 }
 
+// 规范化选项答案：统一大写、只保留选项字母、去重并排序（用于判分比较，
+// 避免"CA"vs"AC"、"A、B"vs"AB"这类写法差异导致误判）
+function normalizeAnswerString(answer) {
+    return (answer || '')
+        .toUpperCase()
+        .replace(/[^A-H]/g, '')
+        .split('')
+        .filter((ch, idx, arr) => arr.indexOf(ch) === idx)
+        .sort()
+        .join('');
+}
+
+// 重建当前题目视图：在"全部题库"合并视图下题库发生增删改后调用
+function refreshQuestionBankView() {
+    if (!isAllBanksView) return;
+    questionBank = [];
+    Object.values(questionBanks).forEach(bank => {
+        questionBank = [...questionBank, ...bank];
+    });
+}
+
 // 打乱数组
 function shuffleArray(array) {
     const newArray = [...array];
@@ -857,9 +925,11 @@ function createNewBank() {
     questionBanks[bankName] = [];
     currentBankName = bankName;
     questionBank = questionBanks[bankName];
+    isAllBanksView = false;
 
     saveToLocalStorage();
     updateBankSelect();
+    questionBankSelect.value = bankName;
     updateBanksList();
 
     hideModal(createBankModal);
@@ -901,6 +971,7 @@ function renameBank() {
     }
 
     saveToLocalStorage();
+    refreshQuestionBankView();
     updateBankSelect();
     updateBanksList();
 
@@ -929,6 +1000,7 @@ function deleteBank(bankName) {
     delete questionBanks[bankName];
 
     saveToLocalStorage();
+    refreshQuestionBankView();
     updateBankSelect();
     updateBanksList();
 
@@ -1012,5 +1084,4 @@ function downloadFile(filename, content) {
 }
 
 // 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', init);
 document.addEventListener('DOMContentLoaded', init);
