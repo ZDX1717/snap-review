@@ -893,14 +893,6 @@ h3 {
     padding: 26px 8px 8px;
 }
 
-.hero-sub {
-    color: #6c757d;
-    font-size: 15px;
-    max-width: 580px;
-    margin: 10px auto 18px;
-    line-height: 1.8;
-}
-
 .hero-actions {
     display: flex;
     gap: 12px;
