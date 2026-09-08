@@ -47,6 +47,7 @@ const accuracy = document.getElementById('accuracy');
 const backToOptionsBtn = document.getElementById('back-to-options-btn');
 const clearErrorsBtn = document.getElementById('clear-errors-btn');
 const reviewErrorsBtn = document.getElementById('review-errors-btn');
+const toggleAllBanksBtn = document.getElementById('toggle-all-banks-btn');
 const errorsList = document.getElementById('errors-list');
 const questionBankSelect = document.getElementById('question-bank-select');
 const quizSettings = document.getElementById('quiz-settings');
@@ -95,6 +96,7 @@ const heroImportBtn = document.getElementById('hero-import-btn');
 function init() {
     // 加载本地存储的数据
     loadFromLocalStorage();
+    loadCollapsedBanks();
 
     // 更新题库选择下拉框
     updateBankSelect();
@@ -215,6 +217,7 @@ function setupEventListeners() {
     // 错题本
     clearErrorsBtn.addEventListener('click', clearErrors);
     reviewErrorsBtn.addEventListener('click', reviewErrors);
+    toggleAllBanksBtn.addEventListener('click', toggleAllBanks);
 
     // 题库管理
     createBankBtn.addEventListener('click', () => showModal(createBankModal));
@@ -1008,14 +1011,39 @@ function addToErrorBook(question, userAnswer) {
 }
 
 // 更新错题列表
+// 错题本分组展开状态（true = 已展开），持久化到 localStorage；缺省 = 折叠
+let expandedBanks = {};
+
+function loadCollapsedBanks() {
+    try {
+        const saved = localStorage.getItem('errorBookExpandedBanks');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                expandedBanks = parsed;
+            }
+        }
+    } catch (e) {
+        expandedBanks = {};
+    }
+}
+
+function saveCollapsedBanks() {
+    try {
+        localStorage.setItem('errorBookExpandedBanks', JSON.stringify(expandedBanks));
+    } catch (e) { /* 存储异常时静默降级：展开状态不持久化 */ }
+}
+
 function updateErrorsList() {
     if (errorQuestions.length === 0) {
         errorsList.innerHTML = '<p class="empty-message">暂无错题记录</p>';
+        toggleAllBanksBtn.classList.add('hidden');
         return;
     }
-    
+    toggleAllBanksBtn.classList.remove('hidden');
+
     errorsList.innerHTML = '';
-    
+
     // 按题库分类错题
     const errorsByBank = {};
     errorQuestions.forEach((question, index) => {
@@ -1026,26 +1054,65 @@ function updateErrorsList() {
         errorsByBank[bankName].push({ question, index });
     });
 
-    // 显示每个题库的错题
-    Object.keys(errorsByBank).forEach(bankName => {
-        // 创建题库标题
-        const bankTitle = document.createElement('div');
-        bankTitle.className = 'bank-title';
-        bankTitle.textContent = `${bankName} (${errorsByBank[bankName].length}题)`;
-        errorsList.appendChild(bankTitle);
+    const bankNames = Object.keys(errorsByBank);
+    updateToggleAllBanksLabel(bankNames);
 
-        // 创建题库容器
+    // 显示每个题库的错题（可折叠分组，默认折叠）
+    bankNames.forEach(bankName => {
+        const isCollapsed = !expandedBanks[bankName]; // 缺省折叠
+
+        const group = document.createElement('div');
+        group.className = 'bank-group';
+
+        // 分组头部：整行可点击，展开/折叠该题库
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'bank-toggle' + (isCollapsed ? '' : ' expanded');
+        toggle.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+
+        const chevron = document.createElement('span');
+        chevron.className = 'bank-chevron';
+        chevron.textContent = '▸';
+        toggle.appendChild(chevron);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'bank-toggle-name';
+        nameSpan.textContent = bankName;
+        toggle.appendChild(nameSpan);
+
+        const countBadge = document.createElement('span');
+        countBadge.className = 'bank-count-badge';
+        countBadge.textContent = `${errorsByBank[bankName].length} 题`;
+        toggle.appendChild(countBadge);
+
+        // 该题库的错题容器
         const bankContainer = document.createElement('div');
-        bankContainer.className = 'bank-errors';
+        bankContainer.className = 'bank-errors' + (isCollapsed ? ' collapsed' : '');
+
+        toggle.addEventListener('click', () => {
+            const nowExpanded = !expandedBanks[bankName];
+            expandedBanks[bankName] = nowExpanded;
+            saveCollapsedBanks();
+            if (nowExpanded) {
+                bankContainer.classList.remove('collapsed');
+                toggle.classList.add('expanded');
+                toggle.setAttribute('aria-expanded', 'true');
+            } else {
+                bankContainer.classList.add('collapsed');
+                toggle.classList.remove('expanded');
+                toggle.setAttribute('aria-expanded', 'false');
+            }
+            updateToggleAllBanksLabel();
+        });
 
         // 显示该题库的错题
         errorsByBank[bankName].forEach(({ question, index }) => {
         const errorItem = document.createElement('div');
         errorItem.className = 'error-item';
-        
+
         const title = document.createElement('h4');
         title.textContent = question.content;
-        
+
         const type = document.createElement('p');
         type.textContent = `题型：${question.type}`;
 
@@ -1072,23 +1139,23 @@ function updateErrorsList() {
                 optionsDiv.appendChild(optionDiv);
             });
         }
-        
+
         const correctAnswer = document.createElement('p');
         correctAnswer.className = 'correct-answer';
         correctAnswer.textContent = `正确答案：${question.answer}`;
-        
+
         const yourAnswer = document.createElement('p');
         yourAnswer.className = 'your-answer';
         yourAnswer.textContent = `你的答案：${question.userAnswer}`;
-        
+
         const analysis = document.createElement('p');
         analysis.textContent = `解析：${question.analysis || '暂无解析'}`;
-        
+
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'delete-btn';
         deleteBtn.textContent = '删除';
         deleteBtn.addEventListener('click', () => deleteError(index));
-        
+
         errorItem.appendChild(title);
         if (question.options && Object.keys(question.options).length > 0) {
             errorItem.appendChild(optionsDiv);
@@ -1098,12 +1165,33 @@ function updateErrorsList() {
         errorItem.appendChild(yourAnswer);
         errorItem.appendChild(analysis);
         errorItem.appendChild(deleteBtn);
-        
+
         bankContainer.appendChild(errorItem);
         });
 
-        errorsList.appendChild(bankContainer);
+        group.appendChild(toggle);
+        group.appendChild(bankContainer);
+        errorsList.appendChild(group);
     });
+}
+
+// 根据当前展开/折叠状态更新"全部展开/全部折叠"按钮文案（展示将要执行的动作）
+function updateToggleAllBanksLabel(bankNameList) {
+    const names = bankNameList || new Set(errorQuestions.map(q => q.bankName || '未知题库'));
+    const list = Array.isArray(names) ? names : [...names];
+    if (list.length === 0) return;
+    const anyExpanded = list.some(name => !!expandedBanks[name]);
+    toggleAllBanksBtn.textContent = anyExpanded ? '全部折叠' : '全部展开';
+}
+
+// 全部展开 / 全部折叠
+function toggleAllBanks() {
+    const bankNames = new Set(errorQuestions.map(q => q.bankName || '未知题库'));
+    const anyExpanded = [...bankNames].some(name => !!expandedBanks[name]);
+    // 有展开的组 → 全部折叠；全部已折叠 → 全部展开
+    bankNames.forEach(name => { expandedBanks[name] = !anyExpanded; });
+    saveCollapsedBanks();
+    updateErrorsList();
 }
 
 // 删除错题
