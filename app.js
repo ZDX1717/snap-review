@@ -65,6 +65,21 @@ const confirmRenameBankBtn = document.getElementById('confirm-rename-bank-btn');
 const cancelRenameBankBtn = document.getElementById('cancel-rename-bank-btn');
 let currentRenameBank = null; // 当前正在重命名的题库名
 
+// 粘贴导入与预览向导
+const pasteInput = document.getElementById('paste-input');
+const pasteParseBtn = document.getElementById('paste-parse-btn');
+const pasteClearBtn = document.getElementById('paste-clear-btn');
+const importPreviewModal = document.getElementById('import-preview-modal');
+const previewSummary = document.getElementById('preview-summary');
+const previewSelectAll = document.getElementById('preview-select-all');
+const previewSkipDupes = document.getElementById('preview-skip-dupes');
+const previewList = document.getElementById('preview-list');
+const previewTargetBankSelect = document.getElementById('preview-target-bank');
+const previewOverwrite = document.getElementById('preview-overwrite');
+const previewConfirmBtn = document.getElementById('preview-confirm-btn');
+const previewCancelBtn = document.getElementById('preview-cancel-btn');
+let previewData = []; // 预览中的待导入题目
+
 // 初始化
 function init() {
     // 加载本地存储的数据
@@ -198,6 +213,16 @@ function setupEventListeners() {
     confirmRenameBankBtn.addEventListener('click', renameBank);
     exportAllBtn.addEventListener('click', exportAllBanks);
     exportCurrentBtn.addEventListener('click', () => exportBank(currentBankName));
+
+    // 粘贴导入
+    pasteInput.addEventListener('paste', handlePasteEvent);
+    pasteParseBtn.addEventListener('click', parsePastedText);
+    pasteClearBtn.addEventListener('click', () => { pasteInput.value = ''; });
+
+    // 导入预览向导
+    previewSelectAll.addEventListener('change', togglePreviewSelectAll);
+    previewConfirmBtn.addEventListener('click', commitPreviewImport);
+    previewCancelBtn.addEventListener('click', () => hideModal(importPreviewModal));
 }
 
 // 显示指定部分
@@ -266,144 +291,279 @@ function importQuestions() {
         showImportStatus('请先选择一个文件', 'error');
         return;
     }
-    
+
     const reader = new FileReader();
     reader.onload = function(event) {
         const content = event.target.result;
-        const importedQuestions = parseQuestions(content);
-        
+        const importedQuestions = parseQuestionsText(content);
+
         if (importedQuestions.length === 0) {
             showImportStatus('导入失败：文件中没有找到有效的题目', 'error');
             return;
         }
-        
-        // 根据导入模式处理题目
-        const importMode = document.querySelector('input[name="import-mode"]:checked').value;
 
-        // 从文件名提取题库名（去掉扩展名）
-        const bankName = file.name.replace(/\.[^/.]+$/, '');
-        
-        if (importMode === 'replace') {
-            if (isAllBanksView) {
-                showImportStatus('当前为"全部题库"视图，请先在刷题设置的"选择题库"中选定一个具体题库，再使用替换模式', 'error');
-                return;
-            }
-            // 替换当前题库
-            questionBank = importedQuestions;
-            questionBanks[currentBankName] = questionBank;
-        } else {
-            // 追加模式：创建新题库或追加到现有题库
-            if (questionBanks[bankName]) {
-                // 如果题库已存在，追加到该题库
-                questionBanks[bankName] = [...questionBanks[bankName], ...importedQuestions];
-            } else {
-                // 如果题库不存在，创建新题库
-                questionBanks[bankName] = importedQuestions;
-            }
-            // 切换到新导入的题库
-            isAllBanksView = false;
-            currentBankName = bankName;
-            questionBank = questionBanks[currentBankName];
-            questionBankSelect.value = bankName;
-        }
-        
-        // 保存到本地存储
-        saveToLocalStorage();
-        
-        // 更新题库选择下拉框
-        updateBankSelect();
-
-        showImportStatus(`成功导入 ${importedQuestions.length} 道题目到题库：${bankName}`, 'success');
-        
-        // 重置文件输入
-        fileInput.value = '';
-        fileName.textContent = '未选择文件';
+        // 解析结果先进入预览向导，由用户确认后再导入
+        updatePreviewTargetBanks();
+        openImportPreview(importedQuestions);
     };
-    
+
     reader.readAsText(file);
 }
 
-// 解析题目内容 - 简化版，高容错性
-function parseQuestions(content) {
-    const questions = [];
-    // 支持两种分隔方式：以#开头或以"题目："开头
-    const questionBlocks = content.split(/(?=^\s*#)|(?=^\s*题目：)/m).filter(block => block.trim());
-    
-    questionBlocks.forEach(block => {
-        const question = {
-            title: '',
-            content: '',
-            explanation: '',
-            options: {},
-            optionExplanations: {},
-            answer: '',
-            analysis: '',
-            type: '单选'
-        };
-        
-        const lines = block.trim().split('\n');
-        
-        lines.forEach(line => {
-            const trimmedLine = line.trim();
-            
-            // 支持多种分隔符：：、: 、空格等
-            const parseField = (prefixes, startIndex = 0) => {
-                for (const prefix of prefixes) {
-                    if (trimmedLine.startsWith(prefix)) {
-                        return trimmedLine.substring(prefix.length).trim();
-                    }
-                }
-                return null;
-            };
+// ==================== 题目解析（批次1：多格式自动识别） ====================
+//
+// 支持的格式家族（自动识别，无需用户选择）：
+//   A. 字段式：  题目：xxx / A：xxx / 答案：x（原有格式，完整保留）
+//   B. 编号式：  1. 题干 / A. 选项（逐行）/ 答案：x（最常见的题库排版）
+//   C. 混排式：  1. 题干 A.xx B.xx C.xx D.xx 答案：x（单行，常见于网页/微信复制）
+//   D. 判断题：  答案为 对/错/√/×/正确/错误，自动配 A正确/B错误 两个选项
+// 每题输出置信度，供导入预览向导提示需要人工确认的题。
 
-            // 解析题目内容
-            const content = parseField(['题目：', '题目:', '题目 ']);
-            if (content) question.content = content;
+const OPTION_LINE_RE = /^\s*([A-Ha-h])\s*[.、:：．)）,，]\s*(.+)$/;
+const OPTION_EXPLAIN_RE = /^\s*([A-Ha-h])\s*解释\s*[:：]\s*(.+)$/;
+const QUESTION_NUM_RE = /^(\d{1,3})\s*[.、)）．]\s*(.*)$/;
+const JUDGE_QUESTION_RE = /^判断题\s*[:：]\s*(.*)$/;
+const TITLE_RE = /^#\s*(.*)$/;
+const ANALYSIS_RE = /^(?:答案解析|解析)\s*[:：]\s*(.+)$/;
+const EXPLAIN_RE = /^(?:题目解释|题干解释)\s*[:：]\s*(.+)$/;
+const TYPE_RE = /^(?:类型|题型)\s*[:：]\s*(.+)$/;
+const QUESTION_FIELD_RE = /^题目\s*[:：]\s*(.*)$/;
+// 整行答案（必须带冒号，避免把普通句子误判成答案行）
+const FULL_ANSWER_RE = /^(?:【?参考答案】?|【?标准答案】?|【?正确答案】?|【?答案】?|答案)\s*[:：]\s*(.+?)\s*[。.]?$/;
+// 空格分隔的纯答案行，如"答案 A" / "参考答案 B"
+const FULL_ANSWER_SPACED_RE = /^(?:【?参考答案】?|【?标准答案】?|【?正确答案】?|【?答案】?|答案)\s+((?:[A-Ha-h√×对错]+)(?:[\s、,，]+[A-Ha-h√×对错]+)*)\s*[。.]?$/;
+// 行尾行内答案（家族C），要求"答案"前是行首、空白或中文标点，避免误伤选项文字
+// 分组1=前导字符(裁剪时保留),分组2=答案内容
+const INLINE_ANSWER_RE = /(^|[\s(（,，;；。？！：、])(?:【?参考答案】?|【?标准答案】?|【?正确答案】?|【?答案】?|答案)\s*[:：]?\s*((?:正确|错误)|[A-Ha-h√×对错])\s*[。.]?\s*$/;
 
-            // 解析题目解释（可选）
-            const explanation = parseField(['题目解释：', '题目解释:', '题目解释 ']);
-            if (explanation) question.explanation = explanation;
+const JUDGE_TRUE_RE = /^(对|正确|√|T|Y)$/i;
+const JUDGE_FALSE_RE = /^(错|错误|×|X|F|N)$/i;
 
-            // 解析答案
-            const answer = parseField(['答案：', '答案:', '答案 ']);
-            if (answer) question.answer = answer.toUpperCase();
-
-            // 解析解析（可选）
-            const analysis = parseField(['解析：', '解析:', '解析 ']);
-            if (analysis) question.analysis = analysis;
-
-            // 解析类型（可选，会自动根据答案判断）
-            const type = parseField(['类型：', '类型:', '类型 ']);
-            if (type) question.type = type;
-
-            // 解析选项 - 支持多种格式：A：、A.、A、等
-            const optionMatch = trimmedLine.match(/^([A-Z])[：.、\s](.+)$/);
-            if (optionMatch) {
-                const optionKey = optionMatch[1];
-                const optionValue = optionMatch[2];
-                question.options[optionKey] = optionValue;
-            }
-
-            // 解析选项解释（可选）
-            const optionExpMatch = trimmedLine.match(/^([A-Z])解释[：.、\s](.+)$/);
-            if (optionExpMatch) {
-                const optionKey = optionExpMatch[1];
-                const optionValue = optionExpMatch[2];
-                question.optionExplanations[optionKey] = optionValue;
-            }
+// 拆分行内选项（家族C）："题干 A.xx B.yy C.zz" → { stem, options }
+// 要求至少两个选项且从 A 开始连续编号，避免把题干中"A、B两类"这类文字误拆
+function splitInlineOptions(text) {
+    // 分组1=前导字符(题干裁剪时保留),分组2=选项字母
+    const re = /(^|[\s(（,，;；。？！：、…""''「」『』（）【】《》<>])\s*([A-Ha-h])\s*[.、:：．)）]\s*/g;
+    const markers = [];
+    let m;
+    while ((m = re.exec(text)) !== null) {
+        markers.push({
+            key: m[2].toUpperCase(),
+            stemEnd: m.index + m[1].length,
+            textStart: re.lastIndex,
         });
-        
-        // 自动判断题型（按答案中实际选项字母数判断，兼容"A、B"这类带分隔符的写法）
-        if (question.answer) {
-            question.type = normalizeAnswerString(question.answer).length > 1 ? '多选' : '单选';
+    }
+    if (markers.length < 2 || markers[0].key !== 'A') return null;
+    for (let i = 0; i < markers.length; i++) {
+        if (markers[i].key !== String.fromCharCode(65 + i)) return null;
+    }
+    const options = {};
+    markers.forEach((mk, i) => {
+        const end = i + 1 < markers.length ? markers[i + 1].stemEnd : text.length;
+        options[mk.key] = text.slice(mk.textStart, end).replace(/\s+/g, ' ').trim();
+    });
+    const stem = text.slice(0, markers[0].stemEnd).replace(/\s+/g, ' ').trim();
+    return { stem, options };
+}
+
+// 题型/答案/选项的最终规范化（导入与预览提交时都会调用，幂等）
+function finalizeQuestion(q) {
+    q.title = (q.title || '').trim();
+    q.content = (q.content || '').trim();
+    q.analysis = (q.analysis || '').trim();
+    q.explanation = (q.explanation || '').trim();
+    const rawAnswer = (q.answer || '').toUpperCase().replace(/\s+/g, '');
+
+    const hint = (q.type || '').replace(/题$/, '');
+    const isJudge = hint === '判断' || JUDGE_TRUE_RE.test(rawAnswer) || JUDGE_FALSE_RE.test(rawAnswer);
+
+    if (isJudge) {
+        q.type = '判断';
+        const meaningful = Object.values(q.options).some(v => v && v.length > 2);
+        if (!meaningful) {
+            // 统一选项为 A正确 / B错误，保证刷题界面与判分一致
+            q.options = { A: '正确', B: '错误' };
+        }
+        if (JUDGE_TRUE_RE.test(rawAnswer)) q.answer = 'A';
+        else if (JUDGE_FALSE_RE.test(rawAnswer)) q.answer = 'B';
+        else if (/^[AB]$/.test(rawAnswer)) q.answer = rawAnswer;
+        else q.answer = '';
+    } else {
+        q.answer = rawAnswer.replace(/[^A-H]/g, '');
+        q.type = q.answer.length > 1 ? '多选' : '单选';
+    }
+
+    // 置信度：预览时用于提示"需要人工看一眼"的题
+    let conf = 1.0;
+    const optCount = Object.keys(q.options).length;
+    if (!q.answer) conf -= 0.5;
+    if (optCount === 0) conf -= 0.4;
+    else if (optCount < 2) conf -= 0.3;
+    if (!q.analysis) conf -= 0.1;
+    q.confidence = Math.max(0, Math.min(1, conf));
+    q.raw = Array.isArray(q.raw) ? q.raw.join('\n') : (q.raw || '');
+
+    if (!q.content) return null; // 没有题干的散行直接丢弃
+    return q;
+}
+
+// 查重键：题干（去空白）+ 规范化答案
+function questionDedupKey(q) {
+    return (q.content || '').replace(/\s+/g, '') + '|' + (q.answer || '').toUpperCase().replace(/[^A-H]/g, '');
+}
+
+// 主解析器：逐行状态机，同时覆盖家族 A/B/C/D
+function parseQuestionsText(content) {
+    const questions = [];
+    const lines = String(content).replace(/\r\n?/g, '\n').split('\n');
+    let cur = null;
+
+    const newQuestion = () => {
+        cur = {
+            title: '', content: '', explanation: '', options: {}, optionExplanations: {},
+            answer: '', analysis: '', type: '', confidence: 1.0, raw: []
+        };
+    };
+    const flush = () => {
+        if (!cur) return;
+        const q = finalizeQuestion(cur);
+        if (q) questions.push(q);
+        cur = null;
+    };
+
+    for (const rawLine of lines) {
+        const line = rawLine.replace(/\s+$/, '').trim();
+        if (!line) continue;
+
+        // 1. "# 标题" → 新题开始
+        const titleM = line.match(TITLE_RE);
+        if (titleM) {
+            flush();
+            newQuestion();
+            cur.title = titleM[1].trim();
+            cur.raw.push(rawLine);
+            continue;
         }
 
-        // 只有当题目有内容且有答案时才添加到题库
-        if (question.content && question.answer) {
-            questions.push(question);
+        // 2. 剥离行尾行内答案（家族C："…… 答案：B"）
+        let body = line;
+        let inlineAnswer = null;
+        const ansM = body.match(INLINE_ANSWER_RE);
+        if (ansM) {
+            inlineAnswer = ansM[2];
+            // 裁剪时保留前导字符（如"？"），避免题干丢失标点
+            body = body.slice(0, ansM.index + ansM[1].length).trim();
         }
-    });
-    
+
+        // 3. 字段行（顺序重要：题目解释/解析 必须先于 题目/答案 判断）
+        const explainM = body.match(EXPLAIN_RE);
+        if (explainM) {
+            if (!cur) newQuestion();
+            cur.explanation = explainM[1].trim();
+            cur.raw.push(rawLine);
+            continue;
+        }
+        const analysisM = body.match(ANALYSIS_RE);
+        if (analysisM) {
+            if (!cur) newQuestion();
+            cur.analysis = analysisM[1].trim();
+            cur.raw.push(rawLine);
+            continue;
+        }
+        const typeM = body.match(TYPE_RE);
+        if (typeM) {
+            if (!cur) newQuestion();
+            cur.type = typeM[1].trim();
+            cur.raw.push(rawLine);
+            continue;
+        }
+        const fieldM = body.match(QUESTION_FIELD_RE);
+        if (fieldM) {
+            if (cur && cur.content) flush(); // 家族A连续两题之间靠"题目："分隔
+            if (!cur) newQuestion();
+            cur.content = fieldM[1].trim();
+            if (inlineAnswer) cur.answer = inlineAnswer;
+            cur.raw.push(rawLine);
+            continue;
+        }
+
+        // 3.5 整行答案
+        const fullAnsM = body.match(FULL_ANSWER_RE) || body.match(FULL_ANSWER_SPACED_RE);
+        if (fullAnsM) {
+            if (!cur) newQuestion();
+            cur.answer = fullAnsM[1].trim();
+            cur.raw.push(rawLine);
+            continue;
+        }
+
+        // 4. "1. 题干"编号行 → 新题（家族B/C）
+        const numM = body.match(QUESTION_NUM_RE);
+        if (numM) {
+            const afterNum = numM[2].trim();
+            const split = splitInlineOptions(afterNum);
+            flush();
+            newQuestion();
+            cur.raw.push(rawLine);
+            if (split) {
+                cur.content = split.stem;   // 家族C：题干 + 行内选项
+                cur.options = split.options;
+            } else {
+                cur.content = afterNum;     // 家族B：仅题干，选项在后续行
+            }
+            if (inlineAnswer) cur.answer = inlineAnswer;
+            continue;
+        }
+
+        // 5. "判断题：xxx" 开头
+        const judgeM = body.match(JUDGE_QUESTION_RE);
+        if (judgeM) {
+            flush();
+            newQuestion();
+            cur.raw.push(rawLine);
+            cur.content = judgeM[1].trim();
+            cur.type = '判断';
+            if (inlineAnswer) cur.answer = inlineAnswer;
+            continue;
+        }
+
+        // 6. 选项解释行（A解释：xxx）
+        const opExM = body.match(OPTION_EXPLAIN_RE);
+        if (opExM) {
+            if (!cur) newQuestion();
+            cur.optionExplanations[opExM[1].toUpperCase()] = opExM[2].trim();
+            cur.raw.push(rawLine);
+            continue;
+        }
+
+        // 7. 选项行（A. xxx / A：xxx / A、xxx）
+        const opM = body.match(OPTION_LINE_RE);
+        if (opM) {
+            if (!cur) newQuestion();
+            cur.options[opM[1].toUpperCase()] = opM[2].trim();
+            if (inlineAnswer) cur.answer = inlineAnswer;
+            cur.raw.push(rawLine);
+            continue;
+        }
+
+        // 8. 整行就是答案（行内答案剥离后 body 为空）
+        if (inlineAnswer) {
+            if (!cur) newQuestion();
+            cur.answer = inlineAnswer;
+            cur.raw.push(rawLine);
+            continue;
+        }
+
+        // 9. 其他 → 题干续行（多行题干）；没有当前题的散行丢弃
+        if (cur) {
+            if (cur.content) {
+                cur.content += '\n' + line;
+            } else if (!cur.answer && Object.keys(cur.options).length === 0) {
+                cur.content = line;
+            }
+            cur.raw.push(rawLine);
+        }
+    }
+    flush();
     return questions;
 }
 
@@ -438,6 +598,8 @@ function startQuiz() {
         filteredQuestions = questionBank.filter(q => q.type === '单选');
     } else if (questionType === 'multiple') {
         filteredQuestions = questionBank.filter(q => q.type === '多选');
+    } else if (questionType === 'judge') {
+        filteredQuestions = questionBank.filter(q => q.type === '判断');
     }
     
     if (filteredQuestions.length === 0) {
@@ -490,9 +652,9 @@ function displayQuestion() {
         const optionItem = document.createElement('div');
         optionItem.className = 'option-item';
         
-        // 根据题目类型创建不同的输入元素
+        // 根据题目类型创建不同的输入元素（多选用 checkbox，单选/判断题用 radio）
         let inputElement;
-        if (question.type === '单选') {
+        if (question.type !== '多选') {
             inputElement = document.createElement('input');
             inputElement.type = 'radio';
             inputElement.name = 'answer';
@@ -546,7 +708,7 @@ function submitAnswer() {
     const question = currentQuiz[currentQuestionIndex];
     let userAnswer;
     
-    if (question.type === '单选') {
+    if (question.type !== '多选') { // 单选/判断题：单选框
         const selectedOption = document.querySelector('input[name="answer"]:checked');
         if (!selectedOption) {
             alert('请选择一个答案');
@@ -830,6 +992,274 @@ function showQuizStatus(message, type) {
     setTimeout(() => {
         quizStatus.className = 'status-message';
     }, 3000);
+}
+
+// ==================== 粘贴导入 + 导入预览向导（批次1） ====================
+
+// 把剪贴板里的富文本 HTML 按块级元素拆成行（Word/网页/PDF 复制时保留结构）
+function htmlToLines(html) {
+    if (typeof DOMParser === 'undefined') {
+        // 无 DOMParser 环境的兜底
+        return html.replace(/<[^>]+>/g, '\n').split('\n').map(s => s.trim()).filter(Boolean);
+    }
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const lines = [];
+    const BLOCK = new Set(['P', 'DIV', 'LI', 'TR', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'PRE', 'BLOCKQUOTE']);
+    const pushText = (t) => {
+        const s = (t || '').replace(/\s+/g, ' ').trim();
+        if (s) lines.push(s);
+    };
+    const walk = (node) => {
+        for (const child of node.children) {
+            const tag = child.tagName;
+            if (tag === 'TR') {
+                const cells = Array.from(child.children)
+                    .map(td => (td.textContent || '').replace(/\s+/g, ' ').trim())
+                    .filter(Boolean);
+                if (cells.length) lines.push(cells.join(' '));
+            } else if (tag === 'UL' || tag === 'OL' || tag === 'TABLE' || tag === 'THEAD' || tag === 'TBODY' || tag === 'TFOOT' ||
+                       (BLOCK.has(tag) && child.querySelector('p, div, li, tr'))) {
+                walk(child); // 容器元素继续下钻
+            } else if (BLOCK.has(tag)) {
+                pushText(child.textContent);
+            }
+            // 行内元素（span/b/i 等）的文本已包含在最近的块级祖先里
+        }
+    };
+    walk(doc.body);
+    if (lines.length === 0) {
+        return (doc.body.textContent || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    }
+    return lines;
+}
+
+// 粘贴事件：优先按富文本 HTML 读取（保留段落/表格结构），纯文本走默认行为
+function handlePasteEvent(event) {
+    const html = event.clipboardData && event.clipboardData.getData('text/html');
+    if (!html) return;
+    event.preventDefault();
+    pasteInput.value = htmlToLines(html).join('\n');
+    showImportStatus('已按富文本结构读取剪贴板内容', 'success');
+}
+
+function parsePastedText() {
+    const text = pasteInput.value;
+    if (!text.trim()) {
+        showImportStatus('请先粘贴题目内容', 'error');
+        return;
+    }
+    const importedQuestions = parseQuestionsText(text);
+    if (importedQuestions.length === 0) {
+        showImportStatus('没有解析出有效题目，请检查内容格式', 'error');
+        return;
+    }
+    updatePreviewTargetBanks();
+    openImportPreview(importedQuestions);
+}
+
+// ---------- 导入预览向导 ----------
+
+// 打开预览：questions 为解析结果数组
+function openImportPreview(questions) {
+    previewData = questions.map(q => ({ q, include: true, warnings: [] }));
+    renderPreview();
+    showModal(importPreviewModal);
+}
+
+function updatePreviewTargetBanks() {
+    previewTargetBankSelect.innerHTML = '';
+    Object.keys(questionBanks).forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = `${name}（${(questionBanks[name] || []).length} 题）`;
+        previewTargetBankSelect.appendChild(opt);
+    });
+    const newOpt = document.createElement('option');
+    newOpt.value = '__new__';
+    newOpt.textContent = '＋ 新建题库…';
+    previewTargetBankSelect.appendChild(newOpt);
+    if (Object.keys(questionBanks).length === 0) {
+        previewTargetBankSelect.value = '__new__';
+    }
+}
+
+function renderPreview() {
+    previewList.innerHTML = '';
+    const bankKeys = new Set();
+    Object.values(questionBanks).forEach(bank => (bank || []).forEach(q => bankKeys.add(questionDedupKey(q))));
+
+    let warnCount = 0;
+    previewData.forEach((item, idx) => {
+        const q = item.q;
+        const warnings = [];
+        if (!q.answer) warnings.push('缺答案');
+        if (Object.keys(q.options).length < 2) warnings.push('选项不足');
+        if (bankKeys.has(questionDedupKey(q))) warnings.push('与现有题库重复');
+        if ((q.confidence || 0) < 0.6) warnings.push('低置信度');
+        item.warnings = warnings;
+        if (warnings.length) warnCount++;
+
+        const box = document.createElement('div');
+        box.className = 'preview-item' + (warnings.length ? ' warn' : '');
+
+        const head = document.createElement('div');
+        head.className = 'preview-item-head';
+
+        const chk = document.createElement('input');
+        chk.type = 'checkbox';
+        chk.checked = item.include;
+        chk.addEventListener('change', () => { item.include = chk.checked; updatePreviewSummary(); });
+        head.appendChild(chk);
+
+        const num = document.createElement('span');
+        num.className = 'preview-num';
+        num.textContent = `#${idx + 1}`;
+        head.appendChild(num);
+
+        const typeBadge = document.createElement('span');
+        typeBadge.className = 'badge';
+        typeBadge.textContent = q.type || '未知';
+        head.appendChild(typeBadge);
+
+        warnings.forEach(w => {
+            const b = document.createElement('span');
+            b.className = 'badge warn-badge';
+            b.textContent = w;
+            head.appendChild(b);
+        });
+
+        const conf = document.createElement('span');
+        conf.className = 'preview-conf';
+        conf.textContent = `${Math.round((q.confidence || 0) * 100)}%`;
+        head.appendChild(conf);
+        box.appendChild(head);
+
+        const stem = document.createElement('textarea');
+        stem.className = 'preview-stem';
+        stem.rows = 2;
+        stem.value = q.content;
+        stem.addEventListener('input', () => { q.content = stem.value; });
+        box.appendChild(stem);
+
+        const optsDiv = document.createElement('div');
+        optsDiv.className = 'preview-options';
+        const optKeys = Object.keys(q.options).sort();
+        optsDiv.textContent = optKeys.length
+            ? optKeys.map(k => `${k}. ${q.options[k]}`).join('　')
+            : '（未解析到选项）';
+        box.appendChild(optsDiv);
+
+        const editRow = document.createElement('div');
+        editRow.className = 'preview-edit-row';
+
+        const ansLabel = document.createElement('span');
+        ansLabel.className = 'preview-answer-label';
+        ansLabel.textContent = '答案：';
+        editRow.appendChild(ansLabel);
+
+        const ansInput = document.createElement('input');
+        ansInput.className = 'preview-answer';
+        ansInput.value = q.answer;
+        ansInput.placeholder = '如 A / ABC / 对';
+        ansInput.addEventListener('input', () => { q.answer = ansInput.value; });
+        editRow.appendChild(ansInput);
+
+        if (q.analysis) {
+            const ana = document.createElement('span');
+            ana.className = 'preview-analysis';
+            ana.textContent = `解析：${q.analysis}`;
+            editRow.appendChild(ana);
+        }
+        box.appendChild(editRow);
+
+        previewList.appendChild(box);
+    });
+
+    updatePreviewSummary(warnCount);
+}
+
+function updatePreviewSummary(warnCount) {
+    const total = previewData.length;
+    const included = previewData.filter(i => i.include).length;
+    const warns = (typeof warnCount === 'number')
+        ? warnCount
+        : previewData.filter(i => i.warnings && i.warnings.length).length;
+    previewSummary.textContent = `共解析 ${total} 题，已勾选 ${included} 题，${warns} 题含警告需要留意`;
+}
+
+function togglePreviewSelectAll() {
+    previewData.forEach(i => { i.include = previewSelectAll.checked; });
+    renderPreview();
+}
+
+// 确认导入：收集勾选项 → 重新规范化 → 去重 → 写入目标题库
+function commitPreviewImport() {
+    let targetName = previewTargetBankSelect.value;
+    if (targetName === '__new__') {
+        const name = (prompt('请输入新题库名称：') || '').trim();
+        if (!name) return;
+        targetName = name;
+    }
+    if (!questionBanks[targetName]) questionBanks[targetName] = [];
+
+    const overwrite = previewOverwrite.checked;
+    if (overwrite && questionBanks[targetName].length > 0 &&
+        !confirm(`确定清空题库"${targetName}"并导入新题目吗？此操作不可恢复！`)) {
+        return;
+    }
+
+    // 收集勾选且有答案的题（重新规范化保证答案/题型一致）
+    const items = [];
+    const seen = new Set();
+    let droppedNoAnswer = 0;
+    for (const item of previewData) {
+        if (!item.include) continue;
+        const clone = JSON.parse(JSON.stringify(item.q));
+        const finalized = finalizeQuestion(clone);
+        if (!finalized) continue;
+        if (!finalized.answer) { droppedNoAnswer++; continue; }
+        const key = questionDedupKey(finalized);
+        if (seen.has(key)) continue; // 批内去重
+        seen.add(key);
+        items.push(finalized);
+    }
+
+    // 与目标题库查重
+    const existingKeys = new Set((overwrite ? [] : questionBanks[targetName]).map(questionDedupKey));
+    const finalItems = previewSkipDupes.checked
+        ? items.filter(q => !existingKeys.has(questionDedupKey(q)))
+        : items;
+
+    if (finalItems.length === 0) {
+        alert(droppedNoAnswer > 0
+            ? `没有可导入的题目：${droppedNoAnswer} 题缺少答案，请在预览中补填答案后重试`
+            : '没有可导入的题目（均与目标题库重复）');
+        return;
+    }
+
+    if (overwrite) {
+        questionBanks[targetName] = finalItems;
+    } else {
+        questionBanks[targetName].push(...finalItems);
+    }
+
+    // 切换到目标题库
+    isAllBanksView = false;
+    currentBankName = targetName;
+    questionBank = questionBanks[targetName];
+
+    saveToLocalStorage();
+    updateBankSelect();
+    questionBankSelect.value = targetName;
+    updateBanksList();
+
+    hideModal(importPreviewModal);
+    fileInput.value = '';
+    fileName.textContent = '未选择文件';
+    pasteInput.value = '';
+
+    const dupeNote = (items.length - finalItems.length) > 0 ? `（跳过 ${items.length - finalItems.length} 题重复）` : '';
+    showImportStatus(`成功导入 ${finalItems.length} 道题目到题库：${targetName}${dupeNote}`, 'success');
 }
 
 // 题库管理功能

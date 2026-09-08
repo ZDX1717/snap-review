@@ -62,6 +62,10 @@
                             <input type="radio" name="question-type" value="multiple">
                             仅多选题
                         </label>
+                        <label>
+                            <input type="radio" name="question-type" value="judge">
+                            仅判断题
+                        </label>
                     </div>
 
                     <div class="option-group">
@@ -180,25 +184,23 @@
                     <!-- 右侧：题库操作 -->
                     <div class="bank-operations-panel">
                         <div class="operation-card">
-                            <h3>导入题库</h3>
+                            <h3>粘贴导入</h3>
+                            <p class="import-hint">支持从 Word / PDF / 网页 / 微信直接复制粘贴，自动识别常见题目格式（编号式、字段式、单行混排、判断题），导入前可逐题预览修正。</p>
+                            <textarea id="paste-input" rows="8" placeholder="把题目直接粘贴到这里，然后点击下方按钮…"></textarea>
+                            <div class="paste-actions">
+                                <button id="paste-parse-btn" class="action-btn">解析并预览</button>
+                                <button id="paste-clear-btn" class="action-btn secondary">清空</button>
+                            </div>
+                        </div>
+
+                        <div class="operation-card">
+                            <h3>导入题库文件</h3>
                             <div class="upload-area">
-                                <input type="file" id="file-input" accept=".txt" />
+                                <input type="file" id="file-input" accept=".txt,.md,.csv,.json" />
                                 <button id="upload-btn">选择文件</button>
                                 <p id="file-name">未选择文件</p>
                             </div>
-                            <div class="import-options">
-                                <div class="option-group">
-                                    <label>
-                                        <input type="radio" name="import-mode" value="append" checked>
-                                        追加到对应题库（按文件名）
-                                    </label>
-                                    <label>
-                                        <input type="radio" name="import-mode" value="replace">
-                                        替换当前题库
-                                    </label>
-                                </div>
-                            </div>
-                            <button id="import-btn" class="action-btn">导入题库</button>
+                            <button id="import-btn" class="action-btn">解析并预览</button>
                             <div id="import-status" class="status-message"></div>
                         </div>
 
@@ -263,6 +265,32 @@ D：HTML
                         <div class="modal-actions">
                             <button id="confirm-rename-bank-btn" class="action-btn">确定</button>
                             <button id="cancel-rename-bank-btn" class="action-btn secondary">取消</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 导入预览模态框 -->
+                <div id="import-preview-modal" class="modal hidden">
+                    <div class="modal-content modal-lg">
+                        <h3>导入预览</h3>
+                        <p id="preview-summary" class="preview-summary"></p>
+                        <div class="preview-toolbar">
+                            <label class="inline-label">
+                                <input type="checkbox" id="preview-select-all" checked> 全选
+                            </label>
+                            <label class="inline-label">
+                                <input type="checkbox" id="preview-skip-dupes" checked> 跳过与目标题库重复的题
+                            </label>
+                        </div>
+                        <div id="preview-list" class="preview-list"></div>
+                        <div class="preview-import-row">
+                            <span>导入到：</span>
+                            <select id="preview-target-bank" class="bank-select"></select>
+                            <label class="inline-label">
+                                <input type="checkbox" id="preview-overwrite"> 覆盖目标题库
+                            </label>
+                            <button id="preview-confirm-btn" class="action-btn">确认导入</button>
+                            <button id="preview-cancel-btn" class="action-btn secondary">取消</button>
                         </div>
                     </div>
                 </div>
