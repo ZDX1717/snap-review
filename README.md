@@ -2,7 +2,7 @@
 
 **Zquiz**（期末周刷题）是一个基于 Web 的纯前端刷题工具：把任意格式的题目粘贴进来就能刷。支持多格式题库导入、逐题边刷边学、套题模式模拟考试、错题自动归档。零依赖、零构建、无需注册，所有数据仅保存在本地浏览器。
 
-**在线使用**：<https://zdx1717.github.io/snap-review/>（手机浏览器打开即可，建议"添加到主屏幕"当 App 用）
+**在线使用**：<https://zdx1717.github.io/zquiz/>（手机浏览器打开即可，建议"添加到主屏幕"当 App 用）
 
 ## 功能特点
 
@@ -138,7 +138,7 @@ tests/                Node 内置 test runner 的回归套件（62 组断言）
 
 ## 更新记录
 
-- **0.7.0** — 单文件重构为 ES Modules 多模块（parser/state/storage/quiz/errorbook/favorites/bank/dom/main）；测试入仓并接入 GitHub Actions；应用更名 Zquiz
+- **0.7.0** — 单文件重构为 ES Modules 多模块（parser/state/storage/quiz/errorbook/favorites/bank/dom/main）；测试入仓并接入 GitHub Actions；应用更名 Zquiz；仓库与在线地址更名为 zquiz（旧地址 zdx1717.github.io/snap-review/ 不再有效，数据保存在浏览器本地不受影响）
 - **0.6.1** — 修复复习范围弹窗被隐藏 section 连带隐藏的问题；所有模态框移出 section
 - **0.6.0** — 错题移出规则可配置（含关闭）、复习错题可选范围（题库×题型）、题库可视化编辑器
 - **0.5.0** — 错题本闭环（连对 2 次自动移出）、收藏夹、去重指纹升级（题干+选项）+ 题库一键去重
