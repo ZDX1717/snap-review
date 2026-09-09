@@ -5,7 +5,7 @@ import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, toggleAllBanks, updateErrorStreak, updateErrorsList, updateToggleAllBanksLabel } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
 import { backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getScopeSelection, nextQuestion, prevQuestion, renderAnswerReview, reviewErrors, showQuizResult, showQuizStatus, showSection, startQuiz, startReviewSession, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton, updateScopeSummary } from './quiz.js';
-import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, editorMutateOptions, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, importQuestions, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks } from './bank.js';
+import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, editorMutateOptions, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, importQuestions, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks } from './bank.js';
 
 // Zquiz · 期末周刷题 —— 应用装配入口
 // 依赖方向:main → 业务模块(quiz/errorbook/favorites/bank/dom)→ parser/storage/state。
@@ -95,6 +95,7 @@ const importPreviewModal = document.getElementById('import-preview-modal');
 const previewSummary = document.getElementById('preview-summary');
 const previewSelectAll = document.getElementById('preview-select-all');
 const previewCleanBtn = document.getElementById('preview-clean-btn');
+const copyPromptBtn = document.getElementById('copy-prompt-btn');
 const undoImportBtn = document.getElementById('undo-import-btn');
 const restoreSnapshotBtn = document.getElementById('restore-snapshot-btn');
 const previewSkipDupes = document.getElementById('preview-skip-dupes');
@@ -272,6 +273,7 @@ function setupEventListeners() {
     // 粘贴导入
     pasteInput.addEventListener('paste', handlePasteEvent);
     pasteParseBtn.addEventListener('click', parsePastedText);
+    copyPromptBtn.addEventListener('click', copyOfficialPrompt);
     pasteClearBtn.addEventListener('click', () => { pasteInput.value = ''; });
 
     // 导入预览向导

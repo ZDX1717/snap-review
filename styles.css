@@ -1349,3 +1349,21 @@ h3 {
         gap: 8px;
     }
 }
+
+/* ==================== 官方提示词引导条 ==================== */
+.prompt-guide {
+    background: #eef3fb;
+    border: 1px solid #b9c6dd;
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 20px;
+}
+.prompt-guide.hidden {
+    display: none;
+}
+.prompt-guide-text {
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 10px;
+    color: #343a40;
+}

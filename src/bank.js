@@ -3,6 +3,7 @@ import { finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, pars
 import { saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportBatch, saveOverwriteSnapshot, loadOverwriteSnapshot, clearOverwriteSnapshot } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
+import { OFFICIAL_PROMPT, needsPromptHelp, copyText } from './prompt.js';
 
 // 本次预览的来源标签(撤销记录展示用),由导入入口设置
 let previewSourceLabel = '导入';
@@ -43,6 +44,8 @@ const editorExplanation = document.getElementById('editor-explanation');
 const editorAnalysis = document.getElementById('editor-analysis');
 const editorPosition = document.getElementById('editor-position');
 const lastImportInfo = document.getElementById('last-import-info');
+const promptGuide = document.getElementById('prompt-guide');
+const copyPromptBtn = document.getElementById('copy-prompt-btn');
 
 // 导入题目(按扩展名分流:txt 直读;docx 走零依赖抽取;.doc 明确引导另存)
 export function importQuestions() {
@@ -56,8 +59,9 @@ export function importQuestions() {
 
     const runPreview = (content, label) => {
         const importedQuestions = parseQuestionsText(content);
+        if (needsPromptHelp(importedQuestions)) showPromptGuide(); else hidePromptGuide();
         if (importedQuestions.length === 0) {
-            showImportStatus(`导入失败：${label}中没有找到有效的题目`, 'error');
+            showImportStatus(`导入失败：${label}中没有找到有效的题目。格式太乱？试试「复制官方提示词」`, 'error');
             return;
         }
         // 解析结果先进入预览向导，由用户确认后再导入
@@ -120,6 +124,28 @@ export function updateBankSelect() {
 }
 
 
+// ==================== 官方提示词引导(解析失败的自救通道) ====================
+
+export function showPromptGuide() {
+    promptGuide.classList.remove('hidden');
+}
+
+export function hidePromptGuide() {
+    promptGuide.classList.add('hidden');
+}
+
+export async function copyOfficialPrompt() {
+    const ok = await copyText(OFFICIAL_PROMPT);
+    if (ok) {
+        copyPromptBtn.textContent = '✓ 已复制,去 AI 粘贴使用';
+        setTimeout(() => { copyPromptBtn.textContent = '📋 复制官方提示词'; }, 2500);
+        showImportStatus('提示词已复制:打开豆包 / Kimi / DeepSeek,粘贴提示词和题目,把整理结果复制回来', 'success');
+    } else {
+        showImportStatus('复制失败:请长按提示词文字手动复制', 'error');
+    }
+}
+
+
 export function parsePastedText() {
     const text = pasteInput.value;
     if (!text.trim()) {
@@ -128,8 +154,9 @@ export function parsePastedText() {
     }
     previewSourceLabel = '粘贴导入';
     const importedQuestions = parseQuestionsText(text);
+    if (needsPromptHelp(importedQuestions)) showPromptGuide(); else hidePromptGuide();
     if (importedQuestions.length === 0) {
-        showImportStatus('没有解析出有效题目，请检查内容格式', 'error');
+        showImportStatus('没有解析出有效题目。格式太乱？试试上方「复制官方提示词」', 'error');
         return;
     }
     updatePreviewTargetBanks();
@@ -192,6 +219,8 @@ export function showImportStatus(message, type) {
 export function openImportPreview(questions) {
     // 预览防呆:缺答案/选项不足/低置信度(conf ≤ 0.6)的题默认不勾选,用户确认后可手动勾回
     state.previewData = questions.map(q => ({ q, include: (q.confidence || 0) > 0.6, warnings: [] }));
+    // 低置信占比过高 → 建议官方提示词路线
+    if (needsPromptHelp(state.previewData.map(i => i.q))) showPromptGuide(); else hidePromptGuide();
     renderPreview();
     showModal(importPreviewModal);
 }
