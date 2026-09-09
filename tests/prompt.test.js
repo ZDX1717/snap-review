@@ -1,7 +1,7 @@
 // 官方提示词模块测试:触发判定 + 提示词内容关键约束
 import assert from 'node:assert';
 import test from 'node:test';
-import { OFFICIAL_PROMPT, needsPromptHelp, LOW_CONF_RATIO_THRESHOLD } from '../src/prompt.js';
+import { OFFICIAL_PROMPT, needsPromptHelp, LOW_CONF_RATIO_THRESHOLD, buildCopyText } from '../src/prompt.js';
 import { parseQuestionsText } from '../src/parser.js';
 
 test('触发判定:0 题 → 建议;低置信占比达标 → 建议;健康批次 → 不建议', () => {
@@ -25,4 +25,13 @@ test('提示词内容:关键约束齐备(不猜答案/不改内容/格式对齐 
     assert.ok(OFFICIAL_PROMPT.includes('判断题写"对"或"错"'));
     assert.ok(OFFICIAL_PROMPT.includes('题目：'));
     assert.ok(OFFICIAL_PROMPT.includes('不要给题目加编号'));
+});
+
+test('buildCopyText:无原文仅提示词;有原文自动合成(分隔线隔开)', () => {
+    assert.strictEqual(buildCopyText('P', ''), 'P');
+    assert.strictEqual(buildCopyText('P', '   '), 'P');
+    const combined = buildCopyText('PROMPT', '1.题目原文\n2.第二题');
+    assert.ok(combined.startsWith('PROMPT'));
+    assert.ok(combined.includes('以下是需要整理的题目原文'));
+    assert.ok(combined.endsWith('1.题目原文\n2.第二题'));
 });

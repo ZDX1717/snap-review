@@ -3,10 +3,12 @@ import { finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, pars
 import { saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportBatch, saveOverwriteSnapshot, loadOverwriteSnapshot, clearOverwriteSnapshot } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
-import { OFFICIAL_PROMPT, needsPromptHelp, copyText } from './prompt.js';
+import { OFFICIAL_PROMPT, buildCopyText, copyText } from './prompt.js';
 
 // 本次预览的来源标签(撤销记录展示用),由导入入口设置
 let previewSourceLabel = '导入';
+// 最近一次导入的原始文本(粘贴内容或上传文档抽取结果),供"提示词+原文"一键合成
+let lastRawContent = '';
 
 // ==================== bank.js ====================
 // 自动拆分自 main.js;依赖方向见各 import。
@@ -76,13 +78,14 @@ export function importQuestions() {
     if (name.endsWith('.docx')) {
         file.arrayBuffer()
             .then(buf => docxToText(buf))
-            .then(text => runPreview(text, 'docx 文件'))
+            .then(text => { lastRawContent = text; runPreview(text, 'docx 文件'); })
             .catch(err => showImportStatus(`docx 解析失败：${err && err.message ? err.message : '文件可能损坏'}（老版 .doc 请另存为 .docx，或复制文字粘贴）`, 'error'));
         return;
     }
 
     const reader = new FileReader();
     reader.onload = function(event) {
+        lastRawContent = event.target.result;
         runPreview(event.target.result, '文件');
     };
     reader.onerror = function() {
@@ -134,11 +137,16 @@ export function togglePromptContent() {
 }
 
 export async function copyOfficialPrompt() {
-    const ok = await copyText(OFFICIAL_PROMPT);
+    const material = (pasteInput.value || '').trim() || lastRawContent;
+    const ok = await copyText(buildCopyText(OFFICIAL_PROMPT, material));
     if (ok) {
-        copyPromptBtn.textContent = '✓ 已复制,去 AI 粘贴使用';
-        setTimeout(() => { copyPromptBtn.textContent = '📋 复制官方提示词'; }, 2500);
-        showImportStatus('提示词已复制:打开豆包 / Kimi / DeepSeek,粘贴提示词和题目,把整理结果复制回来', 'success');
+        copyPromptBtn.textContent = material
+            ? `✓ 已复制提示词+题目(${material.length} 字)`
+            : '✓ 已复制提示词';
+        setTimeout(() => { copyPromptBtn.textContent = '📋 一键复制提示词'; }, 2500);
+        showImportStatus(material
+            ? '已复制提示词+题目原文:整段粘贴给豆包 / Kimi / DeepSeek,把整理结果粘回这里'
+            : '提示词已复制:打开豆包 / Kimi / DeepSeek 粘贴使用', 'success');
     } else {
         showImportStatus('复制失败:请长按提示词文字手动复制', 'error');
     }

@@ -44,6 +44,12 @@ export function needsPromptHelp(questions) {
     return low / questions.length >= LOW_CONF_RATIO_THRESHOLD;
 }
 
+// 合成复制文本:提示词在前,题目原文在后(分隔线隔开);无原文时仅提示词
+export function buildCopyText(prompt, material) {
+    if (!material || !material.trim()) return prompt;
+    return prompt + '\n\n──────── 以下是需要整理的题目原文 ────────\n\n' + material.trim();
+}
+
 // 剪贴板复制:优先 Clipboard API(需 HTTPS),降级 execCommand
 export async function copyText(text) {
     try {
