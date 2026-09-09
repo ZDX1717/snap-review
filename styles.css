@@ -1232,3 +1232,27 @@ h3 {
         flex-wrap: wrap;
     }
 }
+
+/* ==================== 模态框手机适配:超高可滚动(编辑器超屏修复) ==================== */
+.modal {
+    overflow-y: auto;
+}
+.modal-content {
+    margin: auto; /* flex + margin auto:矮时居中,高时可滚动 */
+}
+.editor-inline-row {
+    flex-wrap: wrap;
+}
+.editor-option-row .editor-option-input {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+}
+@media (max-width: 768px) {
+    .editor-question-list {
+        max-height: 30vh;
+    }
+    .modal-content {
+        width: 95%;
+    }
+}
