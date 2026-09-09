@@ -324,3 +324,30 @@ test('预览全选三态:未全勾→点一次全勾;再点→全不选;部分�
     run(`previewData[0].include = true; renderPreview()`);
     assert.strictEqual(all.indeterminate, true);
 });
+
+test('导入按钮职责分离回归:选文件即读进框;解析按钮单监听纯解析;清空复位一切', async () => {
+    const { run, elements, alerts } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+        sandboxExtras: {
+            // 同步版 FileReader:构造即回调 onload
+            FileReader: class { readAsText(f) { this.result = '1. 试卷题 A.甲 B.乙 答案：A'; this.onload({ target: { result: this.result } }); } },
+        },
+    }));
+    run(`init()`);
+    run(`handleFileSelect({ target: { files: [{ name: '期试卷.txt' }] } })`);
+    // 选完即读:文字应已在输入框,来源标签待用
+    assert.ok(String(run(`pasteInput.value`)).includes('试卷题'), '选文件后文字应立即进输入框');
+    assert.strictEqual(run(`previewData.length`), 0, '读取本身不触发预览');
+    // 点解析(按钮监听=parsePastedText) → 出预览
+    elements['paste-parse-btn']._listeners.click();
+    assert.strictEqual(run(`previewData.length`), 1);
+    // 解析按钮:确认只挂了一个监听且指向解析
+    const parseBtn = elements['paste-parse-btn'];
+    const listeners = parseBtn._listeners ? Object.keys(parseBtn._listeners) : [];
+    assert.strictEqual(listeners.filter(k => k === 'click').length, 1, '解析按钮只允许一个 click 监听');
+    // 清空:复位输入框与 AI 标记
+    run(`pasteInput.value = '有内容'; aiSourcedContent = true`);
+    run(`clearPasteInput()`);
+    assert.strictEqual(run(`pasteInput.value`), '');
+    assert.strictEqual(String(elements['import-status'].className), 'status-line');
+    assert.ok(alerts.length === 0);
+});

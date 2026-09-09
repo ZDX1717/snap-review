@@ -83,14 +83,9 @@ let rescueAiRunning = false;
 let aiSourcedContent = false;
 
 // 导入题目(按扩展名分流:txt 直读;docx 走零依赖抽取;.doc 明确引导另存)
-// 导入统一管道(0.9.1):所有文件先变文字进输入框,人工过目可编辑,再点「解析并预览」;
+// 文件选择即读取(0.9.1 重构):所有文件先变文字进输入框,人工过目可编辑,再点「解析并预览」;
 // 读不了的(pdf/老版 doc)给两个具体动作:①复制提示词发给 AI ②转换格式/复制文字。
-export function importQuestions() {
-    const file = fileInput.files[0];
-    if (!file) {
-        showImportStatus('请先选择一个文件', 'error');
-        return;
-    }
+function readFileIntoBox(file) {
     const name = file.name.toLowerCase();
 
     if (name.endsWith('.pdf')) {
@@ -115,7 +110,7 @@ export function importQuestions() {
         lastRawContent = text;
         pendingSourceLabel = `文件：${file.name}`;
         hideFileNotice();
-        showImportStatus(`${label}已读出 ${text.length} 字,放进输入框了——可直接编辑,检查无误后点「解析并预览」`, 'success');
+        showImportStatus(`${label}已读出 ${text.length} 字并填入输入框——可直接编辑，点「解析并预览」继续`, 'success');
     };
 
     if (name.endsWith('.docx')) {
@@ -150,7 +145,9 @@ export function handleFileSelect(event) {
     } else if (name.endsWith('.doc') && !name.endsWith('.docx')) {
         showUnreadableFileNotice(false);
     } else {
-        showFileNotice(`✅ 已选择 <b>${file.name}</b>——点「解析并预览」，文字会先填进输入框供你过目`, 'warning');
+        // 选中即读:文字立刻进输入框,「解析并预览」按钮从此只有一个职责 = 解析
+        showImportStatus(`正在读取 ${file.name}…`, 'success');
+        readFileIntoBox(file);
     }
 }
 
@@ -578,6 +575,17 @@ export async function rescueAiOrganize() {
             rescueAiBtn.textContent = '🤖 一键 AI 整理原文';
         }
     }
+}
+
+// 清空输入框 + 复位文件选择与 AI 生成标记
+export function clearPasteInput() {
+    pasteInput.value = '';
+    lastRawContent = '';
+    aiSourcedContent = false;
+    pendingSourceLabel = '';
+    lastFilledFile = null;
+    if (fileInput) fileInput.value = '';
+    setStatusNeutral();
 }
 
 // 取消进行中的 AI 兜底
