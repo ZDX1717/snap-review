@@ -1184,3 +1184,51 @@ h3 {
     font-size: 13px;
     margin: -4px 0 14px;
 }
+
+/* ==================== 手机适配补丁(题库管理 + 模态框) ==================== */
+
+/* 格式说明等 pre 长行换行,防止整页横向溢出(真机 375px 实测问题) */
+.operation-card pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12.5px;
+    line-height: 1.65;
+    overflow-x: auto;
+}
+
+/* 导入撤销卡片按钮竖排 */
+.undo-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.undo-actions .action-btn {
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .operation-card {
+        padding: 16px 14px;
+    }
+    .panel-header {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .upload-area {
+        padding: 20px 12px;
+    }
+    .modal-content {
+        padding: 20px 14px;
+    }
+    .modal-actions {
+        flex-wrap: wrap;
+    }
+    .preview-item-head {
+        flex-wrap: wrap;
+    }
+    .preview-actions-row,
+    .inline-label {
+        flex-wrap: wrap;
+    }
+}
