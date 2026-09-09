@@ -142,8 +142,9 @@ export function questionDedupKey(q) {
 
 // 文末答案表整行判定:可选"答案:"头 + 一串 题号.答案 对,必须吃满整行
 // ("1.B 超检查…"这类真题干因吃不满而被排除,防"B超"误伤)
-export const ANSWER_LINE_RE = /^(?:【?(?:参考|标准|正确)?答案】?\s*[:：]?\s*)?\d{1,3}\s*[.、:：]?\s*(?:[A-Ha-h√×]{1,4}|对|错|正确|错误)(?:[\s,，、;；.。]+\d{1,3}\s*[.、:：]?\s*(?:[A-Ha-h√×]{1,4}|对|错|正确|错误))*\s*[。.]?\s*$/;
-const ANSWER_RANGE_RE = /^\s*(\d{1,3})\s*[-—–~至]\s*(\d{1,3})\s*[:：]?\s*([A-Ha-h√×]{2,40})\s*$/;
+// 支持变体:答案 token 可被【】包裹;对错判卷题;字母含 x(判断标记)
+export const ANSWER_LINE_RE = /^(?:【?(?:参考|标准|正确)?答案】?\s*[:：]?\s*)?\d{1,3}\s*[.、:：]?\s*【?\s*(?:[A-Ha-h√×xX]{1,4}|对|错|正确|错误)\s*】?(?:[\s,，、;；.。]+\d{1,3}\s*[.、:：]?\s*【?\s*(?:[A-Ha-h√×xX]{1,4}|对|错|正确|错误)\s*】?)*\s*[。.]?\s*$/;
+const ANSWER_RANGE_RE = /^(?:【?(?:参考|标准|正确)?答案】?\s*[:：]?\s*)?(\d{1,3})\s*[-—–~至]\s*(\d{1,3})\s*[:：]?\s*【?\s*([A-Ha-h√×xX]{2,40})\s*】?\s*$/;
 const ANSWER_HEADER_RE = /^\s*【?(?:参考|标准|正确)?答案】?\s*[:：]?\s*$/;
 
 // 自文档底部收集连续答案行 → {num: answer} 映射,并剥离这些行(含"参考答案:"头行)
@@ -169,7 +170,7 @@ export function extractAnswerSheet(lines) {
             break;
         }
         if (ANSWER_LINE_RE.test(line)) {
-            const pairRe = /(\d{1,3})\s*[.、:：]?\s*([A-Ha-h√×]{1,4}|对|错|正确|错误)/g;
+            const pairRe = /(\d{1,3})\s*[.、:：]?\s*【?\s*([A-Ha-h√×xX]{1,4}|对|错|正确|错误)\s*】?/g;
             let pm;
             while ((pm = pairRe.exec(line)) !== null) map.set(parseInt(pm[1], 10), pm[2]);
             blockStart = i; i--; continue;

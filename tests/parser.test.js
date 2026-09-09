@@ -190,6 +190,25 @@ B. 抢劫罪
     assert.strictEqual(hinted[0].answer, 'A');
 });
 
+test('答案表格式变体:【】包裹/带头区间式/对错判卷表', () => {
+    const bracket = P(`1. 一 A.甲 B.乙
+2. 二 A.甲 B.乙
+
+参考答案：
+1.【B】
+2.【A】`);
+    assert.deepStrictEqual(bracket.map(q => q.answer), ['B', 'A']);
+    const rangeHead = P(`1. 一 A.甲 B.乙
+2. 二 A.甲 B.乙
+3. 三 A.甲 B.乙
+参考答案：1-3 BBA`);
+    assert.deepStrictEqual(rangeHead.map(q => q.answer), ['B', 'B', 'A']);
+    const judgeSheet = P(`1. 一。A.对 B.错
+2. 二。A.对 B.错
+1.对 2.错`);
+    assert.deepStrictEqual(judgeSheet.map(q => q.answer), ['A', 'B']);
+});
+
 test('选项折行归并:续行进选项文本,不污染题干;题干续行行为不变', () => {
     const wrapped = P(`1. 下列说法正确的是
 A. 甲为了防止果园被盗拉设电网，导致

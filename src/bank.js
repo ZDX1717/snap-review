@@ -387,7 +387,8 @@ export function commitPreviewImport() {
     pasteInput.value = '';
 
     const dupeNote = (items.length - finalItems.length) > 0 ? `（跳过 ${items.length - finalItems.length} 题重复）` : '';
-    showImportStatus(`成功导入 ${finalItems.length} 道题目到题库：${targetName}${dupeNote}`, 'success');
+    const dropNote = droppedNoAnswer > 0 ? `，另有 ${droppedNoAnswer} 题因缺答案未导入（可在预览中补填答案后重新导入）` : '';
+    showImportStatus(`成功导入 ${finalItems.length} 道题目到题库：${targetName}${dupeNote}${dropNote}`, 'success');
 }
 
 
