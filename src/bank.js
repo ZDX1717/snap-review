@@ -47,6 +47,8 @@ const editorAnalysis = document.getElementById('editor-analysis');
 const editorPosition = document.getElementById('editor-position');
 const lastImportInfo = document.getElementById('last-import-info');
 const copyPromptBtn = document.getElementById('copy-prompt-btn');
+const fileNotice = document.getElementById('file-notice');
+const previewWarnedBtn = document.getElementById('preview-warned-btn');
 const promptToggleBtn = document.getElementById('prompt-toggle-btn');
 const promptContent = document.getElementById('prompt-content');
 
@@ -72,11 +74,11 @@ export function importQuestions() {
     };
 
     if (name.endsWith('.pdf')) {
-        showImportStatus('PDF 两条路:①把 PDF 文件直接发给豆包 / Kimi（能读 PDF），配合上方提示词转录整理；②复制 PDF 文字粘贴到输入框', 'error');
+        showFileNotice('<b>PDF 已选择,两条路:</b><br>① 把 PDF 文件直接发给豆包 / Kimi（它们能读 PDF），配合上方提示词转录整理；<br>② 复制 PDF 里的文字粘贴到输入框', 'warning');
         return;
     }
     if (name.endsWith('.doc') && !name.endsWith('.docx')) {
-        showImportStatus('老版 .doc 暂不支持：请用 Word 另存为 .docx，或复制文字粘贴', 'error');
+        showFileNotice('<b>老版 .doc 暂不支持</b>：请用 Word 另存为 .docx，或复制文字粘贴到输入框', 'warning');
         return;
     }
     if (name.endsWith('.docx')) {
@@ -114,12 +116,13 @@ export function handleFileSelect(event) {
     const name = file.name.toLowerCase();
     if (name.endsWith('.pdf')) {
         fileName.textContent = `已选择:${file.name}`;
-        showImportStatus('PDF 两条路:①把 PDF 文件直接发给豆包 / Kimi（它们能读 PDF），配合上方提示词转录整理；②复制 PDF 里的文字粘贴到输入框', 'error');
+        showFileNotice('<b>PDF 已选择,两条路:</b><br>① 把 PDF 文件直接发给豆包 / Kimi（它们能读 PDF），配合上方提示词转录整理；<br>② 复制 PDF 里的文字粘贴到输入框', 'warning');
     } else if (name.endsWith('.doc') && !name.endsWith('.docx')) {
         fileName.textContent = `已选择:${file.name}`;
-        showImportStatus('老版 .doc 暂不支持：请用 Word 另存为 .docx，或复制文字粘贴', 'error');
+        showFileNotice('<b>老版 .doc 暂不支持</b>：请用 Word 另存为 .docx，或复制文字粘贴到输入框', 'warning');
     } else {
         fileName.textContent = `已选择:${file.name}——点击「解析并预览」`;
+        showFileNotice(`✅ 已选择 <b>${file.name}</b>——点击「解析并预览」；或用上方提示词 + AI 整理`, 'info');
     }
 }
 
@@ -154,6 +157,15 @@ export function togglePromptContent() {
     if (!promptContent.textContent) promptContent.textContent = OFFICIAL_PROMPT;
     promptContent.classList.toggle('hidden');
     promptToggleBtn.textContent = promptContent.classList.contains('hidden') ? '查看提示词 ▾' : '收起 ▴';
+}
+
+// 文件提示常驻块(选择文件/解析失败时出现,持久显示直到下次选择替换)
+function showFileNotice(html, type = 'warning') {
+    fileNotice.innerHTML = html;
+    fileNotice.className = 'file-notice ' + type;
+}
+function hideFileNotice() {
+    fileNotice.className = 'file-notice hidden';
 }
 
 // 文档/粘贴原文就绪后,把状态写回引导条(让"已可复制"看得见)
@@ -249,7 +261,15 @@ export function showImportStatus(message, type) {
 
 
 // 打开预览：questions 为解析结果数组
+// 预览筛选开关:只渲染含警告的题(视图层,不动勾选)
+export function toggleWarnedFilter() {
+    state.previewFilterWarned = !state.previewFilterWarned;
+    renderPreview();
+    updatePreviewSummary();
+}
+
 export function openImportPreview(questions) {
+    state.previewFilterWarned = false; // 新一批导入重置筛选
     // 预览防呆:缺答案/选项不足/低置信度(conf ≤ 0.6)的题默认不勾选,用户确认后可手动勾回
     state.previewData = questions.map(q => ({ q, include: (q.confidence || 0) > 0.6, warnings: [] }));
     renderPreview();
@@ -280,8 +300,8 @@ export function renderPreview() {
     const bankKeys = new Set();
     Object.values(state.questionBanks).forEach(bank => (bank || []).forEach(q => bankKeys.add(questionDedupKey(q))));
 
-    let warnCount = 0;
-    state.previewData.forEach((item, idx) => {
+    // 第一遍:全量计算警告(筛选只是视图层,不改变勾选与统计)
+    state.previewData.forEach(item => {
         const q = item.q;
         const warnings = [];
         if (!q.answer) warnings.push('缺答案');
@@ -289,7 +309,16 @@ export function renderPreview() {
         if (bankKeys.has(questionDedupKey(q))) warnings.push('与现有题库重复');
         if ((q.confidence || 0) < 0.6) warnings.push('低置信度');
         item.warnings = warnings;
-        if (warnings.length) warnCount++;
+    });
+
+    // 第二遍:按筛选渲染(只看问题题时隐藏无警告项)
+    const warnCount = state.previewData.filter(i => i.warnings.length).length;
+    state.previewData
+        .map((item, idx) => ({ item, idx }))
+        .filter(({ item }) => !state.previewFilterWarned || item.warnings.length > 0)
+        .forEach(({ item, idx }) => {
+        const q = item.q;
+        const warnings = item.warnings;
 
         const box = document.createElement('div');
         box.className = 'preview-item' + (warnings.length ? ' warn' : '');
@@ -367,6 +396,7 @@ export function renderPreview() {
         previewList.appendChild(box);
     });
 
+    if (previewWarnedBtn) previewWarnedBtn.textContent = state.previewFilterWarned ? '📋 显示全部题目' : '🔍 只看问题题';
     updatePreviewSummary(warnCount);
 }
 
@@ -449,6 +479,7 @@ export function commitPreviewImport() {
     updateBanksList();
 
     hideModal(importPreviewModal);
+    hideFileNotice();
     fileInput.value = '';
     fileName.textContent = '未选择文件';
     pasteInput.value = '';

@@ -26,6 +26,7 @@ export const state = {
     masteryRemovedInSession: 0,
     // 导入预览
     previewData: [],
+    previewFilterWarned: false,
     // 题库编辑器
     editBankName: null,
     editIndex: 0,

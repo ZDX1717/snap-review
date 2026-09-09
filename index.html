@@ -260,6 +260,7 @@
                                 <button id="copy-prompt-btn" class="action-btn">📋 一键复制提示词+题目</button>
                                 <pre id="prompt-content" class="prompt-content hidden"></pre>
                             </div>
+                            <div id="file-notice" class="file-notice hidden"></div>
                             <p class="import-hint">支持从 Word / PDF / 网页 / 微信直接复制粘贴，自动识别常见题目格式（编号式、字段式、单行混排、判断题），导入前可逐题预览修正。</p>
                             <textarea id="paste-input" rows="8" placeholder="把题目直接粘贴到这里，或点下方「选择文件」上传 txt / docx…"></textarea>
                             <div class="paste-actions">
@@ -361,6 +362,7 @@ C：选项C    D：选项D
                         <input type="checkbox" id="preview-select-all" checked> 全选
                     </label>
                     <button type="button" id="preview-clean-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">只保留无警告题</button>
+                    <button type="button" id="preview-warned-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">🔍 只看问题题</button>
                     <label class="inline-label">
                         <input type="checkbox" id="preview-skip-dupes" checked> 跳过与目标题库重复的题
                     </label>

@@ -1412,3 +1412,25 @@ h3 {
 .prompt-content.hidden {
     display: none;
 }
+
+/* ==================== 文件常驻提示块 + 预览筛选 ==================== */
+.file-notice {
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 12px;
+}
+.file-notice.warning {
+    background: #fff8e6;
+    border: 1.5px solid #e0a800;
+    color: #7a5800;
+}
+.file-notice.info {
+    background: #eef3fb;
+    border: 1.5px solid #4a6fa5;
+    color: #2c4a80;
+}
+.file-notice.hidden {
+    display: none;
+}
