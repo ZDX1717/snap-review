@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import test from 'node:test';
 import { AI_PROVIDERS, normalizeAiConfig, aiConfigReady, chatCompletion, testConnection, splitIntoChunks, aiFormatMaterial } from '../src/ai.js';
 import { loadAiConfig, saveAiConfig, loadAiUsage, recordAiUsage } from '../src/storage.js';
+import { buildAiNotes } from '../src/ai.js';
 
 // ---------- 厂商预设与配置 ----------
 test('厂商预设:三家直连厂商在列,CORS 实测结论不入配置', () => {
@@ -171,8 +172,22 @@ test('previewAiFallback:AI 文本替换预览列表并走同一防呆;埋点记�
     assert.strictEqual(run(`previewData[0].q.content`), '1+1等于几?');
     assert.strictEqual(run(`previewData[0].include`), true);
     assert.strictEqual(run(`previewData[1].q.answer`), 'C');
+    // AI 改动标注:原文预览为空 → 全部视为 AI 新拆出
+    assert.ok(String(run(`previewData[0].aiNote`)).includes('AI 新拆出'));
     const usage = JSON.parse(store.get('aiUsage'));
     assert.strictEqual(usage.length, 1);
     assert.strictEqual(usage[0].trigger, 'preview-fallback');
     assert.strictEqual(usage[0].aiQuestions, 2);
+});
+
+test('buildAiNotes:改动逐项写明;未变不标;题干同选项变可宽松匹配', () => {
+    const orig = { content: '天空是什么颜色?', options: { A: '红', B: '绿', C: '蓝' }, type: '单选', answer: '' };
+    const [noteSame] = buildAiNotes([JSON.parse(JSON.stringify(orig))], [{ ...orig, answer: 'C' }]);
+    assert.strictEqual(noteSame, 'AI 修改：补入答案 C');
+    const tweaked = { content: '天空是什么颜色?', options: { A: '红', B: '绿', C: '蓝色' }, type: '单选', answer: 'C' };
+    const [noteTweak] = buildAiNotes([JSON.parse(JSON.stringify(orig))], [tweaked]);
+    assert.ok(noteTweak.includes('选项调整'));
+    const identical = { content: '天空是什么颜色?', options: { A: '红', B: '绿', C: '蓝' }, type: '单选', answer: 'C' };
+    const [noteNone] = buildAiNotes([{ ...identical }], [JSON.parse(JSON.stringify(identical))]);
+    assert.strictEqual(noteNone, '');
 });

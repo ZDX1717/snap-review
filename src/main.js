@@ -1,3 +1,4 @@
+import { buildAiNotes } from './ai.js';
 import { state } from './state.js';
 import { finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey, shuffleArray, splitInlineOptions } from './parser.js';
 import { loadCollapsedBanks, loadFromLocalStorage, loadMasterySetting, saveCollapsedBanks, saveToLocalStorage, recordImportBatch } from './storage.js';
@@ -515,6 +516,7 @@ if (typeof window === 'undefined') {
         toggleFavoriteCurrent,
         togglePreviewSelectAll,
         openAiSettings,
+        buildAiNotes,
         aiProviderChanged,
         testAiConnection,
         saveAiSettings,

@@ -1434,3 +1434,39 @@ h3 {
 .file-notice.hidden {
     display: none;
 }
+
+/* ==================== 0.9.0 · AI 兜底 ==================== */
+.preview-ai-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+.ai-progress {
+    flex: 1;
+    min-width: 80px;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.ai-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #4e8cff, #8e7cc3);
+    transition: width 0.3s;
+}
+.ai-progress-text {
+    font-size: 12px;
+    color: #667085;
+    white-space: nowrap;
+}
+.badge.ai-badge {
+    background: #efeaff;
+    color: #6a4fb6;
+}
+.preview-item.ai-touched {
+    box-shadow: inset 3px 0 0 #8e7cc3;
+    background: #fbfaff;
+}

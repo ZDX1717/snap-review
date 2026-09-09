@@ -362,13 +362,17 @@ C：选项C    D：选项D
                     <label class="inline-label">
                         <input type="checkbox" id="preview-select-all" checked> 全选
                     </label>
-                    <button type="button" id="preview-clean-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">只保留无警告题</button>
-                    <button type="button" id="preview-warned-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">🔍 只看问题题</button>
-                    <button type="button" id="preview-ai-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">🤖 AI 兜底整理</button>
-                    <button type="button" id="preview-ai-cancel-btn" class="action-btn secondary hidden" style="padding:4px 10px;font-size:0.85em;">⛔ 取消 AI</button>
                     <label class="inline-label">
-                        <input type="checkbox" id="preview-skip-dupes" checked> 跳过与目标题库重复的题
+                        <input type="checkbox" id="preview-skip-dupes" checked> 跳过重复题
                     </label>
+                    <button type="button" id="preview-warned-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">🔍 只看问题题</button>
+                    <button type="button" id="preview-clean-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">✓ 只勾选无警告题</button>
+                </div>
+                <div class="preview-ai-row">
+                    <button type="button" id="preview-ai-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">🤖 AI 兜底整理</button>
+                    <button type="button" id="preview-ai-cancel-btn" class="action-btn secondary hidden" style="padding:4px 10px;font-size:0.85em;">⛔ 取消</button>
+                    <div id="preview-ai-progress" class="ai-progress hidden"><div id="preview-ai-progress-fill" class="ai-progress-fill"></div></div>
+                    <span id="preview-ai-progress-text" class="ai-progress-text"></span>
                 </div>
                 <div id="preview-list" class="preview-list"></div>
                 <div class="preview-import-row">

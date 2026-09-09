@@ -4,6 +4,7 @@
 // CORS 已实测(2026-09-09):智谱/DeepSeek 回显 Origin 放行,硅基流动 `*` —— 浏览器可直连。
 
 import { OFFICIAL_PROMPT } from './prompt.js';
+import { normalizeAnswerString } from './parser.js';
 
 // 厂商预设:按成本排序;baseUrl 均为 OpenAI 兼容根(不含 /chat/completions)
 export const AI_PROVIDERS = [
@@ -126,3 +127,46 @@ export async function aiFormatMaterial(config, material, { signal, onProgress, m
     }
     return { text: outs.join('\n\n'), chunks: chunks.length };
 }
+
+// ==================== AI 修改对比(供预览逐题标注) ====================
+
+// AI 修改对比:找出 nu 相对 orig 变了什么(答案/选项/题型/题干),返回人类可读片段
+export function aiDiffParts(orig, nu) {
+    const parts = [];
+    const oa = normalizeAnswerString(orig.answer || ''), na = normalizeAnswerString(nu.answer || '');
+    if (oa !== na) parts.push(na ? (oa ? `答案 ${oa}→${na}` : `补入答案 ${na}`) : '答案被清空');
+    const ok = Object.keys(orig.options || {}).sort(), nk = Object.keys(nu.options || {}).sort();
+    const optsChanged = ok.join(',') !== nk.join(',') ||
+        ok.some(k => (orig.options[k] || '').replace(/\s+/g, '') !== (nu.options[k] || '').replace(/\s+/g, ''));
+    if (optsChanged) parts.push('选项调整');
+    if ((orig.type || '') !== (nu.type || '')) parts.push(`题型 ${orig.type || '?'}→${nu.type || '?'}`);
+    if ((orig.content || '').replace(/\s+/g, '') !== (nu.content || '').replace(/\s+/g, '')) parts.push('题干调整');
+    return parts;
+}
+
+// 匹配键:题干+选项全归一(AI 换空白不影响匹配)
+export function aiMatchKey(q, stemOnly) {
+    const stem = (q.content || '').replace(/\s+/g, '');
+    if (stemOnly) return stem;
+    const opts = Object.keys(q.options || {}).sort().map(k => k + ':' + (q.options[k] || '').replace(/\s+/g, '')).join(',');
+    return stem + '|' + opts;
+}
+
+// 为 AI 整理结果逐题生成标注:精确匹配 → 宽松匹配(题干) → 视为 AI 新拆出的题;没变的不标
+export function buildAiNotes(originals, parsed) {
+    const pool = originals.map(q => ({ q, used: false }));
+    return parsed.map(nu => {
+        let orig = null;
+        let hit = pool.find(p => !p.used && aiMatchKey(p.q) === aiMatchKey(nu));
+        if (hit) {
+            orig = hit.q; hit.used = true;
+        } else {
+            hit = pool.find(p => !p.used && p.q && aiMatchKey(p.q, true) === aiMatchKey(nu, true));
+            if (hit) { orig = hit.q; hit.used = true; }
+        }
+        if (!orig) return 'AI 新拆出（规则解析未发现此题）';
+        const parts = aiDiffParts(orig, nu);
+        return parts.length ? 'AI 修改：' + parts.join('，') : '';
+    });
+}
+

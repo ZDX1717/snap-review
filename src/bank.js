@@ -4,7 +4,7 @@ import { saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportB
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
 import { OFFICIAL_PROMPT, buildCopyText, copyText } from './prompt.js';
-import { aiConfigReady, aiFormatMaterial, getProvider, normalizeAiConfig, testConnection } from './ai.js';
+import { aiConfigReady, aiFormatMaterial, buildAiNotes, getProvider, normalizeAiConfig, testConnection } from './ai.js';
 import { loadAiConfig, saveAiConfig, recordAiUsage } from './storage.js';
 
 // 本次预览的来源标签(撤销记录展示用),由导入入口设置
@@ -63,6 +63,9 @@ const aiModelInput = document.getElementById('ai-model-input');
 const aiTestStatus = document.getElementById('ai-test-status');
 const previewAiBtn = document.getElementById('preview-ai-btn');
 const previewAiCancelBtn = document.getElementById('preview-ai-cancel-btn');
+const previewAiProgress = document.getElementById('preview-ai-progress');
+const previewAiProgressFill = document.getElementById('preview-ai-progress-fill');
+const previewAiProgressText = document.getElementById('preview-ai-progress-text');
 // AI 兜底运行状态(模块级:取消控制器 + 防重入)
 let previewAiAbort = null;
 let previewAiRunning = false;
@@ -285,6 +288,13 @@ export function toggleWarnedFilter() {
 
 // ==================== AI 设置面板(0.9.0 · BYO key) ====================
 
+// 设置面板状态行(.status-message 默认 display:none,必须带 success/error 类才可见)
+function setAiTestStatus(message, type) {
+    if (!aiTestStatus) return;
+    aiTestStatus.textContent = message;
+    aiTestStatus.className = 'status-message' + (type ? ' ' + type : '');
+}
+
 // 打开设置:把已存配置回填进表单(缺省按当前厂商预设)
 export function openAiSettings() {
     const cfg = normalizeAiConfig(loadAiConfig());
@@ -292,7 +302,7 @@ export function openAiSettings() {
     aiBaseUrl.value = cfg.baseUrl;
     aiApiKey.value = cfg.apiKey;
     aiModelInput.value = cfg.model;
-    if (aiTestStatus) aiTestStatus.textContent = '';
+    setAiTestStatus('');
     showModal(aiSettingsModal);
 }
 
@@ -313,26 +323,27 @@ function collectAiConfigFromForm() {
         model: aiModelInput.value,
     });
     if (!aiConfigReady(cfg)) {
-        if (aiTestStatus) {
-            aiTestStatus.textContent = '⚠ 接口地址、API Key、模型名都需要填写';
-        }
+        setAiTestStatus('⚠ 接口地址、API Key、模型名都需要填写', 'error');
         return null;
     }
     return cfg;
 }
 
-// 测试连接(不保存):极短消息往返验证 key/地址/模型
+// 测试连接(不保存):极短消息往返验证 key/地址/模型;全程按钮禁用 + 状态可见
 export async function testAiConnection() {
     const cfg = collectAiConfigFromForm();
     if (!cfg) return false;
-    if (aiTestStatus) aiTestStatus.textContent = '⏳ 正在测试连接…';
+    if (aiTestBtn) aiTestBtn.disabled = true;
+    setAiTestStatus('⏳ 正在连接,请稍候(最多 15 秒)…', 'success');
     try {
         const r = await testConnection(cfg);
-        if (aiTestStatus) aiTestStatus.textContent = `✅ 连接成功（模型回复：${r.sample}）`;
+        setAiTestStatus(`✅ 连接成功（模型回复：${r.sample}）`, 'success');
         return true;
     } catch (e) {
-        if (aiTestStatus) aiTestStatus.textContent = '❌ ' + e.message;
+        setAiTestStatus('❌ ' + e.message, 'error');
         return false;
+    } finally {
+        if (aiTestBtn) aiTestBtn.disabled = false;
     }
 }
 
@@ -341,7 +352,7 @@ export function saveAiSettings() {
     const cfg = collectAiConfigFromForm();
     if (!cfg) return false;
     saveAiConfig(cfg);
-    if (aiTestStatus) aiTestStatus.textContent = '✅ 已保存到本机';
+    setAiTestStatus('✅ 已保存到本机', 'success');
     setTimeout(() => hideModal(aiSettingsModal), 400);
     return true;
 }
@@ -349,7 +360,7 @@ export function saveAiSettings() {
 // ==================== 预览 AI 兜底(分块/进度/取消 → 复用预览确认管道) ====================
 
 // 预览页 AI 兜底:取粘贴框/最近原文 → 分块发官方提示词 → 结果交回 parser 走同一套规则解析,
-// 替换当前预览列表(AI 只整理格式,不编答案——提示词已写死)。
+// 替换当前预览列表并逐题标注 AI 改动(🤖 徽章 + 左侧紫条);AI 只整理格式,不编答案。
 export async function previewAiFallback() {
     if (previewAiRunning) return;
     const material = (pasteInput.value || '').trim() || (lastRawContent || '').trim();
@@ -364,39 +375,57 @@ export async function previewAiFallback() {
         return;
     }
 
+    // 快照当前(规则解析)结果,用于逐题对比 AI 改了什么
+    const originals = state.previewData.map(i => JSON.parse(JSON.stringify(i.q)));
+
     previewAiRunning = true;
     if (typeof AbortController !== 'undefined') previewAiAbort = new AbortController();
     const signal = previewAiAbort ? previewAiAbort.signal : undefined;
     if (previewAiBtn) previewAiBtn.disabled = true;
     if (previewAiCancelBtn) previewAiCancelBtn.classList.remove('hidden');
-    if (previewSummary) previewSummary.textContent = '🤖 AI 整理中(第 1/… 块)…';
+    if (previewAiProgress) previewAiProgress.classList.remove('hidden');
+    if (previewAiProgressFill) previewAiProgressFill.style.width = '5%';
+    if (previewAiProgressText) previewAiProgressText.textContent = '连接 AI…';
 
     try {
         const { text, chunks } = await aiFormatMaterial(cfg, material, {
             signal,
             onProgress: (done, total) => {
-                if (previewSummary) previewSummary.textContent = `🤖 AI 整理中…(${done}/${total} 块)`;
+                if (previewAiProgressFill) previewAiProgressFill.style.width = Math.round(done / total * 100) + '%';
+                if (previewAiProgressText) previewAiProgressText.textContent = `整理第 ${done}/${total} 块原文`;
             },
         });
         const parsed = parseQuestionsText(text);
         recordAiUsage({ trigger: 'preview-fallback', chunks, aiQuestions: parsed.length });
+        if (previewAiProgressFill) previewAiProgressFill.style.width = '100%';
         if (parsed.length === 0) {
+            if (previewAiProgressText) previewAiProgressText.textContent = 'AI 没整理出题目';
             alert('AI 没有整理出任何题目(回复可能不合规)。可以改用「一键复制提示词+题目」去聊天 AI 手动整理。');
             return;
         }
+        const notes = buildAiNotes(originals, parsed);
         // 替换预览(复用预览确认管道):缺答案/低置信默认不勾选,与常规导入一致
-        state.previewData = parsed.map(q => ({ q, include: (q.confidence || 0) > 0.6, warnings: [] }));
+        state.previewData = parsed.map((q, i) => ({ q, include: (q.confidence || 0) > 0.6, warnings: [], aiNote: notes[i] || '' }));
         renderPreview();
+        const changed = notes.filter(n => n).length;
+        if (previewAiProgressText) previewAiProgressText.textContent = `完成:${parsed.length} 题,其中 ${changed} 题有 AI 改动(紫标)`;
         if (previewSummary) previewSummary.textContent = `🤖 AI 整理完成:解析出 ${parsed.length} 题(${chunks} 块原文),请确认后导入`;
     } catch (e) {
         recordAiUsage({ trigger: 'preview-fallback', ok: false, error: String(e.message || e).slice(0, 120) });
-        alert('AI 兜底失败:' + (e.message || e));
+        if (e && /取消/.test(e.message)) {
+            if (previewAiProgressText) previewAiProgressText.textContent = '已取消';
+        } else {
+            alert('AI 兜底失败:' + (e.message || e));
+            if (previewAiProgressText) previewAiProgressText.textContent = '失败:' + String(e.message || e).slice(0, 60);
+        }
         renderPreview();
     } finally {
         previewAiRunning = false;
         previewAiAbort = null;
         if (previewAiBtn) previewAiBtn.disabled = false;
         if (previewAiCancelBtn) previewAiCancelBtn.classList.add('hidden');
+        // 进度条停留 2 秒后收起(结果文字保留)
+        setTimeout(() => { if (previewAiProgress) previewAiProgress.classList.add('hidden'); }, 2000);
     }
 }
 
@@ -461,7 +490,7 @@ export function renderPreview() {
         const warnings = item.warnings;
 
         const box = document.createElement('div');
-        box.className = 'preview-item' + (warnings.length ? ' warn' : '');
+        box.className = 'preview-item' + (warnings.length ? ' warn' : '') + (item.aiNote ? ' ai-touched' : '');
 
         const head = document.createElement('div');
         head.className = 'preview-item-head';
@@ -488,6 +517,14 @@ export function renderPreview() {
             b.textContent = w;
             head.appendChild(b);
         });
+
+        // AI 改动标注(🤖 紫徽章):只有真变了才显示,写明改了什么
+        if (item.aiNote) {
+            const aiB = document.createElement('span');
+            aiB.className = 'badge ai-badge';
+            aiB.textContent = '🤖 ' + item.aiNote;
+            head.appendChild(aiB);
+        }
 
         const conf = document.createElement('span');
         conf.className = 'preview-conf';
