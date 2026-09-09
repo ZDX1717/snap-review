@@ -1470,3 +1470,9 @@ h3 {
     box-shadow: inset 3px 0 0 #8e7cc3;
     background: #fbfaff;
 }
+
+.prompt-guide-head-actions {
+    display: inline-flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}

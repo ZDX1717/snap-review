@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=0903">
 </head>
 <body>
     <div class="container">
@@ -254,11 +254,13 @@
                             <div id="prompt-guide" class="prompt-guide">
                                 <div class="prompt-guide-head">
                                     <span class="prompt-guide-title">📋 格式乱？用 AI 一键整理（免费）</span>
-                                    <button type="button" id="prompt-toggle-btn" class="prompt-toggle">查看提示词 ▾</button>
+                                    <span class="prompt-guide-head-actions">
+                                        <button type="button" id="ai-settings-btn" class="prompt-toggle">⚙ AI 设置</button>
+                                        <button type="button" id="prompt-toggle-btn" class="prompt-toggle">查看提示词 ▾</button>
+                                    </span>
                                 </div>
                                 <p class="prompt-guide-text" id="prompt-guide-text">粘贴或上传题目后点下方按钮:自动合成<b>提示词+你的题目原文</b>,整段发给豆包 / Kimi / DeepSeek(免费),整理结果粘回这里即可。PDF 可直接发给 AI 转录整理。提示词会强制 AI 保留原文、不猜答案。</p>
                                 <button id="copy-prompt-btn" class="action-btn">📋 一键复制提示词+题目</button>
-                                <button type="button" id="ai-settings-btn" class="action-btn secondary" style="margin-left:6px;">⚙ AI 设置</button>
                                 <pre id="prompt-content" class="prompt-content hidden"></pre>
                             </div>
                             <div id="file-notice" class="file-notice hidden"></div>
@@ -362,11 +364,8 @@ C：选项C    D：选项D
                     <label class="inline-label">
                         <input type="checkbox" id="preview-select-all" checked> 全选
                     </label>
-                    <label class="inline-label">
-                        <input type="checkbox" id="preview-skip-dupes" checked> 跳过重复题
-                    </label>
                     <button type="button" id="preview-warned-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">🔍 只看问题题</button>
-                    <button type="button" id="preview-clean-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">✓ 只勾选无警告题</button>
+                    <button type="button" id="preview-clean-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">✓ 只选无警告题</button>
                 </div>
                 <div class="preview-ai-row">
                     <button type="button" id="preview-ai-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">🤖 AI 兜底整理</button>
@@ -380,6 +379,9 @@ C：选项C    D：选项D
                     <select id="preview-target-bank" class="bank-select"></select>
                     <label class="inline-label">
                         <input type="checkbox" id="preview-overwrite"> 覆盖目标题库
+                    </label>
+                    <label class="inline-label">
+                        <input type="checkbox" id="preview-skip-dupes" checked> 跳过重复题
                     </label>
                     <button id="preview-confirm-btn" class="action-btn">确认导入</button>
                     <button id="preview-cancel-btn" class="action-btn secondary">取消</button>
@@ -506,6 +508,6 @@ C：选项C    D：选项D
 
     </div>
 
-    <script type="module" src="src/main.js"></script>
+    <script type="module" src="src/main.js?v=0903"></script>
 </body>
 </html>

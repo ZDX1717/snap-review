@@ -191,3 +191,41 @@ test('buildAiNotes:改动逐项写明;未变不标;题干同选项变可宽松�
     const [noteNone] = buildAiNotes([{ ...identical }], [JSON.parse(JSON.stringify(identical))]);
     assert.strictEqual(noteNone, '');
 });
+
+test('设置面板回归:测试连接点击后状态可见且成功(锁死 aiTestBtn 未定义类静默故障)', async () => {
+    const { run, store, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+        sandboxExtras: { fetch: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: 'OK' } }] }) }) },
+    }));
+    store.set('aiConfig', JSON.stringify(CFG));
+    run(`init()`);
+    run(`openAiSettings()`);
+    const btn = elements['ai-test-btn'];
+    assert.ok(btn._listeners.click, '测试连接按钮必须已绑定 click');
+    await btn._listeners.click();
+    const st = elements['ai-test-status'];
+    assert.ok(st.textContent.includes('连接成功'), '状态文案要出现');
+    assert.ok(st.className.includes('success'), '必须带 success 类(.status-message 默认 display:none)');
+});
+
+test('预览全选三态:未全勾→点一次全勾;再点→全不选;部分选中→勾选框呈 indeterminate', async () => {
+    const { run, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
+    run(`init()`);
+    run(`openImportPreview(parseQuestionsText(['1. 甲题 A.一 B.二 答案：A', '2. 乙题 A.一 B.二 答案：B', '3. 丙题(缺答案)'].join('\\n')))`);
+    const all = elements['preview-select-all'];
+    // 3 题:2 题高置信默认勾(1/2),1 题缺答案低置信不勾 → 部分选中
+    assert.strictEqual(run(`previewData.filter(i => i.include).length`), 2);
+    assert.strictEqual(all.indeterminate, true);
+    assert.strictEqual(all.checked, false);
+    // 第一次点击:部分 → 全选
+    all._listeners.change();
+    assert.strictEqual(run(`previewData.every(i => i.include)`), true);
+    assert.strictEqual(all.checked, true);
+    assert.strictEqual(all.indeterminate, false);
+    // 第二次点击:全选 → 全不选
+    all._listeners.change();
+    assert.strictEqual(run(`previewData.some(i => i.include)`), false);
+    assert.strictEqual(all.checked, false);
+    // 单题手动勾回 → 回到 indeterminate
+    run(`previewData[0].include = true; renderPreview()`);
+    assert.strictEqual(all.indeterminate, true);
+});

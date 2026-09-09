@@ -61,6 +61,7 @@ const aiBaseUrl = document.getElementById('ai-base-url');
 const aiApiKey = document.getElementById('ai-api-key');
 const aiModelInput = document.getElementById('ai-model-input');
 const aiTestStatus = document.getElementById('ai-test-status');
+const aiTestBtn = document.getElementById('ai-test-btn');
 const previewAiBtn = document.getElementById('preview-ai-btn');
 const previewAiCancelBtn = document.getElementById('preview-ai-cancel-btn');
 const previewAiProgress = document.getElementById('preview-ai-progress');
@@ -498,7 +499,7 @@ export function renderPreview() {
         const chk = document.createElement('input');
         chk.type = 'checkbox';
         chk.checked = item.include;
-        chk.addEventListener('change', () => { item.include = chk.checked; updatePreviewSummary(); });
+        chk.addEventListener('change', () => { item.include = chk.checked; updateSelectAllState(); updatePreviewSummary(); });
         head.appendChild(chk);
 
         const num = document.createElement('span');
@@ -574,13 +575,25 @@ export function renderPreview() {
     });
 
     if (previewWarnedBtn) previewWarnedBtn.textContent = state.previewFilterWarned ? '📋 显示全部题目' : '🔍 只看问题题';
+    updateSelectAllState();
     updatePreviewSummary(warnCount);
 }
 
 
+// 三态全选:全勾 → 点击清空;未全勾(含部分/全不选)→ 点击全勾;勾选框本体只作状态显示(粗体横杠=部分选中)
 export function togglePreviewSelectAll() {
-    state.previewData.forEach(i => { i.include = previewSelectAll.checked; });
+    const allSelected = state.previewData.length > 0 && state.previewData.every(i => i.include);
+    state.previewData.forEach(i => { i.include = !allSelected; });
     renderPreview();
+}
+
+// 把预览数据的选择状态同步回"全选"勾选框(checked/indeterminate 双属性)
+function updateSelectAllState() {
+    if (!previewSelectAll) return;
+    const total = state.previewData.length;
+    const inc = state.previewData.filter(i => i.include).length;
+    previewSelectAll.checked = total > 0 && inc === total;
+    previewSelectAll.indeterminate = inc > 0 && inc < total;
 }
 
 
