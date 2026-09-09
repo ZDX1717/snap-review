@@ -11,6 +11,10 @@ import { loadAiConfig, saveAiConfig, recordAiUsage } from './storage.js';
 let previewSourceLabel = '导入';
 // 最近一次导入的原始文本(粘贴内容或上传文档抽取结果),供"提示词+原文"一键合成
 let lastRawContent = '';
+// 文件填框后的待用来源标签(解析时转正,撤销记录展示用)
+let pendingSourceLabel = '';
+// 已成功填框的文件:再次点「解析并预览」直接解析输入框,不重读文件
+let lastFilledFile = null;
 
 // ==================== bank.js ====================
 // 自动拆分自 main.js;依赖方向见各 import。
@@ -72,54 +76,55 @@ let previewAiAbort = null;
 let previewAiRunning = false;
 
 // 导入题目(按扩展名分流:txt 直读;docx 走零依赖抽取;.doc 明确引导另存)
+// 导入统一管道(0.9.1):所有文件先变文字进输入框,人工过目可编辑,再点「解析并预览」;
+// 读不了的(pdf/老版 doc)给两个具体动作:①复制提示词发给 AI ②转换格式/复制文字。
 export function importQuestions() {
     const file = fileInput.files[0];
     if (!file) {
         showImportStatus('请先选择一个文件', 'error');
         return;
     }
-    previewSourceLabel = `文件：${file.name}`;
     const name = file.name.toLowerCase();
 
-    const runPreview = (content, label) => {
-        const importedQuestions = parseQuestionsText(content);
-        if (importedQuestions.length === 0) {
-            showImportStatus(`导入失败：${label}中没有找到有效的题目。试试上方「复制官方提示词」用 AI 整理`, 'error');
-            return;
-        }
-        // 解析结果先进入预览向导，由用户确认后再导入
-        updatePreviewTargetBanks();
-        openImportPreview(importedQuestions);
-    };
-
     if (name.endsWith('.pdf')) {
-        showFileNotice('<b>PDF 已选择,两条路:</b><br>① 把 PDF 文件直接发给豆包 / Kimi（它们能读 PDF），配合上方提示词转录整理；<br>② 复制 PDF 里的文字粘贴到输入框', 'warning');
+        lastRawContent = '';
+        showUnreadableFileNotice(true);
         return;
     }
     if (name.endsWith('.doc') && !name.endsWith('.docx')) {
-        showFileNotice('<b>老版 .doc 暂不支持</b>：请用 Word 另存为 .docx，或复制文字粘贴到输入框', 'warning');
+        lastRawContent = '';
+        showUnreadableFileNotice(false);
         return;
     }
+    if (file === lastFilledFile && (pasteInput.value || '').trim()) {
+        return parsePastedText();  // 已在框里(用户可能改过),点解析就是解析
+    }
+
+    // 文字进框(不自动解析:这一眼是人工审查抽取质量的机会)
+    const fillBox = (text, label) => {
+        lastFilledFile = file;
+        pasteInput.value = text;
+        lastRawContent = text;
+        pendingSourceLabel = `文件：${file.name}`;
+        hideFileNotice();
+        updateGuideReady(`已提取《${file.name}》原文`, text.length);
+        showImportStatus(`${label}已读出 ${text.length} 字,放进输入框了——可直接编辑,检查无误后点「解析并预览」`, 'success');
+    };
+
     if (name.endsWith('.docx')) {
         file.arrayBuffer()
             .then(buf => docxToText(buf))
-            .then(text => {
-                lastRawContent = text;
-                updateGuideReady(`已提取《${file.name}》原文`, text.length);
-                runPreview(text, 'docx 文件');
-            })
-            .catch(err => showImportStatus(`docx 解析失败：${err && err.message ? err.message : '文件可能损坏'}（老版 .doc 请另存为 .docx，或复制文字粘贴）`, 'error'));
+            .then(text => fillBox(text, 'Word 文档'))
+            .catch(err => showImportStatus(`docx 读取失败：${err && err.message ? err.message : '文件可能损坏'}（老版 .doc 请另存为 .docx，或复制文字粘贴）`, 'error'));
         return;
     }
 
     const reader = new FileReader();
     reader.onload = function(event) {
-        lastRawContent = event.target.result;
-        updateGuideReady(`已读取《${file.name}》原文`, lastRawContent.length);
-        runPreview(event.target.result, '文件');
+        fillBox(String(event.target.result), '文件');
     };
     reader.onerror = function() {
-        showImportStatus('导入失败：文件读取出错', 'error');
+        showImportStatus('读取失败：文件读取出错', 'error');
     };
     reader.readAsText(file);
 }
@@ -135,13 +140,13 @@ export function handleFileSelect(event) {
     const name = file.name.toLowerCase();
     if (name.endsWith('.pdf')) {
         fileName.textContent = `已选择:${file.name}`;
-        showFileNotice('<b>PDF 已选择,两条路:</b><br>① 把 PDF 文件直接发给豆包 / Kimi（它们能读 PDF），配合上方提示词转录整理；<br>② 复制 PDF 里的文字粘贴到输入框', 'warning');
+        showUnreadableFileNotice(true);
     } else if (name.endsWith('.doc') && !name.endsWith('.docx')) {
         fileName.textContent = `已选择:${file.name}`;
-        showFileNotice('<b>老版 .doc 暂不支持</b>：请用 Word 另存为 .docx，或复制文字粘贴到输入框', 'warning');
+        showUnreadableFileNotice(false);
     } else {
-        fileName.textContent = `已选择:${file.name}——点击「解析并预览」`;
-        showFileNotice(`✅ 已选择 <b>${file.name}</b>——点击「解析并预览」；或用上方提示词 + AI 整理`, 'info');
+        fileName.textContent = `已选择:${file.name}`;
+        showFileNotice(`✅ 已选择 <b>${file.name}</b>——点「解析并预览」后,文字会先填进输入框供你过目`, 'info');
     }
 }
 
@@ -187,23 +192,43 @@ function hideFileNotice() {
     fileNotice.className = 'file-notice hidden';
 }
 
+// PDF / 老版 doc:给两个具体动作(①复制提示词发给 AI·附文件 ②转换格式/复制文字),不再只是静态文字
+function showUnreadableFileNotice(isPdf) {
+    const label = isPdf ? 'PDF' : '老版 .doc';
+    const via = isPdf ? '把 PDF 文件附到对话里' : '把 .doc 另存为 .docx 后再选一次';
+    showFileNotice(
+        `<b>📄 ${label} 不能直接读,两个办法:</b>` +
+        '<div class="file-notice-actions"><button type="button" id="file-ai-copy-btn" class="action-btn secondary">① 📋 复制提示词，去豆包/Kimi 让 AI 提取</button></div>' +
+        `<p class="file-notice-hint">点上方按钮复制提示词 → 打开豆包 / Kimi / DeepSeek,${via},粘贴提示词发送,把 AI 回复粘回输入框。` +
+        `注意:此法会把材料上传给该 AI 服务。` +
+        `<br>② 或把文字直接复制出来,粘贴到输入框(任何格式通用)</p>`,
+        'warning'
+    );
+}
+
+// 提示块内动态按钮的事件委托(每次 innerHTML 重建,委托最稳)
+fileNotice.addEventListener('click', (e) => {
+    if (e && e.target && e.target.id === 'file-ai-copy-btn') copyOfficialPrompt(true);
+});
+
 // 文档/粘贴原文就绪后,把状态写回引导条(让"已可复制"看得见)
 function updateGuideReady(label, length) {
     const el = document.getElementById('prompt-guide-text');
     if (el) el.innerHTML = `✅ ${label}(${length} 字)已就绪——点下方按钮,提示词+原文一键复制,发给豆包 / Kimi / DeepSeek 整理。PDF 可直接发给 AI 转录。`;
 }
 
-export async function copyOfficialPrompt() {
-    const material = (pasteInput.value || '').trim() || lastRawContent;
+export async function copyOfficialPrompt(forcePromptOnly = false) {
+    // forcePromptOnly:PDF/doc 场景没有文字可合并,只要提示词(防止误合并上一次的原文)
+    const material = forcePromptOnly ? '' : ((pasteInput.value || '').trim() || lastRawContent);
     const ok = await copyText(buildCopyText(OFFICIAL_PROMPT, material));
     if (ok) {
         copyPromptBtn.textContent = material
             ? `✓ 已复制提示词+题目(${material.length} 字)`
             : '✓ 已复制提示词';
-        setTimeout(() => { copyPromptBtn.textContent = '📋 一键复制提示词'; }, 2500);
+        setTimeout(() => { copyPromptBtn.textContent = '📋 一键复制提示词+题目'; }, 2500);
         showImportStatus(material
             ? '已复制提示词+题目原文:整段粘贴给豆包 / Kimi / DeepSeek,把整理结果粘回这里'
-            : '提示词已复制:打开豆包 / Kimi / DeepSeek 粘贴使用', 'success');
+            : '提示词已复制:打开豆包 / Kimi / DeepSeek,附上文件后粘贴发送,把 AI 回复粘回输入框', 'success');
     } else {
         showImportStatus('复制失败:请长按提示词文字手动复制', 'error');
     }
@@ -216,7 +241,9 @@ export function parsePastedText() {
         showImportStatus('请先粘贴题目内容', 'error');
         return;
     }
-    previewSourceLabel = '粘贴导入';
+    // 来源:文件填框的用文件名,纯粘贴用"粘贴导入"(撤销记录展示用)
+    previewSourceLabel = pendingSourceLabel || '粘贴导入';
+    pendingSourceLabel = '';
     updateGuideReady('已就绪:当前粘贴内容', text.length);
     const importedQuestions = parseQuestionsText(text);
     if (importedQuestions.length === 0) {

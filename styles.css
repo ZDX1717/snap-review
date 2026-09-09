@@ -1476,3 +1476,12 @@ h3 {
     gap: 8px;
     flex-wrap: wrap;
 }
+
+.file-notice-actions {
+    margin: 8px 0 4px;
+}
+.file-notice-hint {
+    font-size: 0.85em;
+    color: #667085;
+    margin: 4px 0 0;
+}

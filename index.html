@@ -264,7 +264,7 @@
                                 <pre id="prompt-content" class="prompt-content hidden"></pre>
                             </div>
                             <div id="file-notice" class="file-notice hidden"></div>
-                            <p class="import-hint">支持从 Word / PDF / 网页 / 微信直接复制粘贴，自动识别常见题目格式（编号式、字段式、单行混排、判断题），导入前可逐题预览修正。</p>
+                            <p class="import-hint">粘贴或上传文件 → 文字先进输入框（可编辑过目）→ 解析预览 → 确认导入。自动识别编号式 / 字段式 / 单行混排 / 判断题；读不了的格式（PDF / 老 .doc）会给 AI 提取和转换格式两条路。</p>
                             <textarea id="paste-input" rows="8" placeholder="把题目直接粘贴到这里，或点下方「选择文件」上传 txt / docx…"></textarea>
                             <div class="paste-actions">
                                 <button id="upload-btn" class="action-btn secondary">📂 选择文件</button>
@@ -272,7 +272,7 @@
                                 <button id="paste-clear-btn" class="action-btn secondary">清空</button>
                             </div>
                             <input type="file" id="file-input" class="hidden" accept=".txt,.md,.csv,.json,.docx,.pdf,.doc" />
-                            <p id="file-name" class="import-hint" style="margin-bottom:8px;">未选择文件。支持 txt / docx；PDF 建议直接发给 AI 转录；老版 .doc 请另存为 .docx</p>
+                            <p id="file-name" class="import-hint" style="margin-bottom:8px;">未选择文件。txt / docx / md / csv 会把文字读进输入框；PDF、老版 .doc 选了会给处理指引</p>
                             <div id="import-status" class="status-message"></div>
                         </div>
 
