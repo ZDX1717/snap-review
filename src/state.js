@@ -29,5 +29,6 @@ export const state = {
     editBankName: null,
     editIndex: 0,
     editorDirty: false,
+    editorPendingOnly: false,
     currentRenameBank: null,
 };

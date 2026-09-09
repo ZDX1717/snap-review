@@ -59,9 +59,15 @@ export function startQuiz() {
     } else if (questionType === 'judge') {
         filteredQuestions = state.questionBank.filter(q => q.type === '判断');
     }
-    
+
+    // 待补答案的题自动排除(无法判分);全部被排除时给出明确指引
+    const pendingCount = filteredQuestions.filter(q => !q.answer).length;
+    filteredQuestions = filteredQuestions.filter(q => q.answer);
+
     if (filteredQuestions.length === 0) {
-        showQuizStatus('没有符合条件的题目', 'error');
+        showQuizStatus(pendingCount > 0
+            ? `没有符合条件的题目（有 ${pendingCount} 题待补答案，请在题库编辑器中补齐后再刷）`
+            : '没有符合条件的题目', 'error');
         return;
     }
     

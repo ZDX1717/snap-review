@@ -339,20 +339,18 @@ export function commitPreviewImport() {
 
     const overwrite = previewOverwrite.checked;
     if (overwrite && state.questionBanks[targetName].length > 0 &&
-        !confirm(`确定清空题库"${targetName}"并导入新题目吗？此操作不可恢复！`)) {
+        !confirm(`确定清空题库"${targetName}"并导入新题目吗？（覆盖前会自动快照，可恢复）`)) {
         return;
     }
 
-    // 收集勾选且有答案的题（重新规范化保证答案/题型一致）
+    // 收集勾选项（重新规范化保证答案/题型一致）；缺答案题不再丢弃,入库为"待补"
     const items = [];
     const seen = new Set();
-    let droppedNoAnswer = 0;
     for (const item of state.previewData) {
         if (!item.include) continue;
         const clone = JSON.parse(JSON.stringify(item.q));
         const finalized = finalizeQuestion(clone);
         if (!finalized) continue;
-        if (!finalized.answer) { droppedNoAnswer++; continue; }
         const key = questionDedupKey(finalized);
         if (seen.has(key)) continue; // 批内去重
         seen.add(key);
@@ -366,9 +364,7 @@ export function commitPreviewImport() {
         : items;
 
     if (finalItems.length === 0) {
-        alert(droppedNoAnswer > 0
-            ? `没有可导入的题目：${droppedNoAnswer} 题缺少答案，请在预览中补填答案后重试`
-            : '没有可导入的题目（均与目标题库重复）');
+        alert('没有可导入的题目（均与目标题库重复）');
         return;
     }
 
@@ -398,8 +394,9 @@ export function commitPreviewImport() {
     pasteInput.value = '';
 
     const dupeNote = (items.length - finalItems.length) > 0 ? `（跳过 ${items.length - finalItems.length} 题重复）` : '';
-    const dropNote = droppedNoAnswer > 0 ? `，另有 ${droppedNoAnswer} 题因缺答案未导入（可在预览中补填答案后重新导入）` : '';
-    showImportStatus(`成功导入 ${finalItems.length} 道题目到题库：${targetName}${dupeNote}${dropNote}`, 'success');
+    const pendingImported = finalItems.filter(q => !q.answer).length;
+    const pendingNote = pendingImported > 0 ? `，其中 ${pendingImported} 题待补答案（编辑器中可补，刷题时自动排除）` : '';
+    showImportStatus(`成功导入 ${finalItems.length} 道题目到题库：${targetName}${dupeNote}${pendingNote}`, 'success');
 
     // 记录导入批次(供"撤销上次导入"按指纹回滚;手改过的题指纹变化后自动跳过)
     recordImportBatch({
@@ -762,18 +759,39 @@ export function editorClose() {
     state.editBankName = null;
     state.editIndex = 0;
     state.editorDirty = false;
+    state.editorPendingOnly = false;
     hideModal(editBankModal);
     updateBanksList();
 }
 
 
-// 编辑器内切换题目
+// 编辑器内切换题目(开启"只看待补"时,在待补题之间跳转)
 export function editorNavigate(delta) {
     const questions = currentEditBank();
+    if (state.editorPendingOnly) {
+        let target = state.editIndex + delta;
+        while (target >= 0 && target < questions.length && questions[target].answer) target += delta;
+        if (target < 0 || target >= questions.length) return;
+        if (!editorGuard()) return;
+        state.editIndex = target;
+        renderBankEditor();
+        return;
+    }
     const target = state.editIndex + delta;
     if (target < 0 || target >= questions.length) return;
     if (!editorGuard()) return;
     state.editIndex = target;
+    renderBankEditor();
+}
+
+// 切换"只看待补答案"筛选
+export function editorTogglePendingOnly(checked) {
+    state.editorPendingOnly = !!checked;
+    const questions = currentEditBank();
+    if (state.editorPendingOnly) {
+        const firstPending = questions.findIndex(q => !q.answer);
+        state.editIndex = firstPending >= 0 ? firstPending : 0;
+    }
     renderBankEditor();
 }
 
@@ -953,7 +971,8 @@ export function updateBanksList() {
 
         const bankCount = document.createElement('p');
         const questions = state.questionBanks[bankName] || [];
-        bankCount.textContent = `题目数量：${questions.length}`;
+        const pendingCount = questions.filter(q => !q.answer).length;
+        bankCount.textContent = `题目数量：${questions.length}` + (pendingCount > 0 ? `（待补答案 ${pendingCount}）` : '');
 
         const bankActions = document.createElement('div');
         bankActions.className = 'bank-actions';
@@ -1004,13 +1023,15 @@ export function updateBanksList() {
 // 渲染编辑器整体（题目列表 + 当前题表单）
 export function renderBankEditor() {
     const questions = currentEditBank();
+    const pendingOnly = !!state.editorPendingOnly;
 
     editorQuestionList.innerHTML = '';
     questions.forEach((q, idx) => {
+        if (pendingOnly && q.answer) return; // 只看待补
         const item = document.createElement('button');
         item.type = 'button';
         item.className = 'editor-list-item' + (idx === state.editIndex ? ' selected' : '');
-        item.textContent = `${idx + 1}. ${(q.content || '（无题干）').slice(0, 22)}`;
+        item.textContent = `${idx + 1}. ${(q.content || '（无题干）').slice(0, 22)}` + (!q.answer ? ' ⏳' : '');
         item.addEventListener('click', () => {
             if (!editorGuard()) return;
             state.editIndex = idx;
@@ -1022,7 +1043,7 @@ export function renderBankEditor() {
     if (questions.length === 0 || !questions[state.editIndex]) {
         editorForm.classList.add('hidden');
         editorEmpty.classList.remove('hidden');
-        editorPosition.textContent = '';
+        editorPosition.textContent = pendingOnly ? '没有待补答案的题目 🎉' : '';
         return;
     }
     editorForm.classList.remove('hidden');

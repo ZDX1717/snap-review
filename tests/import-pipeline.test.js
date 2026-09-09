@@ -176,10 +176,12 @@ test('批内去重 + 目标题库查重 + 正确入库', () => {
         commitPreviewImport();
     `);
     const target = JSON.parse(run('JSON.stringify(questionBanks["目标"])'));
-    // 第1题入库;第2题批内重复跳过;第3题与目标重复跳过;第4题缺答案丢弃;第5题未勾选
-    assert.strictEqual(target.length, 2);
+    // 第1题入库;第2题批内重复跳过;第3题与目标重复跳过;第4题缺答案入库为"待补";第5题未勾选
+    assert.strictEqual(target.length, 3);
     assert.strictEqual(target.filter(q => q.content === '全新题目？').length, 1);
     assert.ok(target.some(q => q.content === '已存在的题'));
+    const pending = target.find(q => q.content === '缺答案的题');
+    assert.ok(pending && pending.answer === ''); // 待补答案,不判分不出题
 });
 test('新建题库(prompt) + 导入后切换当前题库', () => {
     run(`

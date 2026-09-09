@@ -5,7 +5,7 @@ import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, toggleAllBanks, updateErrorStreak, updateErrorsList, updateToggleAllBanksLabel } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
 import { backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getScopeSelection, nextQuestion, prevQuestion, renderAnswerReview, reviewErrors, showQuizResult, showQuizStatus, showSection, startQuiz, startReviewSession, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton, updateScopeSummary } from './quiz.js';
-import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorMutateOptions, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, importQuestions, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks } from './bank.js';
+import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, editorMutateOptions, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, importQuestions, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks } from './bank.js';
 
 // Zquiz · 期末周刷题 —— 应用装配入口
 // 依赖方向:main → 业务模块(quiz/errorbook/favorites/bank/dom)→ parser/storage/state。
@@ -140,6 +140,7 @@ const editorPrevBtn = document.getElementById('editor-prev-btn');
 const editorNextBtn = document.getElementById('editor-next-btn');
 const editorDeleteBtn = document.getElementById('editor-delete-btn');
 const editorSaveBtn = document.getElementById('editor-save-btn');
+const editorPendingOnly = document.getElementById('editor-pending-only');
 const editorCloseBtn = document.getElementById('editor-close-btn');
 const editorPosition = document.getElementById('editor-position');
 
@@ -247,6 +248,7 @@ function setupEventListeners() {
     editorAddBtn.addEventListener('click', editorAddQuestion);
     editorSaveBtn.addEventListener('click', () => editorSaveCurrent(false));
     editorCloseBtn.addEventListener('click', editorClose);
+    editorPendingOnly.addEventListener('change', (e) => editorTogglePendingOnly(e.target.checked));
     editorPrevBtn.addEventListener('click', () => editorNavigate(-1));
     editorNextBtn.addEventListener('click', () => editorNavigate(1));
     editorDeleteBtn.addEventListener('click', editorDeleteCurrent);
@@ -438,6 +440,7 @@ if (typeof window === 'undefined') {
         editorRenderForm,
         editorRenderOptions,
         editorSaveCurrent,
+        editorTogglePendingOnly,
         endQuiz,
         exportAllBanks,
         exportBank,
