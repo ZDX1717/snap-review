@@ -165,6 +165,31 @@ A. 甲 B. 乙
     assert.strictEqual(both[1].answer, 'A');
 });
 
+test('判断语境:空括号=对(只标错惯例;批内有括号判卷痕迹才生效)', () => {
+    const qs = P(`1. 某甲构成过失爆炸罪。（x ）
+2. 某乙构成放火罪。（ ）`);
+    assert.strictEqual(qs[0].answer, 'B');
+    assert.strictEqual(qs[1].type, '判断');
+    assert.strictEqual(qs[1].answer, 'A');
+    assert.strictEqual(qs[1].content, '某乙构成放火罪。');
+    // 无判卷痕迹 → 不脑补,如实缺答案进预览
+    const noEvidence = P(`1. 某甲构成放火罪。（ ）`);
+    assert.strictEqual(noEvidence[0].answer, '');
+    assert.strictEqual(noEvidence[0].content, '某甲构成放火罪。');
+    // 有选项的选择题空括号不受影响
+    const choice = P(`1. 甲构成何罪（ ）。
+A. 盗窃罪
+B. 抢劫罪
+答案：A`);
+    assert.strictEqual(choice[0].answer, 'A');
+    assert.strictEqual(choice[0].type, '单选');
+    assert.strictEqual(choice[0].options.B, '抢劫罪');
+    // 显式"判断题:"提示,单题也兜
+    const hinted = P(`判断题：某丙构成犯罪。（ ）`);
+    assert.strictEqual(hinted[0].type, '判断');
+    assert.strictEqual(hinted[0].answer, 'A');
+});
+
 test('选项折行归并:续行进选项文本,不污染题干;题干续行行为不变', () => {
     const wrapped = P(`1. 下列说法正确的是
 A. 甲为了防止果园被盗拉设电网，导致

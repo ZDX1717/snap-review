@@ -70,8 +70,11 @@ export function splitInlineOptions(text, { startFromAny = false } = {}) {
 // 只认"纯答案 token"的括号且必须位于题干末尾;括号前不得是字母/数字,防"计算f（x）"误判
 // 注意:判断题的 x/X 不在 [A-Ha-h] 内(a-h 不含 x),须单列
 const EMBEDDED_ANSWER_RE = /([^A-Za-z0-9])[（(]\s*([A-Ha-h]{1,4}|√|×|对|错|正确|错误|T|F|Y|N|[xX])\s*[)）]\s*[。.]?\s*$/;
-// 空答案括号"（）"/"(  )"是答题槽噪音,一律清除
+// 空答题括号"（）"/"(  )":题末形态用于判断语境推断,全部形态按噪音清除
+const EMPTY_PAREN_AT_END_RE = /[（(]\s*[)）]\s*[。.]?\s*$/;
 const EMPTY_PAREN_RE = /[（(]\s*[)）]/g;
+// 判卷痕迹 token:出现即说明本批材料使用"只标错、不标对"的判卷惯例
+const JUDGE_TOKEN_RE = /^(?:√|×|对|错|正确|错误|T|F|Y|N|[xX])$/;
 
 // 题型/答案/选项的最终规范化（导入与预览提交时都会调用，幂等）
 export function finalizeQuestion(q) {
@@ -79,17 +82,22 @@ export function finalizeQuestion(q) {
     q.content = (q.content || '').trim();
     q.analysis = (q.analysis || '').trim();
     q.explanation = (q.explanation || '').trim();
+    const hint = (q.type || '').replace(/题$/, '');
     if (!q.answer) {
         const em = q.content.match(EMBEDDED_ANSWER_RE);
         if (em) {
             q.answer = em[2];
+            if (JUDGE_TOKEN_RE.test(em[2])) q._parenJudge = true; // 判卷痕迹,供批内空括号推断
             q.content = q.content.slice(0, em.index + 1).trimEnd();
+        } else if (EMPTY_PAREN_AT_END_RE.test(q.content)) {
+            q._hadEmptyParen = true;
+            // 显式标注"判断题:"的题,空括号按惯例兜底为对
+            if (hint === '判断') q.answer = '对';
         }
     }
     q.content = q.content.replace(EMPTY_PAREN_RE, '').replace(/\s+$/g, '').trim();
     const rawAnswer = (q.answer || '').toUpperCase().replace(/\s+/g, '');
 
-    const hint = (q.type || '').replace(/题$/, '');
     const isJudge = hint === '判断' || JUDGE_TRUE_RE.test(rawAnswer) || JUDGE_FALSE_RE.test(rawAnswer);
 
     if (isJudge) {
@@ -195,8 +203,7 @@ export function parseQuestionsText(content) {
         if (!cur.answer && cur.num != null && sheetMap.has(cur.num)) {
             cur.answer = sheetMap.get(cur.num);
         }
-        const q = finalizeQuestion(cur);
-        if (q) questions.push(q);
+        questions.push(cur);
         cur = null;
     };
 
@@ -379,7 +386,27 @@ export function parseQuestionsText(content) {
         }
     }
     flush();
-    return questions;
+    // 第一遍 finalize:提取括号答案、清除空括号、打判卷痕迹/空括号标记
+    const finalized = [];
+    for (const q of questions) {
+        const fq = finalizeQuestion(q);
+        if (fq) finalized.push(fq);
+    }
+    // 判断语境推断:批内存在括号判卷痕迹(（x）/（√）等)说明材料遵循"只标错、不标对"惯例,
+    // 此时空括号且无选项的题视为对;选择题与无痕迹批次不脑补(如实缺答案进预览)
+    if (finalized.some(q => q._parenJudge)) {
+        for (const q of finalized) {
+            if (q._hadEmptyParen && !q.answer && Object.keys(q.options).length === 0) {
+                q.answer = '对';
+                finalizeQuestion(q); // 原地重算题型/选项/置信度(幂等)
+            }
+        }
+    }
+    for (const q of finalized) {
+        delete q._parenJudge;
+        delete q._hadEmptyParen;
+    }
+    return finalized;
 }
 
 // 规范化选项答案：统一大写、只保留选项字母、去重并排序（用于判分比较，

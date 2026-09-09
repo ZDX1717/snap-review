@@ -34,7 +34,7 @@
                 <div class="feature-grid">
                     <div class="feature-card">
                         <h3>📋 多格式导入</h3>
-                        <p>Word / PDF / 网页 / 微信里的题目直接复制粘贴，或导入 txt 文件。字段式、编号式、单行混排、判断题自动识别，导入前可逐题预览修正。</p>
+                        <p>Word / PDF / 网页 / 微信里的题目直接复制粘贴，或导入 txt / docx 文件。字段式、编号式、单行混排、判断题自动识别，导入前可逐题预览修正。</p>
                     </div>
                     <div class="feature-card">
                         <h3>📝 两种作答模式</h3>
@@ -61,7 +61,7 @@
                 <div class="info-card quick-start">
                     <h3>快速上手</h3>
                     <ol>
-                        <li>进入「题库管理」，把题目粘贴到导入框（或选择 txt 文件），解析预览确认后入库</li>
+                        <li>进入「题库管理」，把题目粘贴到导入框（或选择 txt / docx 文件），解析预览确认后入库</li>
                         <li>进入「开始刷题」，选择作答方式（逐题 / 套题）和题型，开始刷题</li>
                         <li>做错或没答的题自动进入「错题本」，考前来一轮错题回顾</li>
                     </ol>
@@ -260,9 +260,10 @@
                         <div class="operation-card">
                             <h3>导入题库文件</h3>
                             <div class="upload-area">
-                                <input type="file" id="file-input" accept=".txt,.md,.csv,.json" />
+                                <input type="file" id="file-input" accept=".txt,.md,.csv,.json,.docx" />
                                 <button id="upload-btn">选择文件</button>
                                 <p id="file-name">未选择文件</p>
+                                <p style="font-size:0.85em;color:#888;">支持 txt / docx；老版 .doc 请先另存为 .docx（或复制文字粘贴）</p>
                             </div>
                             <button id="import-btn" class="action-btn">解析并预览</button>
                             <div id="import-status" class="status-message"></div>

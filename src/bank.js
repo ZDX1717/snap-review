@@ -2,6 +2,7 @@ import { state } from './state.js';
 import { finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey } from './parser.js';
 import { saveToLocalStorage } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
+import { docxToText } from './docx.js';
 
 // ==================== bank.js ====================
 // 自动拆分自 main.js;依赖方向见各 import。
@@ -39,29 +40,45 @@ const editorExplanation = document.getElementById('editor-explanation');
 const editorAnalysis = document.getElementById('editor-analysis');
 const editorPosition = document.getElementById('editor-position');
 
-// 导入题目
+// 导入题目(按扩展名分流:txt 直读;docx 走零依赖抽取;.doc 明确引导另存)
 export function importQuestions() {
     const file = fileInput.files[0];
     if (!file) {
         showImportStatus('请先选择一个文件', 'error');
         return;
     }
+    const name = file.name.toLowerCase();
 
-    const reader = new FileReader();
-    reader.onload = function(event) {
-        const content = event.target.result;
+    const runPreview = (content, label) => {
         const importedQuestions = parseQuestionsText(content);
-
         if (importedQuestions.length === 0) {
-            showImportStatus('导入失败：文件中没有找到有效的题目', 'error');
+            showImportStatus(`导入失败：${label}中没有找到有效的题目`, 'error');
             return;
         }
-
         // 解析结果先进入预览向导，由用户确认后再导入
         updatePreviewTargetBanks();
         openImportPreview(importedQuestions);
     };
 
+    if (name.endsWith('.doc')) {
+        showImportStatus('老版 .doc 暂不支持：请用 Word 另存为 .docx，或复制文字粘贴', 'error');
+        return;
+    }
+    if (name.endsWith('.docx')) {
+        file.arrayBuffer()
+            .then(buf => docxToText(buf))
+            .then(text => runPreview(text, 'docx 文件'))
+            .catch(err => showImportStatus(`docx 解析失败：${err && err.message ? err.message : '文件可能损坏'}（老版 .doc 请另存为 .docx，或复制文字粘贴）`, 'error'));
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        runPreview(event.target.result, '文件');
+    };
+    reader.onerror = function() {
+        showImportStatus('导入失败：文件读取出错', 'error');
+    };
     reader.readAsText(file);
 }
 
