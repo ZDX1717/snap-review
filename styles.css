@@ -1256,3 +1256,96 @@ h3 {
         width: 95%;
     }
 }
+
+/* ==================== 方案 A:大卡片即点即判(手机刷题交互) ==================== */
+
+.quiz-progress {
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+#quiz-progress-fill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #4a6fa5, #6c8fc7);
+    transition: width 0.2s;
+}
+
+.streak-badge {
+    font-size: 13px;
+    font-weight: 600;
+    color: #b4690e;
+    background: #fff4e0;
+    border-radius: 12px;
+    padding: 2px 10px;
+}
+
+/* 选项整行卡片:整行可点,触达 ≥44px */
+.option-item {
+    display: block;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    background: #fff;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+.option-item:hover {
+    border-color: #b9c6dd;
+}
+.option-item.selected {
+    border-color: #4a6fa5;
+    background: #eef3fb;
+}
+.option-item.correct-card {
+    border-color: #2e9e5b;
+    background: #eaf7ef;
+}
+.option-item.wrong-card {
+    border-color: #d9534f;
+    background: #fdf0ef;
+}
+.option-item input {
+    accent-color: #4a6fa5;
+    width: 18px;
+    height: 18px;
+    margin: 2px 0 0;
+    flex: none;
+}
+.option-item label {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    font-size: 15px;
+    line-height: 1.55;
+    cursor: pointer;
+}
+.option-item .option-label {
+    font-weight: 700;
+    color: #4a6fa5;
+}
+.option-item.correct-card .option-label {
+    color: #2e9e5b;
+}
+.option-item.wrong-card .option-label {
+    color: #d9534f;
+}
+
+@media (max-width: 768px) {
+    /* 拇指热区:主操作按钮全屏宽大按钮 */
+    #submit-answer-btn,
+    #next-question-btn,
+    #prev-question-btn,
+    #end-quiz-btn {
+        width: 100%;
+        padding: 14px;
+        font-size: 16px;
+    }
+    .question-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+}

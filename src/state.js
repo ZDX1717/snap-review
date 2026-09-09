@@ -21,6 +21,7 @@ export const state = {
     wrongCount: 0,
     isAnswered: false,
     quizMode: 'immediate',
+    correctStreak: 0,
     userAnswers: [],
     masteryRemovedInSession: 0,
     // 导入预览

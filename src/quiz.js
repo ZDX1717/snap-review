@@ -104,6 +104,11 @@ export function displayQuestion() {
     questionNumber.textContent = `${state.currentQuestionIndex + 1}/${state.currentQuiz.length}`;
     questionType.textContent = question.type;
     questionText.textContent = question.content;
+
+    // 方案 A:进度条 + 连对徽标
+    const progressFill = document.getElementById('quiz-progress-fill');
+    if (progressFill) progressFill.style.width = `${Math.round(((state.currentQuestionIndex + 1) / state.currentQuiz.length) * 100)}%`;
+    updateStreakBadge();
     
     // 题目解释：逐题模式作答时可见；套题模式交卷前隐藏（回顾时统一展示）
     if (state.quizMode !== 'exam') {
@@ -153,6 +158,16 @@ export function displayQuestion() {
         
         optionItem.appendChild(inputElement);
         optionItem.appendChild(label);
+
+        // 方案 A:卡片选中态 + 逐题模式单选/判断点选即判
+        inputElement.addEventListener('change', () => {
+            optionItem.classList.toggle('selected', inputElement.checked);
+            if (inputElement.checked && question.type !== '多选') {
+                optionsContainer.querySelectorAll('.option-item').forEach(o => o.classList.remove('selected'));
+                optionItem.classList.add('selected');
+                if (state.quizMode !== 'exam' && !state.isAnswered) submitAnswer();
+            }
+        });
         
         // 选项解释：仅逐题模式作答时显示
         if (state.quizMode !== 'exam' && (question.optionExplanations || {})[optionKey]) {
@@ -193,8 +208,50 @@ export function displayQuestion() {
         }
     } else {
         prevQuestionBtn.classList.add('hidden');
+        submitAnswerBtn.textContent = question.type === '多选' ? '确认答案' : '提交答案';
         submitAnswerBtn.classList.remove('hidden');
         nextQuestionBtn.classList.add('hidden');
+    }
+
+    bindQuizGestures();
+}
+
+// 方案 A:左右滑切题 + 长按收藏(仅绑定一次)
+function bindQuizGestures() {
+    const host = document.querySelector('.quiz-container');
+    if (!host || host.dataset.gestureBound) return;
+    host.dataset.gestureBound = '1';
+    let tsX = 0, tsY = 0, pressTimer = null;
+    host.addEventListener('touchstart', (e) => {
+        const t = e.touches[0];
+        tsX = t.clientX; tsY = t.clientY;
+        pressTimer = setTimeout(() => toggleFavoriteCurrent(), 600); // 长按收藏
+    }, { passive: true });
+    host.addEventListener('touchmove', () => clearTimeout(pressTimer), { passive: true });
+    host.addEventListener('touchend', (e) => {
+        clearTimeout(pressTimer);
+        const t = e.changedTouches[0];
+        const dx = t.clientX - tsX, dy = t.clientY - tsY;
+        if (Math.abs(dx) < 60 || Math.abs(dx) <= Math.abs(dy) * 1.5) return;
+        if (dx < 0) { // 左滑:下一题(逐题需已作答;套题末题防误交卷)
+            if (state.quizMode !== 'exam' && !state.isAnswered) return;
+            if (state.quizMode === 'exam' && state.currentQuestionIndex >= state.currentQuiz.length - 1) return;
+            nextQuestion();
+        } else if (state.currentQuestionIndex > 0 && state.quizMode === 'exam') {
+            prevQuestion(); // 右滑上一题:仅套题
+        }
+    }, { passive: true });
+}
+
+// 方案 A:连对徽标(≥2 显示)
+function updateStreakBadge() {
+    const badge = document.getElementById('streak-badge');
+    if (!badge) return;
+    if (state.correctStreak >= 2) {
+        badge.textContent = `🔥 连对 ${state.correctStreak}`;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
     }
 }
 
@@ -231,8 +288,10 @@ export function submitAnswer() {
     let removedFromErrorBook = 0;
     if (isCorrect) {
         state.correctCount++;
+        state.correctStreak++;
     } else {
         state.wrongCount++;
+        state.correctStreak = 0;
 
         // 将错题添加到错题本
         addToErrorBook(question, userAnswer);
@@ -250,6 +309,22 @@ export function submitAnswer() {
     answerResult.className = isCorrect ? 'correct-answer' : 'wrong-answer';
     answerExplanation.textContent = question.analysis || '';
     answerFeedback.classList.remove('hidden');
+    updateStreakBadge();
+
+    // 方案 A:选项卡片判分标色(对绿/错红/正确项高亮)并禁改
+    const optsContainer = document.querySelector('.options-container');
+    if (optsContainer) {
+        const correctSet = new Set(normalizeAnswerString(question.answer).split(''));
+        const userSet = new Set(normalizeAnswerString(userAnswer).split(''));
+        optsContainer.querySelectorAll('.option-item').forEach(item => {
+            const inp = item.querySelector('input[name="answer"]');
+            if (!inp) return;
+            inp.disabled = true;
+            item.classList.remove('selected');
+            if (correctSet.has(inp.value)) item.classList.add('correct-card');
+            if (userSet.has(inp.value) && !isCorrect) item.classList.add('wrong-card');
+        });
+    }
     
     // 更新按钮状态
     state.isAnswered = true;
