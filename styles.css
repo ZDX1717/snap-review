@@ -1597,3 +1597,18 @@ h3 {
         padding: 8px;
     }
 }
+
+/* 工具栏分组标签:看 / 选 / 🤖 三组,一眼分清视图与勾选 */
+.preview-toolbar .tool-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.preview-toolbar .tool-label {
+    font-size: 11px;
+    color: #adb5bd;
+    background: #f1f3f5;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-weight: 600;
+}

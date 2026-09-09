@@ -920,9 +920,10 @@ export function restoreOverwriteSnapshot() {
 }
 
 // 预览一键"只保留无警告题"(单向过滤,被滤掉的仍可手动勾回)
+// 「推荐选择」:无警告题勾上、有警告题取消——与导入默认防呆规则一致,可再手动微调
 export function keepCleanOnly() {
     state.previewData.forEach(item => {
-        if (item.warnings && item.warnings.length) item.include = false;
+        item.include = !(item.warnings && item.warnings.length);
     });
     renderPreview();
     updatePreviewSummary();
