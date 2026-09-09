@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert';
 import {
     parseQuestionsText, finalizeQuestion, normalizeAnswerString, questionDedupKey,
+    splitInlineOptions,
 } from '../src/parser.js';
 
 const P = (s) => parseQuestionsText(s);
@@ -26,7 +27,7 @@ B：矛盾的斗争性
 类型：单选`);
     assert.strictEqual(qs.length, 1);
     assert.strictEqual(qs[0].title, '单选题1');
-    assert.strictEqual(qs[0].content, '福祸相依体现了（）');
+    assert.strictEqual(qs[0].content, '福祸相依体现了'); // 空答题槽括号按噪音清除
     assert.strictEqual(qs[0].options.A, '矛盾的同一性');
     assert.strictEqual(qs[0].optionExplanations.A, '矛盾双方相互依存');
     assert.strictEqual(qs[0].answer, 'A');
@@ -85,4 +86,97 @@ test('去重指纹:同题干同选项不同答案=重复;同题干不同选项=�
                        questionDedupKey({ content: '题A ', options: { A: '甲' } }));   // 选项相同、答案不同 → 重复
     assert.notStrictEqual(questionDedupKey({ content: '题A', options: { A: '甲' } }),
                           questionDedupKey({ content: '题A', options: { A: '丙' } })); // 选项文本不同 → 不同题
+});
+
+// ==================== 真实语料驱动补强(corpus/ 强化练习×2) ====================
+
+test('双行选项布局:第二行 C.x D.y 不再吞 D(splitInlineOptions startFromAny)', () => {
+    // 直接单测:任意字母起始仍须连续
+    assert.deepStrictEqual(splitInlineOptions('C.爆炸罪 D.故意杀人罪', { startFromAny: true }),
+                           { stem: '', options: { C: '爆炸罪', D: '故意杀人罪' } });
+    assert.strictEqual(splitInlineOptions('C.甲罪 E.乙罪', { startFromAny: true }), null); // 跳号拒绝
+    assert.strictEqual(splitInlineOptions('C.单选项'), null); // 单标记拒绝
+    // 端到端:选项排两行 → 4 个选项齐全,题干无污染
+    const qs = P(`1. 甲的行为构成（ ）。
+A.故意杀人罪和破坏交通工具罪 B.爆炸罪
+C.爆炸罪和破坏交通工具罪 D.故意杀人罪
+答案：C`);
+    assert.strictEqual(qs.length, 1);
+    assert.deepStrictEqual(qs[0].options, {
+        A: '故意杀人罪和破坏交通工具罪', B: '爆炸罪',
+        C: '爆炸罪和破坏交通工具罪', D: '故意杀人罪',
+    });
+    assert.strictEqual(qs[0].content, '甲的行为构成。'); // 空括号清除
+});
+
+test('括号内嵌答案:题末（x）/（B）/（ABD）提取,含实义括号与 f（x）不误判', () => {
+    const j = P(`1. 某甲构成过失爆炸罪。（x ）`)[0];
+    assert.strictEqual(j.type, '判断');
+    assert.strictEqual(j.answer, 'B');
+    assert.strictEqual(j.content, '某甲构成过失爆炸罪。');
+    assert.strictEqual(P(`1. 下列正确的是（B）`)[0].answer, 'B');
+    assert.strictEqual(P(`1. 下列正确的是（ABD）。`)[0].type, '多选');
+    assert.strictEqual(P(`1. 计算f（x）`)[0].answer, '');          // 字母+括号=数学记号,不提取
+    assert.strictEqual(P(`1. 张某（25周岁）饮酒`)[0].answer, '');   // 实义括号不动
+    assert.strictEqual(P(`1. 张某（25周岁）饮酒`)[0].content, '张某（25周岁）饮酒');
+    const empty = P(`1. 甲的行为构成（ ）。`)[0];                    // 真空括号:清除但缺答案如实保留
+    assert.strictEqual(empty.content, '甲的行为构成。');
+    assert.strictEqual(empty.answer, '');
+});
+
+test('文末答案表:逐行式/单行多对/区间式回填,垃圾题消失', () => {
+    // 逐行式(带"参考答案:"头)
+    const perLine = P(`1. 第一题
+A. 甲 B. 乙
+2. 第二题
+A. 甲 B. 乙
+3. 第三题
+A. 甲 B. 乙
+
+参考答案：
+1.B
+2.A
+3.B`);
+    assert.strictEqual(perLine.length, 3); // 不再生成"B"/"A"垃圾题
+    assert.deepStrictEqual(perLine.map(q => q.answer), ['B', 'A', 'B']);
+    // 单行多对
+    const inline = P(`1. 一题 A.甲 B.乙
+2. 二题 A.甲 B.乙
+答案：1.B 2.A`);
+    assert.deepStrictEqual(inline.map(q => q.answer), ['B', 'A']);
+    // 区间式
+    const range = P(`1. 一 A.甲 B.乙
+2. 二 A.甲 B.乙
+3. 三 A.甲 B.乙
+1-3 BBA`);
+    assert.deepStrictEqual(range.map(q => q.answer), ['B', 'B', 'A']);
+    // 题干含"B超"不受答案表逻辑误伤
+    const safe = P(`1. B超检查发现异常。A.对 B.错`);
+    assert.strictEqual(safe.length, 1);
+    assert.strictEqual(safe[0].content, 'B超检查发现异常。');
+    // 显式答案优先,不被答案表覆盖
+    const both = P(`1. 一题 A.甲 B.乙 答案：A
+2. 二题 A.甲 B.乙
+
+参考答案：
+1.B
+2.A`);
+    assert.strictEqual(both[0].answer, 'A');
+    assert.strictEqual(both[1].answer, 'A');
+});
+
+test('选项折行归并:续行进选项文本,不污染题干;题干续行行为不变', () => {
+    const wrapped = P(`1. 下列说法正确的是
+A. 甲为了防止果园被盗拉设电网，导致
+两个儿童触电身亡
+B. 乙使用工业酒精勾兑白酒
+答案：A`);
+    assert.strictEqual(wrapped[0].content, '下列说法正确的是'); // 题干干净
+    assert.strictEqual(wrapped[0].options.A, '甲为了防止果园被盗拉设电网，导致两个儿童触电身亡'); // 折行归并
+    // 题干续行(选项未开始)仍归题干
+    const stemWrap = P(`1. 甲潜入某机关大院
+在乙家门口放火
+A. 对 B. 错
+答案：A`);
+    assert.strictEqual(stemWrap[0].content, '甲潜入某机关大院\n在乙家门口放火');
 });

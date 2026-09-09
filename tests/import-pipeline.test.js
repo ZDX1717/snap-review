@@ -29,7 +29,7 @@ B：矛盾的斗争性
     assert.strictEqual(qs.length, 1);
     const q = qs[0];
     assert.strictEqual(q.title, '单选题1');
-    assert.strictEqual(q.content, '福祸相依体现了（）');
+    assert.strictEqual(q.content, '福祸相依体现了'); // 空答题槽括号按噪音清除
     assert.strictEqual(q.options.A, '矛盾的同一性');
     assert.strictEqual(q.optionExplanations.A, '矛盾双方相互依存');
     assert.strictEqual(q.answer, 'A');

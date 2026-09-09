@@ -35,11 +35,14 @@ export const JUDGE_FALSE_RE = /^(错|错误|×|X|F|N)$/i;
 // 空格分隔的纯答案行，如"答案 A" / "参考答案 B"
 // 行尾行内答案（家族C），要求"答案"前是行首、空白或中文标点，避免误伤选项文字
 // 分组1=前导字符(裁剪时保留),分组2=答案内容（支持多字母，如"答案：AB"）
-// 拆分行内选项（家族C）："题干 A.xx B.yy C.zz" → { stem, options }
-// 要求至少两个选项且从 A 开始连续编号，避免把题干中"A、B两类"这类文字误拆
-export function splitInlineOptions(text) {
+// 拆分行内选项："题干 A.xx B.yy C.zz D.ww" → { stem, options }
+// 要求至少两个选项且连续编号，避免把题干中"A、B两类"这类文字误拆
+// startFromAny=true 用于"选项行的续行"(如双行布局第二行 "C.xx D.yy"):
+//   起始字母不必是 A,但仍须连续,防误拆
+export function splitInlineOptions(text, { startFromAny = false } = {}) {
     // 分组1=前导字符(题干裁剪时保留),分组2=选项字母
-    const re = /(^|[\s(（,，;；。？！：、…""''「」『』（）【】《》<>])\s*([A-Ha-h])\s*[.、:：．)）]\s*/g;
+    // 分隔符含全/半角逗号(与 OPTION_LINE_RE 一致)——真实语料存在 "C.xxx D,yyy" 混排布局
+    const re = /(^|[\s(（,，;；。？！：、…""''「」『』（）【】《》<>])\s*([A-Ha-h])\s*[.、:：．)）,，,]\s*/g;
     const markers = [];
     let m;
     while ((m = re.exec(text)) !== null) {
@@ -49,9 +52,10 @@ export function splitInlineOptions(text) {
             textStart: re.lastIndex,
         });
     }
-    if (markers.length < 2 || markers[0].key !== 'A') return null;
+    if (markers.length < 2) return null;
+    if (!startFromAny && markers[0].key !== 'A') return null;
     for (let i = 0; i < markers.length; i++) {
-        if (markers[i].key !== String.fromCharCode(65 + i)) return null;
+        if (markers[i].key !== String.fromCharCode(markers[0].key.charCodeAt(0) + i)) return null;
     }
     const options = {};
     markers.forEach((mk, i) => {
@@ -62,12 +66,27 @@ export function splitInlineOptions(text) {
     return { stem, options };
 }
 
+// 题末括号内嵌答案："（x ）"/"（B）"/"（ABD）" → 提取为答案(仅当无显式答案行时)。
+// 只认"纯答案 token"的括号且必须位于题干末尾;括号前不得是字母/数字,防"计算f（x）"误判
+// 注意:判断题的 x/X 不在 [A-Ha-h] 内(a-h 不含 x),须单列
+const EMBEDDED_ANSWER_RE = /([^A-Za-z0-9])[（(]\s*([A-Ha-h]{1,4}|√|×|对|错|正确|错误|T|F|Y|N|[xX])\s*[)）]\s*[。.]?\s*$/;
+// 空答案括号"（）"/"(  )"是答题槽噪音,一律清除
+const EMPTY_PAREN_RE = /[（(]\s*[)）]/g;
+
 // 题型/答案/选项的最终规范化（导入与预览提交时都会调用，幂等）
 export function finalizeQuestion(q) {
     q.title = (q.title || '').trim();
     q.content = (q.content || '').trim();
     q.analysis = (q.analysis || '').trim();
     q.explanation = (q.explanation || '').trim();
+    if (!q.answer) {
+        const em = q.content.match(EMBEDDED_ANSWER_RE);
+        if (em) {
+            q.answer = em[2];
+            q.content = q.content.slice(0, em.index + 1).trimEnd();
+        }
+    }
+    q.content = q.content.replace(EMPTY_PAREN_RE, '').replace(/\s+$/g, '').trim();
     const rawAnswer = (q.answer || '').toUpperCase().replace(/\s+/g, '');
 
     const hint = (q.type || '').replace(/题$/, '');
@@ -113,20 +132,69 @@ export function questionDedupKey(q) {
     return stem + '|' + opts;
 }
 
+// 文末答案表整行判定:可选"答案:"头 + 一串 题号.答案 对,必须吃满整行
+// ("1.B 超检查…"这类真题干因吃不满而被排除,防"B超"误伤)
+export const ANSWER_LINE_RE = /^(?:【?(?:参考|标准|正确)?答案】?\s*[:：]?\s*)?\d{1,3}\s*[.、:：]?\s*(?:[A-Ha-h√×]{1,4}|对|错|正确|错误)(?:[\s,，、;；.。]+\d{1,3}\s*[.、:：]?\s*(?:[A-Ha-h√×]{1,4}|对|错|正确|错误))*\s*[。.]?\s*$/;
+const ANSWER_RANGE_RE = /^\s*(\d{1,3})\s*[-—–~至]\s*(\d{1,3})\s*[:：]?\s*([A-Ha-h√×]{2,40})\s*$/;
+const ANSWER_HEADER_RE = /^\s*【?(?:参考|标准|正确)?答案】?\s*[:：]?\s*$/;
+
+// 自文档底部收集连续答案行 → {num: answer} 映射,并剥离这些行(含"参考答案:"头行)
+// 映射按题号回填;若文档题号有重号(多套题各自从头编号)映射可能歧义,由预览人工确认兜底
+export function extractAnswerSheet(lines) {
+    const map = new Map();
+    let blockStart = lines.length;
+    let i = lines.length - 1;
+    while (i >= 0) {
+        const line = lines[i].trim();
+        if (!line) { i--; continue; } // 块内允许空行
+        const rangeM = line.match(ANSWER_RANGE_RE);
+        if (rangeM) {
+            const from = parseInt(rangeM[1], 10), to = parseInt(rangeM[2], 10);
+            const seq = rangeM[3].split('');
+            if (to >= from && to - from < 100) {
+                for (let n = from; n <= to; n++) {
+                    const a = seq[n - from];
+                    if (a) map.set(n, a);
+                }
+                blockStart = i; i--; continue;
+            }
+            break;
+        }
+        if (ANSWER_LINE_RE.test(line)) {
+            const pairRe = /(\d{1,3})\s*[.、:：]?\s*([A-Ha-h√×]{1,4}|对|错|正确|错误)/g;
+            let pm;
+            while ((pm = pairRe.exec(line)) !== null) map.set(parseInt(pm[1], 10), pm[2]);
+            blockStart = i; i--; continue;
+        }
+        if (ANSWER_HEADER_RE.test(line)) {
+            if (map.size > 0) { blockStart = i; i--; continue; } // 头行下确有答案对才并入
+            break;
+        }
+        break;
+    }
+    if (map.size < 2) return { map: new Map(), lines }; // 少于 2 个答案不像答案表,保守放弃
+    return { map, lines: lines.slice(0, blockStart) };
+}
+
 // 主解析器：逐行状态机，同时覆盖家族 A/B/C/D
 export function parseQuestionsText(content) {
     const questions = [];
-    const lines = String(content).replace(/\r\n?/g, '\n').split('\n');
+    const rawLines = String(content).replace(/\r\n?/g, '\n').split('\n');
+    const { map: sheetMap, lines } = extractAnswerSheet(rawLines);
     let cur = null;
 
     const newQuestion = () => {
         cur = {
             title: '', content: '', explanation: '', options: {}, optionExplanations: {},
-            answer: '', analysis: '', type: '', confidence: 1.0, raw: []
+            answer: '', analysis: '', type: '', confidence: 1.0, raw: [], num: null
         };
     };
     const flush = () => {
         if (!cur) return;
+        // 文末答案表按题号回填(在 finalize 之前,保证题型/置信度正确)
+        if (!cur.answer && cur.num != null && sheetMap.has(cur.num)) {
+            cur.answer = sheetMap.get(cur.num);
+        }
         const q = finalizeQuestion(cur);
         if (q) questions.push(q);
         cur = null;
@@ -205,6 +273,7 @@ export function parseQuestionsText(content) {
             flush();
             newQuestion();
             cur.raw.push(rawLine);
+            cur.num = parseInt(numM[1], 10); // 供文末答案表按题号回填
             if (split) {
                 cur.content = split.stem;   // 家族C：题干 + 行内选项
                 cur.options = split.options;
@@ -240,8 +309,9 @@ export function parseQuestionsText(content) {
         const opM = body.match(OPTION_LINE_RE);
         if (opM) {
             if (!cur) newQuestion();
-            // 选项行内还跟着更多选项时（如"A. 21 B.80 C.443 D.22"），按行内选项拆分
-            const lineSplit = splitInlineOptions(body);
+            // 选项行内还跟着更多选项时（如"A. 21 B.80 C.443 D.22"），按行内选项拆分;
+            // startFromAny 兼容双行布局的第二行（"C.xx D.yy"）,否则 D 会被吞进 C
+            const lineSplit = splitInlineOptions(body, { startFromAny: true });
             if (lineSplit && Object.keys(lineSplit.options).length > 1) {
                 Object.assign(cur.options, lineSplit.options);
                 if (!cur.content && lineSplit.stem) cur.content = lineSplit.stem;
@@ -253,6 +323,29 @@ export function parseQuestionsText(content) {
             continue;
         }
 
+        // 7.5 空格分隔选项行:"A 盗窃罪"(字母后无标点,仅空格)。
+        // 须已有题干且字母接续上一选项,防"A 股行情"这类题干续行误判
+        if (cur && cur.content) {
+            const spM = body.match(/^([A-Ha-h])\s+([^\s].*)$/);
+            if (spM) {
+                const letter = spM[1].toUpperCase();
+                const keys = Object.keys(cur.options);
+                const expected = keys.length === 0 ? 'A' : String.fromCharCode(keys[keys.length - 1].charCodeAt(0) + 1);
+                if (letter === expected) {
+                    const normalized = letter + '. ' + spM[2].trim();
+                    const lineSplit = splitInlineOptions(normalized, { startFromAny: true });
+                    if (lineSplit && Object.keys(lineSplit.options).length > 1) {
+                        Object.assign(cur.options, lineSplit.options);
+                    } else {
+                        cur.options[letter] = spM[2].trim();
+                    }
+                    if (inlineAnswer) cur.answer = inlineAnswer;
+                    cur.raw.push(rawLine);
+                    continue;
+                }
+            }
+        }
+
         // 8. 整行就是答案（行内答案剥离后 body 为空）
         if (inlineAnswer) {
             if (!cur) newQuestion();
@@ -261,7 +354,8 @@ export function parseQuestionsText(content) {
             continue;
         }
 
-        // 9. 其他 → 题干续行（多行题干）；续行里跟行内选项的也支持；没有当前题的散行丢弃
+        // 9. 其他 → 续行。选项已开始 → 折行归并进最后一个选项(不污染题干);
+        //    题干续行(含行内选项的也支持);没有当前题的散行丢弃
         if (cur) {
             const contSplit = splitInlineOptions(line);
             if (contSplit && Object.keys(contSplit.options).length > 1) {
@@ -270,6 +364,12 @@ export function parseQuestionsText(content) {
                 if (contSplit.stem) {
                     cur.content = cur.content ? cur.content + '\n' + contSplit.stem : contSplit.stem;
                 }
+            } else if (Object.keys(cur.options).length > 0 && cur.content) {
+                const lastKey = Object.keys(cur.options).pop();
+                const prev = cur.options[lastKey];
+                // CJK 相邻直接拼接,西文/数字接半角空格
+                const glue = (/[\u4e00-\u9fff。）)”》】%]$/.test(prev) || /^[\u4e00-\u9fff（(“《【]/.test(line)) ? '' : ' ';
+                cur.options[lastKey] = prev + glue + line;
             } else if (cur.content) {
                 cur.content += '\n' + line;
             } else if (!cur.answer && Object.keys(cur.options).length === 0) {
