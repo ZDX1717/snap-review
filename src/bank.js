@@ -1,8 +1,11 @@
 import { state } from './state.js';
 import { finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey } from './parser.js';
-import { saveToLocalStorage } from './storage.js';
+import { saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportBatch, saveOverwriteSnapshot, loadOverwriteSnapshot, clearOverwriteSnapshot } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
+
+// 本次预览的来源标签(撤销记录展示用),由导入入口设置
+let previewSourceLabel = '导入';
 
 // ==================== bank.js ====================
 // 自动拆分自 main.js;依赖方向见各 import。
@@ -39,6 +42,7 @@ const editorRemoveOption = document.getElementById('editor-remove-option');
 const editorExplanation = document.getElementById('editor-explanation');
 const editorAnalysis = document.getElementById('editor-analysis');
 const editorPosition = document.getElementById('editor-position');
+const lastImportInfo = document.getElementById('last-import-info');
 
 // 导入题目(按扩展名分流:txt 直读;docx 走零依赖抽取;.doc 明确引导另存)
 export function importQuestions() {
@@ -47,6 +51,7 @@ export function importQuestions() {
         showImportStatus('请先选择一个文件', 'error');
         return;
     }
+    previewSourceLabel = `文件：${file.name}`;
     const name = file.name.toLowerCase();
 
     const runPreview = (content, label) => {
@@ -121,6 +126,7 @@ export function parsePastedText() {
         showImportStatus('请先粘贴题目内容', 'error');
         return;
     }
+    previewSourceLabel = '粘贴导入';
     const importedQuestions = parseQuestionsText(text);
     if (importedQuestions.length === 0) {
         showImportStatus('没有解析出有效题目，请检查内容格式', 'error');
@@ -184,7 +190,8 @@ export function showImportStatus(message, type) {
 
 // 打开预览：questions 为解析结果数组
 export function openImportPreview(questions) {
-    state.previewData = questions.map(q => ({ q, include: true, warnings: [] }));
+    // 预览防呆:缺答案/选项不足/低置信度(conf ≤ 0.6)的题默认不勾选,用户确认后可手动勾回
+    state.previewData = questions.map(q => ({ q, include: (q.confidence || 0) > 0.6, warnings: [] }));
     renderPreview();
     showModal(importPreviewModal);
 }
@@ -366,6 +373,10 @@ export function commitPreviewImport() {
     }
 
     if (overwrite) {
+        // 覆盖前自动快照,支持"恢复覆盖前快照"(消灭"此操作不可恢复")
+        if (state.questionBanks[targetName].length > 0) {
+            saveOverwriteSnapshot(targetName, JSON.parse(JSON.stringify(state.questionBanks[targetName])));
+        }
         state.questionBanks[targetName] = finalItems;
     } else {
         state.questionBanks[targetName].push(...finalItems);
@@ -389,6 +400,101 @@ export function commitPreviewImport() {
     const dupeNote = (items.length - finalItems.length) > 0 ? `（跳过 ${items.length - finalItems.length} 题重复）` : '';
     const dropNote = droppedNoAnswer > 0 ? `，另有 ${droppedNoAnswer} 题因缺答案未导入（可在预览中补填答案后重新导入）` : '';
     showImportStatus(`成功导入 ${finalItems.length} 道题目到题库：${targetName}${dupeNote}${dropNote}`, 'success');
+
+    // 记录导入批次(供"撤销上次导入"按指纹回滚;手改过的题指纹变化后自动跳过)
+    recordImportBatch({
+        time: new Date().toISOString(),
+        source: previewSourceLabel,
+        bank: targetName,
+        fingerprints: finalItems.map(questionDedupKey),
+        imported: finalItems.length,
+    });
+    updateLastImportInfo();
+}
+
+
+// ==================== 导入撤销与覆盖快照恢复 ====================
+
+// 撤销最近一次导入:按批次指纹从目标题库移除,并级联清理错题本/收藏中的同指纹条目
+export function undoLastImport() {
+    const batches = loadImportBatches();
+    const last = batches[batches.length - 1];
+    if (!last) {
+        showImportStatus('没有可撤销的导入记录', 'error');
+        return;
+    }
+    const fpSet = new Set(last.fingerprints || []);
+    const bank = state.questionBanks[last.bank] || [];
+    const keptBank = bank.filter(q => !fpSet.has(questionDedupKey(q)));
+    const removedBank = bank.length - keptBank.length;
+    const keptErr = state.errorQuestions.filter(q => !fpSet.has(questionDedupKey(q)));
+    const removedErr = state.errorQuestions.length - keptErr.length;
+    const keptFav = state.favoriteQuestions.filter(q => !fpSet.has(questionDedupKey(q)));
+    const removedFav = state.favoriteQuestions.length - keptFav.length;
+
+    if (removedBank + removedErr + removedFav === 0) {
+        // 导入的题已被删除或修改(指纹变化):按设计跳过,不误删,批次作废
+        saveImportBatches(batches.slice(0, -1));
+        showImportStatus('上次导入的题目已不存在（可能已被删除或修改），无需撤销', 'error');
+        updateLastImportInfo();
+        return;
+    }
+    if (!confirm(`撤销 ${last.time.replace('T', ' ').slice(0, 16)} 导入到"${last.bank}"的记录？\n将从题库移除 ${removedBank} 题，并同步移除错题本 ${removedErr} 条、收藏 ${removedFav} 条。`)) {
+        return; // 用户取消:批次保留,仍可再次撤销
+    }
+    state.questionBanks[last.bank] = keptBank;
+    state.errorQuestions = keptErr;
+    state.favoriteQuestions = keptFav;
+    if (state.currentBankName === last.bank) state.questionBank = keptBank;
+    saveImportBatches(batches.slice(0, -1));
+    saveToLocalStorage();
+    updateBankSelect();
+    updateBanksList();
+    updateLastImportInfo();
+    showImportStatus(`已撤销导入：从"${last.bank}"移除 ${removedBank} 题（错题本 ${removedErr} 条、收藏 ${removedFav} 条已同步清理）`, 'success');
+}
+
+// 恢复覆盖模式导入前的题库快照
+export function restoreOverwriteSnapshot() {
+    const snap = loadOverwriteSnapshot();
+    if (!snap) {
+        showImportStatus('没有可恢复的覆盖前快照（仅覆盖导入时自动生成）', 'error');
+        return;
+    }
+    if (!state.questionBanks[snap.bank]) {
+        showImportStatus(`快照对应的题库"${snap.bank}"已被删除，无法恢复`, 'error');
+        return;
+    }
+    if (!confirm(`把题库"${snap.bank}"恢复到覆盖前状态（${snap.questions.length} 题，当前 ${(state.questionBanks[snap.bank] || []).length} 题）？`)) {
+        return;
+    }
+    state.questionBanks[snap.bank] = JSON.parse(JSON.stringify(snap.questions));
+    if (state.currentBankName === snap.bank) state.questionBank = state.questionBanks[snap.bank];
+    clearOverwriteSnapshot();
+    saveToLocalStorage();
+    updateBankSelect();
+    updateBanksList();
+    showImportStatus(`已恢复覆盖前快照：${snap.bank}（${snap.questions.length} 题）`, 'success');
+}
+
+// 预览一键"只保留无警告题"(单向过滤,被滤掉的仍可手动勾回)
+export function keepCleanOnly() {
+    state.previewData.forEach(item => {
+        if (item.warnings && item.warnings.length) item.include = false;
+    });
+    renderPreview();
+    updatePreviewSummary();
+}
+
+// 题库管理页展示最近一次导入信息
+export function updateLastImportInfo() {
+    const batches = loadImportBatches();
+    const last = batches[batches.length - 1];
+    if (!last) {
+        lastImportInfo.textContent = '暂无导入记录';
+        return;
+    }
+    lastImportInfo.textContent = `上次导入：${last.time.replace('T', ' ').slice(0, 16)} · ${last.source} → ${last.bank}（${last.imported} 题）`;
 }
 
 

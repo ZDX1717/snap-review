@@ -105,3 +105,47 @@ export function loadMasterySetting() {
     state.masteryThreshold = [0, 1, 2, 3].includes(saved) ? saved : 2;
     return state.masteryThreshold;
 }
+
+// ==================== 导入批次记录(撤销)与覆盖前快照 ====================
+
+// 批次记录:最近 5 次;损坏时静默降级为无记录(仅失去撤销能力,不影响题库数据)
+export function loadImportBatches() {
+    try {
+        const arr = JSON.parse(localStorage.getItem('importBatches') || '[]');
+        return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+export function saveImportBatches(batches) {
+    try {
+        while (batches.length > 5) batches.shift();
+        localStorage.setItem('importBatches', JSON.stringify(batches));
+    } catch (e) { /* 静默降级 */ }
+}
+
+export function recordImportBatch(batch) {
+    const batches = loadImportBatches();
+    batches.push(batch);
+    saveImportBatches(batches);
+}
+
+export function saveOverwriteSnapshot(bankName, questions) {
+    try {
+        localStorage.setItem('overwriteSnapshot', JSON.stringify({ bank: bankName, time: new Date().toISOString(), questions }));
+    } catch (e) { /* 题库过大等异常时静默降级:快照不可用,覆盖流程不受影响 */ }
+}
+
+export function loadOverwriteSnapshot() {
+    try {
+        const s = JSON.parse(localStorage.getItem('overwriteSnapshot') || 'null');
+        return (s && s.bank && Array.isArray(s.questions)) ? s : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+export function clearOverwriteSnapshot() {
+    try { localStorage.removeItem('overwriteSnapshot'); } catch (e) { /* 静默 */ }
+}

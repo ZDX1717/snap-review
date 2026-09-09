@@ -1,11 +1,11 @@
 import { state } from './state.js';
 import { finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey, shuffleArray, splitInlineOptions } from './parser.js';
-import { loadCollapsedBanks, loadFromLocalStorage, loadMasterySetting, saveCollapsedBanks, saveToLocalStorage } from './storage.js';
+import { loadCollapsedBanks, loadFromLocalStorage, loadMasterySetting, saveCollapsedBanks, saveToLocalStorage, recordImportBatch } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, toggleAllBanks, updateErrorStreak, updateErrorsList, updateToggleAllBanksLabel } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
 import { backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getScopeSelection, nextQuestion, prevQuestion, renderAnswerReview, reviewErrors, showQuizResult, showQuizStatus, showSection, startQuiz, startReviewSession, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton, updateScopeSummary } from './quiz.js';
-import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorMutateOptions, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, importQuestions, openImportPreview, parsePastedText, refreshQuestionBankView, renameBank, renderBankEditor, renderPreview, showImportStatus, showRenameModal, togglePreviewSelectAll, updateBankSelect, updateBanksList, updatePreviewSummary, updatePreviewTargetBanks } from './bank.js';
+import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorMutateOptions, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, importQuestions, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks } from './bank.js';
 
 // Zquiz · 期末周刷题 —— 应用装配入口
 // 依赖方向:main → 业务模块(quiz/errorbook/favorites/bank/dom)→ parser/storage/state。
@@ -94,6 +94,9 @@ const pasteClearBtn = document.getElementById('paste-clear-btn');
 const importPreviewModal = document.getElementById('import-preview-modal');
 const previewSummary = document.getElementById('preview-summary');
 const previewSelectAll = document.getElementById('preview-select-all');
+const previewCleanBtn = document.getElementById('preview-clean-btn');
+const undoImportBtn = document.getElementById('undo-import-btn');
+const restoreSnapshotBtn = document.getElementById('restore-snapshot-btn');
 const previewSkipDupes = document.getElementById('preview-skip-dupes');
 const previewList = document.getElementById('preview-list');
 const previewTargetBankSelect = document.getElementById('preview-target-bank');
@@ -151,8 +154,9 @@ function init() {
     loadCollapsedBanks();
     masteryThresholdSelect.value = String(loadMasterySetting());
 
-    // 更新题库选择下拉框
+    // 更新题库选择下拉框与最近导入信息
     updateBankSelect();
+    updateLastImportInfo();
 
     // 初始状态下拉框与实际加载的题库保持一致
     // （页面默认显示"全部题库"，但初始数据只加载了第一个题库，二者必须一致）
@@ -270,6 +274,11 @@ function setupEventListeners() {
 
     // 导入预览向导
     previewSelectAll.addEventListener('change', togglePreviewSelectAll);
+    previewCleanBtn.addEventListener('click', keepCleanOnly);
+
+    // 导入撤销与覆盖快照恢复
+    undoImportBtn.addEventListener('click', undoLastImport);
+    restoreSnapshotBtn.addEventListener('click', restoreOverwriteSnapshot);
     previewConfirmBtn.addEventListener('click', commitPreviewImport);
     previewCancelBtn.addEventListener('click', () => hideModal(importPreviewModal));
 
@@ -407,12 +416,16 @@ if (typeof window === 'undefined') {
         clearErrors,
         collectUserAnswer,
         commitPreviewImport,
+        keepCleanOnly,
         createNewBank,
         currentEditBank,
         dedupBank,
         deleteBank,
+        restoreOverwriteSnapshot,
         deleteError,
         displayQuestion,
+        undoLastImport,
+        updateLastImportInfo,
         downloadFile,
         editBank,
         editorAddQuestion,
@@ -449,6 +462,7 @@ if (typeof window === 'undefined') {
         prevQuestion,
         questionDedupKey,
         refreshQuestionBankView,
+        recordImportBatch,
         renameBank,
         renderAnswerReview,
         renderBankEditor,

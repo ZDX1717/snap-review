@@ -270,6 +270,14 @@
                         </div>
 
                         <div class="operation-card">
+                            <h3>导入撤销</h3>
+                            <p id="last-import-info" style="font-size:0.85em;color:#888;">暂无导入记录</p>
+                            <button id="undo-import-btn" class="action-btn secondary">撤销上次导入</button>
+                            <button id="restore-snapshot-btn" class="action-btn secondary">恢复覆盖前快照</button>
+                            <p style="font-size:0.85em;color:#888;">导入后手动修改过的题目不会被误删（按内容指纹识别）</p>
+                        </div>
+
+                        <div class="operation-card">
                             <h3>导出题库</h3>
                             <div class="export-options">
                                 <button id="export-current-btn" class="action-btn secondary">导出当前题库</button>
@@ -347,6 +355,7 @@ C：选项C    D：选项D
                     <label class="inline-label">
                         <input type="checkbox" id="preview-select-all" checked> 全选
                     </label>
+                    <button type="button" id="preview-clean-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">只保留无警告题</button>
                     <label class="inline-label">
                         <input type="checkbox" id="preview-skip-dupes" checked> 跳过与目标题库重复的题
                     </label>
