@@ -192,16 +192,25 @@ function hideFileNotice() {
     fileNotice.className = 'file-notice hidden';
 }
 
-// PDF / 老版 doc:给两个具体动作(①复制提示词发给 AI·附文件 ②转换格式/复制文字),不再只是静态文字
+// 读不了的格式:两类文件各给两条互不混淆的路。
+// PDF:① AI 提取(AI 聊天能读 PDF 文件,按钮直发提示词) ② 复制文字。
+// 老 .doc:AI 聊天也读不了 .doc,不存在"发给 AI"选项 → ① 另存为 .docx 重选 ② 直接复制文字。
 function showUnreadableFileNotice(isPdf) {
-    const label = isPdf ? 'PDF' : '老版 .doc';
-    const via = isPdf ? '把 PDF 文件附到对话里' : '把 .doc 另存为 .docx 后再选一次';
+    if (isPdf) {
+        showFileNotice(
+            '<b>📄 PDF 不能直接读，两个办法：</b>' +
+            '<div class="file-notice-actions"><button type="button" id="file-ai-copy-btn" class="action-btn secondary">① 📋 复制提示词，去豆包/Kimi 让 AI 提取</button></div>' +
+            '<p class="file-notice-hint">① 步骤：点上方按钮复制提示词 → 打开豆包 / Kimi / DeepSeek → <b>把 PDF 文件附到对话里</b> → 粘贴提示词发送 → 把 AI 回复全文粘回输入框。注意：此法会把材料上传给该 AI 服务。</p>' +
+            '<p class="file-notice-hint">② 不想用 AI：直接在 PDF 里选中文字复制，粘贴到输入框（任何格式通用）。</p>',
+            'warning'
+        );
+        return;
+    }
     showFileNotice(
-        `<b>📄 ${label} 不能直接读,两个办法:</b>` +
-        '<div class="file-notice-actions"><button type="button" id="file-ai-copy-btn" class="action-btn secondary">① 📋 复制提示词，去豆包/Kimi 让 AI 提取</button></div>' +
-        `<p class="file-notice-hint">点上方按钮复制提示词 → 打开豆包 / Kimi / DeepSeek,${via},粘贴提示词发送,把 AI 回复粘回输入框。` +
-        `注意:此法会把材料上传给该 AI 服务。` +
-        `<br>② 或把文字直接复制出来,粘贴到输入框(任何格式通用)</p>`,
+        '<b>📄 老版 .doc 不能直接读，两个办法：</b>' +
+        '<p class="file-notice-hint">① <b>转格式（推荐）</b>：用 Word / WPS 打开 → 另存为 <b>.docx</b> → 回来重新选择文件，文字会自动读进输入框。</p>' +
+        '<p class="file-notice-hint">② <b>复制文字</b>：直接在 .doc 里选中文字复制，粘贴到输入框（任何格式通用）。</p>' +
+        '<p class="file-notice-hint">提示：转成 .docx 导入后若格式仍乱，可用预览页的「🤖 AI 兜底整理」一键清理。</p>',
         'warning'
     );
 }

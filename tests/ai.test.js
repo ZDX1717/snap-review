@@ -236,8 +236,15 @@ test('统一导入管道回归:PDF 选择 → 双选项提示块(AI 提取按钮
     run(`fileInput.files = [{ name: '试卷.pdf' }]`);
     run(`handleFileSelect({ target: { files: [{ name: '试卷.pdf' }] } })`);
     const notice = elements['file-notice'];
-    assert.ok(String(notice.innerHTML).includes('file-ai-copy-btn'), '提示块要有 AI 提取按钮');
+    assert.ok(String(notice.innerHTML).includes('file-ai-copy-btn'), 'PDF 提示块要有 AI 提取按钮');
     assert.ok(String(notice.innerHTML).includes('上传给该 AI 服务'), '要有隐私提示');
+    assert.ok(String(notice.innerHTML).includes('附到对话里'), 'AI 路径要写明附文件步骤');
+    // .doc:AI 聊天读不了 .doc → 不给 AI 按钮,① 是转格式、② 是复制文字,两条路不混
+    run(`handleFileSelect({ target: { files: [{ name: '试卷.doc' }] } })`);
+    const docNotice = String(elements['file-notice'].innerHTML);
+    assert.ok(!docNotice.includes('file-ai-copy-btn'), '.doc 不应出现 AI 提取按钮');
+    assert.ok(docNotice.includes('另存为') && docNotice.includes('.docx'), '① 必须是转格式');
+    assert.ok(docNotice.includes('选中文字复制'), '② 必须是复制文字');
     // 点提示块里的 AI 按钮 → 只复制提示词(不合并旧原文);沙箱无剪贴板 → 走失败分支但必须不抛错
     run(`lastRawContent = '旧的残留原文'`);
     notice._listeners.click({ target: { id: 'file-ai-copy-btn' } });
