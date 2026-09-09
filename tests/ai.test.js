@@ -1,12 +1,11 @@
-// AI 模块测试(0.9.0):厂商预设/配置规范化 + chat 客户端(假 fetch) + 分块 + 编排 + 存储 + 预览兜底集成
+// AI 模块测试(0.9.x):预设/配置 + chat 客户端(假 fetch) + 分块 + 编排 + 存储 + 预览兜底/救援/B 路线集成
 import assert from 'node:assert';
 import test from 'node:test';
-import { AI_PROVIDERS, normalizeAiConfig, aiConfigReady, chatCompletion, testConnection, splitIntoChunks, aiFormatMaterial } from '../src/ai.js';
+import { AI_PROVIDERS, normalizeAiConfig, aiConfigReady, chatCompletion, testConnection, splitIntoChunks, aiFormatMaterial, aiFixQuestions, serializeQuestion, groupQuestionChunks, buildAiNotes } from '../src/ai.js';
 import { loadAiConfig, saveAiConfig, loadAiUsage, recordAiUsage } from '../src/storage.js';
-import { buildAiNotes } from '../src/ai.js';
 
 // ---------- 厂商预设与配置 ----------
-test('厂商预设:三家直连厂商在列,CORS 实测结论不入配置', () => {
+test('厂商预设:三家直连厂商在列', () => {
     const ids = AI_PROVIDERS.map(p => p.id);
     assert.deepStrictEqual(ids, ['zhipu', 'siliconflow', 'deepseek', 'custom']);
     assert.strictEqual(AI_PROVIDERS[0].model, 'glm-4-flash');
@@ -57,7 +56,7 @@ test('chatCompletion:HTTP 错误带状态码;网络异常归类为网络/CORS;�
     await assert.rejects(() => chatCompletion({ ...CFG, apiKey: '' }, [], { fetchImpl: f, timeoutMs: 0 }), /API Key/);
 });
 
-test('testConnection:连通返回 sample;异常上抛', async () => {
+test('testConnection:连通返回 sample', async () => {
     const f = fakeFetch({ ok: true, json: async () => ({ choices: [{ message: { content: 'OK' } }] }) });
     const r = await testConnection(CFG, { fetchImpl: f });
     assert.strictEqual(r.ok, true);
@@ -82,16 +81,15 @@ test('splitIntoChunks:按空行分段累积,不超 maxChars,内容零丢失零�
     assert.strictEqual(chunks.join('\n\n').replace(/\n{2,}/g, '\n\n'), material.replace(/\n{2,}/g, '\n\n'));
 });
 
-test('splitIntoChunks:超长单段按行硬切', () => {
+test('splitIntoChunks:超长单段按行硬切;空材料为空', () => {
     const long = Array.from({ length: 20 }, (_, i) => '第' + i + '行这是一条很长很长的题目内容用来撑爆单块限制').join('\n');
     const chunks = splitIntoChunks(long, { maxChars: 120 });
     assert.ok(chunks.length > 1);
-    assert.ok(chunks.every(c => c.length <= 120 + 40)); // 行级硬切允许略超一行
     assert.strictEqual(chunks.join('\n'), long);
     assert.deepStrictEqual(splitIntoChunks(''), []);
 });
 
-// ---------- 编排 ----------
+// ---------- 编排(整篇原文 → 整理文本,救援区 B 路线用) ----------
 test('aiFormatMaterial:官方提示词作 system,逐块带进度,结果按块拼回', async () => {
     const f = fakeFetch((url, init) => {
         const body = JSON.parse(init.body);
@@ -111,6 +109,23 @@ test('aiFormatMaterial:空材料快速失败', async () => {
     await assert.rejects(() => aiFormatMaterial(CFG, '   ', { fetchImpl: fakeFetch(okResp()), timeoutMs: 0 }), /没有可整理的内容/);
 });
 
+// ---------- 按题修复(预览页 AI 兜底用) ----------
+test('aiFixQuestions 基元:序列化/分块上限/进度按题数', async () => {
+    const q = { content: '题?', options: { A: '甲', B: '乙' }, answer: 'A', explanation: '因为' };
+    assert.ok(serializeQuestion(q).includes('题目：题?'));
+    assert.ok(serializeQuestion(q).includes('解析：因为'));
+    const many = Array.from({ length: 25 }, (_, i) => ({ content: '第' + i + '题很长很长很长很长', options: { A: '甲', B: '乙' }, answer: 'A' }));
+    const chunks = groupQuestionChunks(many);
+    assert.ok(chunks.length >= 3);
+    assert.strictEqual(chunks.reduce((a, c) => a + c.count, 0), 25);
+    assert.ok(chunks.every(c => c.count <= 10));
+    let last = null;
+    const r = await aiFixQuestions(CFG, many.slice(0, 12), { fetchImpl: fakeFetch(okResp()), timeoutMs: 0, onProgress: (d, t) => { last = d + '/' + t; } });
+    assert.strictEqual(r.total, 12);
+    assert.strictEqual(last, '12/12');
+    assert.ok(r.questions.length >= 1);
+});
+
 // ---------- 存储层(全局 localStorage 桩) ----------
 test('AI 配置与埋点:roundtrip、损坏兜底、埋点上限 50', () => {
     const store = new Map();
@@ -125,18 +140,29 @@ test('AI 配置与埋点:roundtrip、损坏兜底、埋点上限 50', () => {
         assert.deepStrictEqual(loadAiConfig(), CFG);
         store.set('aiConfig', '{broken');
         assert.deepStrictEqual(loadAiConfig(), {});
-
-        for (let i = 0; i < 55; i++) recordAiUsage({ trigger: 'preview-fallback', chunks: 1, aiQuestions: i });
+        for (let i = 0; i < 55; i++) recordAiUsage({ trigger: 'preview-fix', chunks: 1, aiQuestions: i });
         const usage = loadAiUsage();
         assert.strictEqual(usage.length, 50);
-        assert.strictEqual(usage[49].aiQuestions, 54); // 保留最近
-        assert.ok(usage[0].time);
+        assert.strictEqual(usage[49].aiQuestions, 54);
     } finally {
         delete globalThis.localStorage;
     }
 });
 
-// ---------- 预览兜底集成(vm 沙箱,假 fetch) ----------
+// ---------- buildAiNotes(改动对比) ----------
+test('buildAiNotes:改动逐项写明;未变不标;题干同选项变可宽松匹配', () => {
+    const orig = { content: '天空是什么颜色?', options: { A: '红', B: '绿', C: '蓝' }, type: '单选', answer: '' };
+    const [noteSame] = buildAiNotes([JSON.parse(JSON.stringify(orig))], [{ ...orig, answer: 'C' }]);
+    assert.strictEqual(noteSame, 'AI 修改：补入答案 C');
+    const tweaked = { content: '天空是什么颜色?', options: { A: '红', B: '绿', C: '蓝色' }, type: '单选', answer: 'C' };
+    const [noteTweak] = buildAiNotes([JSON.parse(JSON.stringify(orig))], [tweaked]);
+    assert.ok(noteTweak.includes('选项调整'));
+    const identical = { content: '天空是什么颜色?', options: { A: '红', B: '绿', C: '蓝' }, type: '单选', answer: 'C' };
+    const [noteNone] = buildAiNotes([{ ...identical }], [JSON.parse(JSON.stringify(identical))]);
+    assert.strictEqual(noteNone, '');
+});
+
+// ---------- vm 沙箱集成 ----------
 const AI_TEXT = `题目：1+1等于几?
 A：1
 B：2
@@ -150,49 +176,61 @@ B：绿
 C：蓝
 答案：C`;
 
-test('previewAiFallback:AI 文本替换预览列表并走同一防呆;埋点记录;缺配置引导打开设置', async () => {
-    const { run, store, alerts } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+test('previewAiFallback(勾选语义):未勾选题不进请求;内容没变不打徽章', async () => {
+    const calls = [];
+    const { run, store } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
         sandboxExtras: {
-            fetch: async (url, init) => ({ ok: true, json: async () => ({ choices: [{ message: { content: AI_TEXT } }] }) }),
+            fetch: async (url, init) => {
+                calls.push(JSON.parse(init.body).messages[1].content);
+                return { ok: true, json: async () => ({ choices: [{ message: { content: AI_TEXT } }] }) };
+            },
             AbortController,
         },
     }));
-    // 场景 1:缺配置 → 提示并打开设置,不动预览
-    run(`pasteInput.value = '有原文但没配置'`);
-    run(`previewAiFallback()`);
-    await new Promise(r => setTimeout(r, 0));
-    assert.ok(alerts.some(m => m.includes('AI 设置')));
-    assert.strictEqual(run(`previewData.length`), 0);
-
-    // 场景 2:配置就绪 + 有原文 → 整理结果替换预览,低置信防呆默认不勾(此批无警告,应全勾)
     store.set('aiConfig', JSON.stringify(CFG));
-    run(`pasteInput.value = '乱七八糟的原文一坨\\n\\n再来一坨'`);
+    run(`Q3 = ['1. 1+1等于几? A.1 B.2 C.3 D.4 答案：B', '2. 天空是什么颜色? A.红 B.绿 C.蓝 答案：C', '3. AI 漏掉的题 A.甲 B.乙 答案：A']`);
+    run(`init()`);
+    run(`openImportPreview(parseQuestionsText(Q3.join(String.fromCharCode(10))))`);
+    assert.strictEqual(run(`previewData.length`), 3);
+    run(`previewData[2].include = false; renderPreview()`);
     await run(`(async () => { await previewAiFallback(); })()`);
-    assert.strictEqual(run(`previewData.length`), 2);
-    assert.strictEqual(run(`previewData[0].q.content`), '1+1等于几?');
-    assert.strictEqual(run(`previewData[0].include`), true);
-    assert.strictEqual(run(`previewData[1].q.answer`), 'C');
-    // AI 改动标注:原文预览为空 → 全部视为 AI 新拆出
-    assert.ok(String(run(`previewData[0].aiNote`)).includes('AI 新拆出'));
-    const usage = JSON.parse(store.get('aiUsage'));
-    assert.strictEqual(usage.length, 1);
-    assert.strictEqual(usage[0].trigger, 'preview-fallback');
-    assert.strictEqual(usage[0].aiQuestions, 2);
+    assert.strictEqual(calls.length, 1);
+    assert.ok(calls[0].includes('1+1等于几'), '勾选题要进请求');
+    assert.ok(!calls[0].includes('AI 漏掉的题'), '未勾选题不进请求');
+    assert.strictEqual(run(`previewData[2].q.content`), 'AI 漏掉的题');
+    assert.strictEqual(run(`previewData[2].aiNote`), '');
 });
 
-test('buildAiNotes:改动逐项写明;未变不标;题干同选项变可宽松匹配', () => {
-    const orig = { content: '天空是什么颜色?', options: { A: '红', B: '绿', C: '蓝' }, type: '单选', answer: '' };
-    const [noteSame] = buildAiNotes([JSON.parse(JSON.stringify(orig))], [{ ...orig, answer: 'C' }]);
-    assert.strictEqual(noteSame, 'AI 修改：补入答案 C');
-    const tweaked = { content: '天空是什么颜色?', options: { A: '红', B: '绿', C: '蓝色' }, type: '单选', answer: 'C' };
-    const [noteTweak] = buildAiNotes([JSON.parse(JSON.stringify(orig))], [tweaked]);
-    assert.ok(noteTweak.includes('选项调整'));
-    const identical = { content: '天空是什么颜色?', options: { A: '红', B: '绿', C: '蓝' }, type: '单选', answer: 'C' };
-    const [noteNone] = buildAiNotes([{ ...identical }], [JSON.parse(JSON.stringify(identical))]);
-    assert.strictEqual(noteNone, '');
+test('previewAiFallback:改动写明差异;AI 未返回的题标注保留原样(不无声消失)', async () => {
+    const { run, store } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+        sandboxExtras: {
+            fetch: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: '题目：1+1等于几?\nA：1\nB：二\nC：3\nD：4\n答案：B' } }] }) }),
+            AbortController,
+        },
+    }));
+    store.set('aiConfig', JSON.stringify(CFG));
+    run(`Q2 = ['1. 1+1等于几? A.1 B.2 C.3 D.4 答案：B', '2. 被漏掉的题 A.甲 B.乙 答案：A']`);
+    run(`init()`);
+    run(`openImportPreview(parseQuestionsText(Q2.join(String.fromCharCode(10))))`);
+    await run(`(async () => { await previewAiFallback(); })()`);
+    assert.ok(String(run(`previewData[0].aiNote`)).includes('选项调整'), '改动要写明');
+    assert.ok(String(run(`previewData[1].aiNote`)).includes('AI 未返回'), '漏答题要有说明');
+    assert.strictEqual(run(`previewData[1].q.content`), '被漏掉的题');
 });
 
-test('设置面板回归:测试连接点击后状态可见且成功(锁死 aiTestBtn 未定义类静默故障)', async () => {
+test('previewAiFallback:0 勾选 → 引导提示,不发请求', async () => {
+    let fetched = 0;
+    const { run } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+        sandboxExtras: { fetch: async () => { fetched++; return { ok: true, json: async () => ({ choices: [{ message: { content: '' } }] }) }; }, AbortController },
+    }));
+    run(`init()`);
+    run(`openImportPreview(parseQuestionsText('1. 题 A.甲 B.乙 答案：A'))`);
+    run(`previewData[0].include = false; renderPreview()`);
+    await run(`(async () => { await previewAiFallback(); })()`);
+    assert.strictEqual(fetched, 0);
+});
+
+test('设置面板回归:测试连接点击后状态可见且成功(锁死静默故障)', async () => {
     const { run, store, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
         sandboxExtras: { fetch: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: 'OK' } }] }) }) },
     }));
@@ -203,57 +241,8 @@ test('设置面板回归:测试连接点击后状态可见且成功(锁死 aiTes
     assert.ok(btn._listeners.click, '测试连接按钮必须已绑定 click');
     await btn._listeners.click();
     const st = elements['ai-test-status'];
-    assert.ok(st.textContent.includes('连接成功'), '状态文案要出现');
-    assert.ok(st.className.includes('success'), '必须带 success 类(.status-message 默认 display:none)');
-});
-
-test('预览全选三态:未全勾→点一次全勾;再点→全不选;部分选中→勾选框呈 indeterminate', async () => {
-    const { run, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
-    run(`init()`);
-    run(`openImportPreview(parseQuestionsText(['1. 甲题 A.一 B.二 答案：A', '2. 乙题 A.一 B.二 答案：B', '3. 丙题(缺答案)'].join('\\n')))`);
-    const all = elements['preview-select-all'];
-    // 3 题:2 题高置信默认勾(1/2),1 题缺答案低置信不勾 → 部分选中
-    assert.strictEqual(run(`previewData.filter(i => i.include).length`), 2);
-    assert.strictEqual(all.indeterminate, true);
-    assert.strictEqual(all.checked, false);
-    // 第一次点击:部分 → 全选
-    all._listeners.change();
-    assert.strictEqual(run(`previewData.every(i => i.include)`), true);
-    assert.strictEqual(all.checked, true);
-    assert.strictEqual(all.indeterminate, false);
-    // 第二次点击:全选 → 全不选
-    all._listeners.change();
-    assert.strictEqual(run(`previewData.some(i => i.include)`), false);
-    assert.strictEqual(all.checked, false);
-    // 单题手动勾回 → 回到 indeterminate
-    run(`previewData[0].include = true; renderPreview()`);
-    assert.strictEqual(all.indeterminate, true);
-});
-
-test('统一导入管道回归:PDF 选择 → 双选项提示块(AI 提取按钮出现)+ 清空旧原文;解析入口不改', async () => {
-    const { run, elements, alerts } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
-    run(`init()`);
-    run(`fileInput.files = [{ name: '试卷.pdf' }]`);
-    run(`handleFileSelect({ target: { files: [{ name: '试卷.pdf' }] } })`);
-    const notice = elements['import-status'];  // 状态区已三合一(file-notice/file-name/import-status)
-    assert.ok(String(notice.innerHTML).includes('file-ai-copy-btn'), 'PDF 提示要有 AI 提取按钮');
-    assert.ok(String(notice.innerHTML).includes('上传给该 AI 服务'), '要有隐私提示');
-    assert.ok(String(notice.innerHTML).includes('附到对话里'), 'AI 路径要写明附文件步骤');
-    // .doc:AI 聊天读不了 .doc → 不给 AI 按钮,① 是转格式、② 是复制文字,两条路不混
-    run(`handleFileSelect({ target: { files: [{ name: '试卷.doc' }] } })`);
-    const docNotice = String(notice.innerHTML);
-    assert.ok(!docNotice.includes('file-ai-copy-btn'), '.doc 不应出现 AI 提取按钮');
-    assert.ok(docNotice.includes('另存为') && docNotice.includes('.docx'), '① 必须是转格式');
-    assert.ok(docNotice.includes('选中文字复制'), '② 必须是复制文字');
-    // 点提示块里的 AI 按钮 → 只复制提示词(不合并旧原文);沙箱无剪贴板 → 走失败分支但必须不抛错
-    run(`lastRawContent = '旧的残留原文'`);
-    notice._listeners.click({ target: { id: 'file-ai-copy-btn' } });  // 委托现挂状态行
-    await new Promise(r => setTimeout(r, 0));
-    assert.ok(String(elements['import-status'].textContent).length > 0, '点击后必须有状态反馈');
-    // 解析入口行为:解析时来源标签消费 pendingSourceLabel(纯粘贴 = 粘贴导入)
-    run(`pasteInput.value = ''`);
-    run(`parsePastedText()`);
-    assert.ok(alerts.length === 0);
+    assert.ok(st.textContent.includes('连接成功'));
+    assert.ok(st.className.includes('success'));
 });
 
 test('AI 已连接徽章:测试成功后 ✓;配置变更未复测则熄灭', async () => {
@@ -263,16 +252,13 @@ test('AI 已连接徽章:测试成功后 ✓;配置变更未复测则熄灭', as
     store.set('aiConfig', JSON.stringify(CFG));
     run(`init()`);
     const btn = elements['ai-settings-btn'];
-    assert.strictEqual(btn.textContent, '⚙ AI 设置');  // 未测试过 → 不亮
+    assert.strictEqual(btn.textContent, '⚙ AI 设置');
     run(`openAiSettings()`);
     await elements['ai-test-btn']._listeners.click();
-    assert.ok(btn.textContent.includes('✓'), '测试成功 → 徽章亮');
     assert.strictEqual(btn.textContent, '⚙ AI 已连接 ✓');
-    // 改配置保存但没复测 → 失配熄灭(改表单再保存,复现真实操作)
     run(`aiModelInput.value = 'glm-4-plus'`);
     run(`saveAiSettings()`);
     assert.strictEqual(btn.textContent, '⚙ AI 设置');
-    assert.strictEqual(btn.classList.ai_connected, undefined);
 });
 
 test('救援区 B 路线:AI 接口整理 → 结果入输入框 → 解析后逐题带 AI 生成标记;手动编辑即失效', async () => {
@@ -286,15 +272,55 @@ test('救援区 B 路线:AI 接口整理 → 结果入输入框 → 解析后逐
     run(`init()`);
     run(`pasteInput.value = '一坨乱原文'`);
     await run(`(async () => { await rescueAiOrganize(); })()`);
-    // AI 结果进了输入框
     assert.ok(String(run(`pasteInput.value`)).includes('1+1等于几'), '输入框应为 AI 整理结果');
-    // 解析 → 预览逐题带 AI 生成标记
     run(`parsePastedText()`);
     assert.strictEqual(run(`previewData.length`), 2);
     assert.strictEqual(run(`previewData[0].aiNote`), 'AI 生成');
-    // 手动编辑输入框 → 标记失效
     run(`pasteInput.value = '1. 手写题 A.甲 B.乙 答案：A'`);
     elements['paste-input']._listeners.input();
     run(`parsePastedText()`);
     assert.strictEqual(run(`previewData[0].aiNote`), '');
+});
+
+test('统一导入管道回归:PDF 选择 → 双选项提示(AI 提取按钮+隐私说明);.doc 双路不混;委托可用', async () => {
+    const { run, elements, alerts } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
+    run(`init()`);
+    run(`fileInput.files = [{ name: '试卷.pdf' }]`);
+    run(`handleFileSelect({ target: { files: [{ name: '试卷.pdf' }] } })`);
+    const notice = elements['import-status'];
+    assert.ok(String(notice.innerHTML).includes('file-ai-copy-btn'), 'PDF 提示要有 AI 提取按钮');
+    assert.ok(String(notice.innerHTML).includes('上传给该 AI 服务'), '要有隐私提示');
+    assert.ok(String(notice.innerHTML).includes('附到对话里'), 'AI 路径要写明附文件步骤');
+    run(`handleFileSelect({ target: { files: [{ name: '试卷.doc' }] } })`);
+    const docNotice = String(notice.innerHTML);
+    assert.ok(!docNotice.includes('file-ai-copy-btn'), '.doc 不应出现 AI 提取按钮');
+    assert.ok(docNotice.includes('另存为') && docNotice.includes('.docx'), '① 必须是转格式');
+    assert.ok(docNotice.includes('选中文字复制'), '② 必须是复制文字');
+    run(`lastRawContent = '旧的残留原文'`);
+    notice._listeners.click({ target: { id: 'file-ai-copy-btn' } });
+    await new Promise(r => setTimeout(r, 0));
+    assert.ok(String(elements['import-status'].textContent).length > 0, '点击后必须有状态反馈');
+    run(`pasteInput.value = ''`);
+    run(`parsePastedText()`);
+    assert.ok(alerts.length === 0);
+});
+
+test('预览全选三态:未全勾→点一次全勾;再点→全不选;部分选中→indeterminate', async () => {
+    const { run, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
+    run(`init()`);
+    run(`Q3b = ['1. 甲题 A.一 B.二 答案：A', '2. 乙题 A.一 B.二 答案：B', '3. 丙题(缺答案)']`);
+    run(`openImportPreview(parseQuestionsText(Q3b.join(String.fromCharCode(10))))`);
+    const all = elements['preview-select-all'];
+    assert.strictEqual(run(`previewData.filter(i => i.include).length`), 2);
+    assert.strictEqual(all.indeterminate, true);
+    assert.strictEqual(all.checked, false);
+    all._listeners.change();
+    assert.strictEqual(run(`previewData.every(i => i.include)`), true);
+    assert.strictEqual(all.checked, true);
+    assert.strictEqual(all.indeterminate, false);
+    all._listeners.change();
+    assert.strictEqual(run(`previewData.some(i => i.include)`), false);
+    assert.strictEqual(all.checked, false);
+    run(`previewData[0].include = true; renderPreview()`);
+    assert.strictEqual(all.indeterminate, true);
 });

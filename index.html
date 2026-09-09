@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=0904">
+    <link rel="stylesheet" href="styles.css?v=0905">
 </head>
 <body>
     <div class="container">
@@ -363,14 +363,17 @@ A：选项A  B：选项B
                 <h3>导入预览</h3>
                 <p id="preview-summary" class="preview-summary"></p>
                 <div class="preview-toolbar">
+                    <div class="preview-view-switch">
+                        <button type="button" id="view-all-btn" class="view-tab active">全部 <span id="view-all-count">0</span></button>
+                        <button type="button" id="view-warned-btn" class="view-tab">⚠ 问题题 <span id="view-warned-count">0</span></button>
+                    </div>
                     <label class="inline-label">
                         <input type="checkbox" id="preview-select-all" checked> 全选
                     </label>
-                    <button type="button" id="preview-warned-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">🔍 只看问题题</button>
                     <button type="button" id="preview-clean-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">✓ 只选无警告题</button>
                 </div>
                 <div class="preview-ai-row">
-                    <button type="button" id="preview-ai-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">🤖 AI 兜底整理</button>
+                    <button type="button" id="preview-ai-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">🤖 AI 整理勾选题</button>
                     <button type="button" id="preview-ai-cancel-btn" class="action-btn secondary hidden" style="padding:4px 10px;font-size:0.85em;">⛔ 取消</button>
                     <div id="preview-ai-progress" class="ai-progress hidden"><div id="preview-ai-progress-fill" class="ai-progress-fill"></div></div>
                     <span id="preview-ai-progress-text" class="ai-progress-text"></span>
@@ -510,6 +513,6 @@ A：选项A  B：选项B
 
     </div>
 
-    <script type="module" src="src/main.js?v=0904"></script>
+    <script type="module" src="src/main.js?v=0905"></script>
 </body>
 </html>

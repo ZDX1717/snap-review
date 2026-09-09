@@ -4,7 +4,7 @@ import { saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportB
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
 import { OFFICIAL_PROMPT, buildCopyText, copyText } from './prompt.js';
-import { aiConfigReady, aiFormatMaterial, buildAiNotes, getProvider, normalizeAiConfig, testConnection } from './ai.js';
+import { aiConfigReady, aiFixQuestions, aiFormatMaterial, aiMatchKey, aiDiffParts, buildAiNotes, getProvider, normalizeAiConfig, testConnection } from './ai.js';
 import { isAiTested, loadAiConfig, markAiTested, saveAiConfig, recordAiUsage } from './storage.js';
 
 // 本次预览的来源标签(撤销记录展示用),由导入入口设置
@@ -52,7 +52,10 @@ const editorAnalysis = document.getElementById('editor-analysis');
 const editorPosition = document.getElementById('editor-position');
 const lastImportInfo = document.getElementById('last-import-info');
 const copyPromptBtn = document.getElementById('copy-prompt-btn');
-const previewWarnedBtn = document.getElementById('preview-warned-btn');
+const viewAllBtn = document.getElementById('view-all-btn');
+const viewWarnedBtn = document.getElementById('view-warned-btn');
+const viewAllCount = document.getElementById('view-all-count');
+const viewWarnedCount = document.getElementById('view-warned-count');
 const promptToggleBtn = document.getElementById('prompt-toggle-btn');
 const promptContent = document.getElementById('prompt-content');
 // AI 设置与预览兜底
@@ -325,9 +328,9 @@ export function showImportStatus(message, type) {
 
 
 // 打开预览：questions 为解析结果数组
-// 预览筛选开关:只渲染含警告的题(视图层,不动勾选)
-export function toggleWarnedFilter() {
-    state.previewFilterWarned = !state.previewFilterWarned;
+// 视图切换(双 tab):全部 / 问题题;只切换镜片,不动勾选
+export function setPreviewView(warned) {
+    state.previewFilterWarned = !!warned;
     renderPreview();
     updatePreviewSummary();
 }
@@ -417,13 +420,15 @@ export function updateAiSettingsBadge() {
 
 // ==================== 预览 AI 兜底(分块/进度/取消 → 复用预览确认管道) ====================
 
-// 预览页 AI 兜底:取粘贴框/最近原文 → 分块发官方提示词 → 结果交回 parser 走同一套规则解析,
-// 替换当前预览列表并逐题标注 AI 改动(🤖 徽章 + 左侧紫条);AI 只整理格式,不编答案。
+// 预览页 AI 兜底(0.9.1 重构):只整理**已勾选的题** —— 视图是镜片,勾选是真相。
+// 勾选题序列化成官方格式分块发 AI → 解析回填 → 逐题 🤖 徽章写明改动;进度按"已整理 x/N 题"。
 export async function previewAiFallback() {
     if (previewAiRunning) return;
-    const material = (pasteInput.value || '').trim() || (lastRawContent || '').trim();
-    if (!material) {
-        alert('没有可整理的原文:请先粘贴题目或选择文件');
+    const checkedSlots = state.previewData
+        .map((item, idx) => ({ item, idx }))
+        .filter(({ item }) => item.include);
+    if (checkedSlots.length === 0) {
+        showPreviewAiText('先勾选要整理的题(可用「问题题」视图快速定位)');
         return;
     }
     const cfg = normalizeAiConfig(loadAiConfig());
@@ -433,8 +438,9 @@ export async function previewAiFallback() {
         return;
     }
 
-    // 快照当前(规则解析)结果,用于逐题对比 AI 改了什么
-    const originals = state.previewData.map(i => JSON.parse(JSON.stringify(i.q)));
+    // 快照勾选题(用于按题号匹配回填与改动对比)
+    const originals = checkedSlots.map(({ item }) => JSON.parse(JSON.stringify(item.q)));
+    const total = originals.length;
 
     previewAiRunning = true;
     if (typeof AbortController !== 'undefined') previewAiAbort = new AbortController();
@@ -443,38 +449,55 @@ export async function previewAiFallback() {
     if (previewAiCancelBtn) previewAiCancelBtn.classList.remove('hidden');
     if (previewAiProgress) previewAiProgress.classList.remove('hidden');
     if (previewAiProgressFill) previewAiProgressFill.style.width = '5%';
-    if (previewAiProgressText) previewAiProgressText.textContent = '连接 AI…';
+    if (previewAiProgressText) previewAiProgressText.textContent = `连接 AI…(共 ${total} 题)`;
 
     try {
-        const { text, chunks } = await aiFormatMaterial(cfg, material, {
+        const { questions: parsed } = await aiFixQuestions(cfg, originals, {
             signal,
-            onProgress: (done, total) => {
-                if (previewAiProgressFill) previewAiProgressFill.style.width = Math.round(done / total * 100) + '%';
-                if (previewAiProgressText) previewAiProgressText.textContent = `整理第 ${done}/${total} 块原文`;
+            onProgress: (done, t) => {
+                if (previewAiProgressFill) previewAiProgressFill.style.width = Math.round(done / t * 100) + '%';
+                if (previewAiProgressText) previewAiProgressText.textContent = `已整理 ${done}/${t} 题`;
             },
         });
-        const parsed = parseQuestionsText(text);
-        recordAiUsage({ trigger: 'preview-fallback', chunks, aiQuestions: parsed.length });
         if (previewAiProgressFill) previewAiProgressFill.style.width = '100%';
-        if (parsed.length === 0) {
-            if (previewAiProgressText) previewAiProgressText.textContent = 'AI 没整理出题目';
-            alert('AI 没有整理出任何题目(回复可能不合规)。可以改用「一键复制提示词+题目」去聊天 AI 手动整理。');
-            return;
-        }
-        const notes = buildAiNotes(originals, parsed);
-        // 替换预览(复用预览确认管道):缺答案/低置信默认不勾选,与常规导入一致
-        state.previewData = parsed.map((q, i) => ({ q, include: (q.confidence || 0) > 0.6, warnings: [], aiNote: notes[i] || '' }));
+        recordAiUsage({ trigger: 'preview-fix', total, aiQuestions: parsed.length });
+
+        // 回填:题干+选项精确匹配 → 题干宽松匹配;匹配上的替换并写改动徽章
+        const pool = originals.map(q => ({ q, used: false }));
+        let replaced = 0, changed = 0;
+        parsed.forEach(nu => {
+            const hit = pool.find(p => !p.used && aiMatchKey(p.q) === aiMatchKey(nu))
+                || pool.find(p => !p.used && p.q && aiMatchKey(p.q, true) === aiMatchKey(nu, true));
+            if (!hit) return; // AI 多返回的题:不是用户勾选的内容,忽略
+            hit.used = true;
+            const slot = checkedSlots[pool.indexOf(hit)];
+            const parts = aiDiffParts(hit.q, nu);
+            if (parts.length) changed++;
+            slot.item.q = nu;
+            slot.item.aiNote = parts.length ? 'AI 修改：' + parts.join('，') : (slot.item.aiNote || '');
+            replaced++;
+        });
+        // AI 没回的题:保留原样并明示,不让题目无声消失
+        let missing = 0;
+        pool.forEach((p, i) => {
+            if (!p.used) {
+                missing++;
+                checkedSlots[i].item.aiNote = 'AI 未返回此题（保留原样）';
+            }
+        });
+
         renderPreview();
-        const changed = notes.filter(n => n).length;
-        if (previewAiProgressText) previewAiProgressText.textContent = `完成:${parsed.length} 题,其中 ${changed} 题有 AI 改动(紫标)`;
-        if (previewSummary) previewSummary.textContent = `🤖 AI 整理完成:解析出 ${parsed.length} 题(${chunks} 块原文),请确认后导入`;
+        let msg = `完成：AI 更新 ${replaced}/${total} 题，其中 ${changed} 题有改动（🤖 标记）`;
+        if (missing) msg += `，${missing} 题 AI 未返回已保留原样`;
+        showPreviewAiText(msg);
+        if (previewSummary) previewSummary.textContent = `🤖 AI 整理完成（${total} 题已处理），请确认后导入`;
     } catch (e) {
-        recordAiUsage({ trigger: 'preview-fallback', ok: false, error: String(e.message || e).slice(0, 120) });
+        recordAiUsage({ trigger: 'preview-fix', ok: false, total, error: String(e.message || e).slice(0, 120) });
         if (e && /取消/.test(e.message)) {
-            if (previewAiProgressText) previewAiProgressText.textContent = '已取消';
+            showPreviewAiText('已取消');
         } else {
-            alert('AI 兜底失败:' + (e.message || e));
-            if (previewAiProgressText) previewAiProgressText.textContent = '失败:' + String(e.message || e).slice(0, 60);
+            alert('AI 兜底失败：' + (e.message || e));
+            showPreviewAiText('失败：' + String(e.message || e).slice(0, 60));
         }
         renderPreview();
     } finally {
@@ -482,9 +505,14 @@ export async function previewAiFallback() {
         previewAiAbort = null;
         if (previewAiBtn) previewAiBtn.disabled = false;
         if (previewAiCancelBtn) previewAiCancelBtn.classList.add('hidden');
-        // 进度条停留 2 秒后收起(结果文字保留)
         setTimeout(() => { if (previewAiProgress) previewAiProgress.classList.add('hidden'); }, 2000);
     }
+}
+
+// 进度/结果文字(留在进度条旁,不随 renderPreview 刷掉)
+function showPreviewAiText(text) {
+    if (previewAiProgress) previewAiProgress.classList.remove('hidden');
+    if (previewAiProgressText) previewAiProgressText.textContent = text;
 }
 
 // ==================== 救援区 B 路线:AI 接口整理原文 → 自动入输入框 ====================
@@ -697,7 +725,13 @@ export function renderPreview() {
         previewList.appendChild(box);
     });
 
-    if (previewWarnedBtn) previewWarnedBtn.textContent = state.previewFilterWarned ? '📋 显示全部题目' : '🔍 只看问题题';
+    // 双 tab 视图:高亮当前 + 计数
+    if (viewAllBtn && viewWarnedBtn) {
+        viewAllBtn.classList.toggle('active', !state.previewFilterWarned);
+        viewWarnedBtn.classList.toggle('active', state.previewFilterWarned);
+    }
+    if (viewAllCount) viewAllCount.textContent = String(state.previewData.length);
+    if (viewWarnedCount) viewWarnedCount.textContent = String(warnCount);
     updateSelectAllState();
     updatePreviewSummary(warnCount);
 }

@@ -4,7 +4,7 @@
 // CORS 已实测(2026-09-09):智谱/DeepSeek 回显 Origin 放行,硅基流动 `*` —— 浏览器可直连。
 
 import { OFFICIAL_PROMPT } from './prompt.js';
-import { normalizeAnswerString } from './parser.js';
+import { normalizeAnswerString, parseQuestionsText } from './parser.js';
 
 // 厂商预设:按成本排序;baseUrl 均为 OpenAI 兼容根(不含 /chat/completions)
 export const AI_PROVIDERS = [
@@ -170,3 +170,55 @@ export function buildAiNotes(originals, parsed) {
     });
 }
 
+// ==================== 按题 AI 修复(预览页「AI 兜底整理」的编排) ====================
+
+// 序列化单题为官方格式(与提示词要求的输出格式一致,让 AI 只做"改格式不改内容")
+export function serializeQuestion(q) {
+    const lines = ['题目：' + (q.content || '')];
+    Object.keys(q.options || {}).sort().forEach(k => lines.push(k + '：' + (q.options[k] || '')));
+    if (q.answer) lines.push('答案：' + q.answer);
+    if (q.explanation) lines.push('解析：' + q.explanation);
+    return lines.join('\n');
+}
+
+// 勾选题分块:每块 ≤ maxChars 且 ≤ 10 题;记录起始题号用于回填
+export function groupQuestionChunks(questions, { maxChars = 2400, maxPerChunk = 10 } = {}) {
+    const chunks = [];
+    let cur = [], curLen = 0, start = 0;
+    questions.forEach((q, i) => {
+        const t = serializeQuestion(q);
+        if (cur.length && (curLen + t.length > maxChars || cur.length >= maxPerChunk)) {
+            chunks.push({ start, count: cur.length });
+            cur = []; curLen = 0; start = i;
+        }
+        cur.push(t); curLen += t.length + 1;
+    });
+    if (cur.length) chunks.push({ start, count: cur.length });
+    return chunks;
+}
+
+// 按题修复:逐块发官方提示词 → 结果交回 parser 解析;进度按"已整理题数"上报。
+// 返回 { questions: 解析后的题, total: 送修题数 } —— 由调用方按题号匹配回填。
+export async function aiFixQuestions(config, questions, { signal, onProgress, timeoutMs, fetchImpl } = {}) {
+    if (!Array.isArray(questions) || questions.length === 0) throw new Error('没有要整理的题');
+    const chunks = groupQuestionChunks(questions);
+    const total = questions.length;
+    let done = 0;
+    const outs = [];
+    for (const chunk of chunks) {
+        const batch = questions.slice(chunk.start, chunk.start + chunk.count).map(serializeQuestion).join('\n\n');
+        const content = await chatCompletion(
+            config,
+            [
+                { role: 'system', content: OFFICIAL_PROMPT },
+                { role: 'user', content: batch },
+            ],
+            { signal, timeoutMs, fetchImpl }
+        );
+        outs.push(content.trim());
+        done += chunk.count;
+        if (onProgress) onProgress(done, total);
+    }
+    const parsed = parseQuestionsText(outs.join('\n\n'));
+    return { questions: parsed, total };
+}

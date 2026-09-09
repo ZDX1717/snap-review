@@ -1556,3 +1556,26 @@ h3 {
     color: #868e96;
     margin: 8px 0 0;
 }
+
+/* 预览视图切换(双 tab) */
+.preview-view-switch {
+    display: inline-flex;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.view-tab {
+    border: none;
+    background: #fff;
+    padding: 4px 12px;
+    font-size: 0.85em;
+    color: #667085;
+    cursor: pointer;
+}
+.view-tab + .view-tab { border-left: 1px solid #dee2e6; }
+.view-tab.active {
+    background: #4e8cff;
+    color: #fff;
+    font-weight: 600;
+}
+.view-tab span { opacity: 0.85; }
