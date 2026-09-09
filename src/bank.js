@@ -78,7 +78,11 @@ export function importQuestions() {
     if (name.endsWith('.docx')) {
         file.arrayBuffer()
             .then(buf => docxToText(buf))
-            .then(text => { lastRawContent = text; runPreview(text, 'docx 文件'); })
+            .then(text => {
+                lastRawContent = text;
+                updateGuideReady(`已提取《${file.name}》原文`, text.length);
+                runPreview(text, 'docx 文件');
+            })
             .catch(err => showImportStatus(`docx 解析失败：${err && err.message ? err.message : '文件可能损坏'}（老版 .doc 请另存为 .docx，或复制文字粘贴）`, 'error'));
         return;
     }
@@ -86,6 +90,7 @@ export function importQuestions() {
     const reader = new FileReader();
     reader.onload = function(event) {
         lastRawContent = event.target.result;
+        updateGuideReady(`已读取《${file.name}》原文`, lastRawContent.length);
         runPreview(event.target.result, '文件');
     };
     reader.onerror = function() {
@@ -136,6 +141,12 @@ export function togglePromptContent() {
     promptToggleBtn.textContent = promptContent.classList.contains('hidden') ? '查看提示词 ▾' : '收起 ▴';
 }
 
+// 文档/粘贴原文就绪后,把状态写回引导条(让"已可复制"看得见)
+function updateGuideReady(label, length) {
+    const el = document.getElementById('prompt-guide-text');
+    if (el) el.innerHTML = `✅ ${label}(${length} 字)已就绪——点下方按钮,提示词+原文一键复制,发给豆包 / Kimi / DeepSeek 整理。PDF 可直接发给 AI 转录。`;
+}
+
 export async function copyOfficialPrompt() {
     const material = (pasteInput.value || '').trim() || lastRawContent;
     const ok = await copyText(buildCopyText(OFFICIAL_PROMPT, material));
@@ -160,6 +171,7 @@ export function parsePastedText() {
         return;
     }
     previewSourceLabel = '粘贴导入';
+    updateGuideReady('已就绪:当前粘贴内容', text.length);
     const importedQuestions = parseQuestionsText(text);
     if (importedQuestions.length === 0) {
         showImportStatus('没有解析出有效题目。试试上方「复制官方提示词」用 AI 整理', 'error');
