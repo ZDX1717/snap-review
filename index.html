@@ -24,7 +24,7 @@
             <section id="home-section" class="section active">
                 <div class="home-hero">
                     <h2>Zquiz · 期末周刷题</h2>
-                    <p class="hero-version">v0.7.0 · 开发中</p>
+                    <p class="hero-version">v0.8.0 · 开发中</p>
                     <div class="hero-actions">
                         <button id="hero-start-btn" class="action-btn">开始刷题</button>
                         <button id="hero-import-btn" class="action-btn secondary">导入题库</button>
@@ -279,27 +279,29 @@
 
                         <div class="operation-card">
                             <h3>题库格式说明</h3>
-                            <p>题库文件采用简化的文本格式，容错性高，易于编辑：</p>
-                            <pre># 题目标题（可选）
+                            <p>四种常见格式自动识别，答案写法灵活：</p>
+                            <pre>① 字段式
 题目：题目内容
-A：选项A内容
-B：选项B内容
-C：选项C内容
-D：选项D内容
-答案：A
+A：选项A    B：选项B
+C：选项C    D：选项D
+答案：A        （多选连写：答案：ABC）
+解析：答案的详细解释（可选）
 
-# 可选字段
-题目解释：题目的解释说明
-解析：答案的详细解释
-类型：单选或多选（可省略，自动判断）
+② 编号式：1. 题干 ＋ 选项行 ＋ 答案：B
+③ 单行混排：1. 题干 A.xx B.yy 答案：B
+④ 判断题：答案写 对 / 错（自动配"正确/错误"选项）
 
-# 多选题示例
-题目：以下哪些是编程语言？
-A：Python
-B：Java
-C：C++
-D：HTML
-答案：ABC</pre>
+可选字段：题目解释 / A解释 / 解析 / 类型（均可省略）</pre>
+                            <p>答案的其他写法（自动识别）：</p>
+                            <pre>· 题末括号内嵌：……（B） / （ABD） / （x ）
+· 集中答案表（文档末尾，按题号回填）：
+  参考答案：
+  1.B
+  2.【A】
+  3-5 BBA
+· 判断语境：批内有（x）判卷痕迹时，
+  空括号"（ ）"视为对（只标错惯例）</pre>
+                            <p style="font-size:0.85em;color:#888;">支持粘贴（Word/PDF/网页/微信）与 txt / docx 文件导入；双行选项、逗号与空格分隔、选项折行、空括号等真实文档排版自动容错；缺答案题在预览与导入结果中明确提示。老版 .doc 请另存为 .docx。</p>
                         </div>
                     </div>
                 </div>
