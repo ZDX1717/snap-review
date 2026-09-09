@@ -45,7 +45,6 @@ const errorsSection = document.getElementById('errors-section');
 const fileInput = document.getElementById('file-input');
 const uploadBtn = document.getElementById('upload-btn');
 const fileName = document.getElementById('file-name');
-const importBtn = document.getElementById('import-btn');
 const importStatus = document.getElementById('import-status');
 const startQuizBtn = document.getElementById('start-quiz-btn');
 const quizStatus = document.getElementById('quiz-status');
@@ -186,7 +185,8 @@ function setupEventListeners() {
     // 文件上传
     uploadBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', handleFileSelect);
-    importBtn.addEventListener('click', importQuestions);
+    // 统一入口:选了文件走文件解析,否则解析粘贴内容
+    pasteParseBtn.addEventListener('click', () => (fileInput.files[0] ? importQuestions() : parsePastedText()));
 
     // 题库选择变化
     questionBankSelect.addEventListener('change', function() {

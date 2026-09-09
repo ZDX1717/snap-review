@@ -71,7 +71,11 @@ export function importQuestions() {
         openImportPreview(importedQuestions);
     };
 
-    if (name.endsWith('.doc')) {
+    if (name.endsWith('.pdf')) {
+        showImportStatus('PDF 两条路:①把 PDF 文件直接发给豆包 / Kimi（能读 PDF），配合上方提示词转录整理；②复制 PDF 文字粘贴到输入框', 'error');
+        return;
+    }
+    if (name.endsWith('.doc') && !name.endsWith('.docx')) {
         showImportStatus('老版 .doc 暂不支持：请用 Word 另存为 .docx，或复制文字粘贴', 'error');
         return;
     }
@@ -100,11 +104,22 @@ export function importQuestions() {
 }
 
 
-// 处理文件选择
+// 处理文件选择:按扩展名当场给出指引(PDF/doc 不可解析,第一时间说清替代路径)
 export function handleFileSelect(event) {
     const file = event.target.files[0];
-    if (file) {
-        fileName.textContent = file.name;
+    if (!file) {
+        fileName.textContent = '未选择文件';
+        return;
+    }
+    const name = file.name.toLowerCase();
+    if (name.endsWith('.pdf')) {
+        fileName.textContent = `已选择:${file.name}`;
+        showImportStatus('PDF 两条路:①把 PDF 文件直接发给豆包 / Kimi（它们能读 PDF），配合上方提示词转录整理；②复制 PDF 里的文字粘贴到输入框', 'error');
+    } else if (name.endsWith('.doc') && !name.endsWith('.docx')) {
+        fileName.textContent = `已选择:${file.name}`;
+        showImportStatus('老版 .doc 暂不支持：请用 Word 另存为 .docx，或复制文字粘贴', 'error');
+    } else {
+        fileName.textContent = `已选择:${file.name}——点击「解析并预览」`;
     }
 }
 

@@ -250,7 +250,7 @@
                     <!-- 右侧：题库操作 -->
                     <div class="bank-operations-panel">
                         <div class="operation-card">
-                            <h3>粘贴导入</h3>
+                            <h3>导入题库</h3>
                             <div id="prompt-guide" class="prompt-guide">
                                 <div class="prompt-guide-head">
                                     <span class="prompt-guide-title">📋 格式乱？用 AI 一键整理（免费）</span>
@@ -261,23 +261,14 @@
                                 <pre id="prompt-content" class="prompt-content hidden"></pre>
                             </div>
                             <p class="import-hint">支持从 Word / PDF / 网页 / 微信直接复制粘贴，自动识别常见题目格式（编号式、字段式、单行混排、判断题），导入前可逐题预览修正。</p>
-                            <textarea id="paste-input" rows="8" placeholder="把题目直接粘贴到这里，然后点击下方按钮…"></textarea>
+                            <textarea id="paste-input" rows="8" placeholder="把题目直接粘贴到这里，或点下方「选择文件」上传 txt / docx…"></textarea>
                             <div class="paste-actions">
+                                <button id="upload-btn" class="action-btn secondary">📂 选择文件</button>
                                 <button id="paste-parse-btn" class="action-btn">解析并预览</button>
                                 <button id="paste-clear-btn" class="action-btn secondary">清空</button>
                             </div>
-                        </div>
-
-
-                        <div class="operation-card">
-                            <h3>导入题库文件</h3>
-                            <div class="upload-area">
-                                <input type="file" id="file-input" accept=".txt,.md,.csv,.json,.docx" />
-                                <button id="upload-btn">选择文件</button>
-                                <p id="file-name">未选择文件</p>
-                                <p style="font-size:0.85em;color:#888;">支持 txt / docx；老版 .doc 请先另存为 .docx（或复制文字粘贴）</p>
-                            </div>
-                            <button id="import-btn" class="action-btn">解析并预览</button>
+                            <input type="file" id="file-input" class="hidden" accept=".txt,.md,.csv,.json,.docx,.pdf,.doc" />
+                            <p id="file-name" class="import-hint" style="margin-bottom:8px;">未选择文件。支持 txt / docx；PDF 建议直接发给 AI 转录；老版 .doc 请另存为 .docx</p>
                             <div id="import-status" class="status-message"></div>
                         </div>
 
