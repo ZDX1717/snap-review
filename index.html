@@ -24,7 +24,7 @@
             <section id="home-section" class="section active">
                 <div class="home-hero">
                     <h2>Zquiz · 期末周刷题</h2>
-                    <p class="hero-version">v0.8.0 · 开发中</p>
+                    <p class="hero-version">v0.8.1-dev · AI 导入测试中</p>
                     <div class="hero-actions">
                         <button id="hero-start-btn" class="action-btn">开始刷题</button>
                         <button id="hero-import-btn" class="action-btn secondary">导入题库</button>
@@ -258,6 +258,7 @@
                                 </div>
                                 <p class="prompt-guide-text" id="prompt-guide-text">粘贴或上传题目后点下方按钮:自动合成<b>提示词+你的题目原文</b>,整段发给豆包 / Kimi / DeepSeek(免费),整理结果粘回这里即可。PDF 可直接发给 AI 转录整理。提示词会强制 AI 保留原文、不猜答案。</p>
                                 <button id="copy-prompt-btn" class="action-btn">📋 一键复制提示词+题目</button>
+                                <button type="button" id="ai-settings-btn" class="action-btn secondary" style="margin-left:6px;">⚙ AI 设置</button>
                                 <pre id="prompt-content" class="prompt-content hidden"></pre>
                             </div>
                             <div id="file-notice" class="file-notice hidden"></div>
@@ -363,6 +364,8 @@ C：选项C    D：选项D
                     </label>
                     <button type="button" id="preview-clean-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">只保留无警告题</button>
                     <button type="button" id="preview-warned-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">🔍 只看问题题</button>
+                    <button type="button" id="preview-ai-btn" class="action-btn secondary" style="padding:4px 10px;font-size:0.85em;">🤖 AI 兜底整理</button>
+                    <button type="button" id="preview-ai-cancel-btn" class="action-btn secondary hidden" style="padding:4px 10px;font-size:0.85em;">⛔ 取消 AI</button>
                     <label class="inline-label">
                         <input type="checkbox" id="preview-skip-dupes" checked> 跳过与目标题库重复的题
                     </label>
@@ -376,6 +379,40 @@ C：选项C    D：选项D
                     </label>
                     <button id="preview-confirm-btn" class="action-btn">确认导入</button>
                     <button id="preview-cancel-btn" class="action-btn secondary">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI 设置模态框 -->
+        <div id="ai-settings-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>⚙ AI 设置（自带 Key，存本机）</h3>
+                <div class="form-group">
+                    <label for="ai-provider-select">服务商：</label>
+                    <select id="ai-provider-select" class="bank-select">
+                        <option value="zhipu">智谱 GLM-4-Flash（免费）</option>
+                        <option value="siliconflow">硅基流动（免费档）</option>
+                        <option value="deepseek">DeepSeek</option>
+                        <option value="custom">自定义（OpenAI 兼容）</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="ai-base-url">接口地址（OpenAI 兼容，不含 /chat/completions）：</label>
+                    <input type="text" id="ai-base-url" class="form-input" placeholder="https://open.bigmodel.cn/api/paas/v4">
+                </div>
+                <div class="form-group">
+                    <label for="ai-api-key">API Key（仅存本机 localStorage，不上传）：</label>
+                    <input type="password" id="ai-api-key" class="form-input" placeholder="粘贴你的 API Key" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="ai-model-input">模型名：</label>
+                    <input type="text" id="ai-model-input" class="form-input" placeholder="glm-4-flash">
+                </div>
+                <p id="ai-test-status" class="status-message"></p>
+                <div class="modal-actions">
+                    <button id="ai-test-btn" class="action-btn secondary">测试连接</button>
+                    <button id="ai-save-btn" class="action-btn">保存</button>
+                    <button id="ai-cancel-btn" class="action-btn secondary">取消</button>
                 </div>
             </div>
         </div>

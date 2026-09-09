@@ -149,3 +149,39 @@ export function loadOverwriteSnapshot() {
 export function clearOverwriteSnapshot() {
     try { localStorage.removeItem('overwriteSnapshot'); } catch (e) { /* 静默 */ }
 }
+
+// ==================== AI 配置(BYO key)与触发埋点 ====================
+
+// 读取 AI 配置;损坏/缺字段由 ai.js 的 normalizeAiConfig 兜底,这里只保证 JSON 安全
+export function loadAiConfig() {
+    try {
+        return JSON.parse(localStorage.getItem('aiConfig') || 'null') || {};
+    } catch (e) {
+        return {};
+    }
+}
+
+export function saveAiConfig(cfg) {
+    try {
+        localStorage.setItem('aiConfig', JSON.stringify(cfg || {}));
+    } catch (e) { /* 静默降级:配置不持久化,本次会话仍可用 */ }
+}
+
+// AI 兜底触发埋点:最近 50 条;用于统计"多少导入需要 AI 救"(规则算法投入决策依据)
+export function loadAiUsage() {
+    try {
+        const arr = JSON.parse(localStorage.getItem('aiUsage') || '[]');
+        return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+export function recordAiUsage(entry) {
+    try {
+        const arr = loadAiUsage();
+        arr.push({ time: new Date().toISOString(), ...(entry || {}) });
+        while (arr.length > 50) arr.shift();
+        localStorage.setItem('aiUsage', JSON.stringify(arr));
+    } catch (e) { /* 埋点失败不影响主流程 */ }
+}

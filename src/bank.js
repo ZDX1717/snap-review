@@ -4,6 +4,8 @@ import { saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportB
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
 import { OFFICIAL_PROMPT, buildCopyText, copyText } from './prompt.js';
+import { aiConfigReady, aiFormatMaterial, getProvider, normalizeAiConfig, testConnection } from './ai.js';
+import { loadAiConfig, saveAiConfig, recordAiUsage } from './storage.js';
 
 // 本次预览的来源标签(撤销记录展示用),由导入入口设置
 let previewSourceLabel = '导入';
@@ -51,6 +53,19 @@ const fileNotice = document.getElementById('file-notice');
 const previewWarnedBtn = document.getElementById('preview-warned-btn');
 const promptToggleBtn = document.getElementById('prompt-toggle-btn');
 const promptContent = document.getElementById('prompt-content');
+// AI 设置与预览兜底
+const aiSettingsBtn = document.getElementById('ai-settings-btn');
+const aiSettingsModal = document.getElementById('ai-settings-modal');
+const aiProviderSelect = document.getElementById('ai-provider-select');
+const aiBaseUrl = document.getElementById('ai-base-url');
+const aiApiKey = document.getElementById('ai-api-key');
+const aiModelInput = document.getElementById('ai-model-input');
+const aiTestStatus = document.getElementById('ai-test-status');
+const previewAiBtn = document.getElementById('preview-ai-btn');
+const previewAiCancelBtn = document.getElementById('preview-ai-cancel-btn');
+// AI 兜底运行状态(模块级:取消控制器 + 防重入)
+let previewAiAbort = null;
+let previewAiRunning = false;
 
 // 导入题目(按扩展名分流:txt 直读;docx 走零依赖抽取;.doc 明确引导另存)
 export function importQuestions() {
@@ -266,6 +281,131 @@ export function toggleWarnedFilter() {
     state.previewFilterWarned = !state.previewFilterWarned;
     renderPreview();
     updatePreviewSummary();
+}
+
+// ==================== AI 设置面板(0.9.0 · BYO key) ====================
+
+// 打开设置:把已存配置回填进表单(缺省按当前厂商预设)
+export function openAiSettings() {
+    const cfg = normalizeAiConfig(loadAiConfig());
+    aiProviderSelect.value = cfg.providerId;
+    aiBaseUrl.value = cfg.baseUrl;
+    aiApiKey.value = cfg.apiKey;
+    aiModelInput.value = cfg.model;
+    if (aiTestStatus) aiTestStatus.textContent = '';
+    showModal(aiSettingsModal);
+}
+
+// 厂商切换:自定义保留手填;预设厂商回填官方地址与默认模型(key 不动)
+export function aiProviderChanged() {
+    if (aiProviderSelect.value === 'custom') return;
+    const p = getProvider(aiProviderSelect.value);
+    aiBaseUrl.value = p.baseUrl;
+    aiModelInput.value = p.model;
+}
+
+// 表单 → 配置;成功返回配置对象,不完整返回 null 并提示
+function collectAiConfigFromForm() {
+    const cfg = normalizeAiConfig({
+        providerId: aiProviderSelect.value,
+        baseUrl: aiBaseUrl.value,
+        apiKey: aiApiKey.value,
+        model: aiModelInput.value,
+    });
+    if (!aiConfigReady(cfg)) {
+        if (aiTestStatus) {
+            aiTestStatus.textContent = '⚠ 接口地址、API Key、模型名都需要填写';
+        }
+        return null;
+    }
+    return cfg;
+}
+
+// 测试连接(不保存):极短消息往返验证 key/地址/模型
+export async function testAiConnection() {
+    const cfg = collectAiConfigFromForm();
+    if (!cfg) return false;
+    if (aiTestStatus) aiTestStatus.textContent = '⏳ 正在测试连接…';
+    try {
+        const r = await testConnection(cfg);
+        if (aiTestStatus) aiTestStatus.textContent = `✅ 连接成功（模型回复：${r.sample}）`;
+        return true;
+    } catch (e) {
+        if (aiTestStatus) aiTestStatus.textContent = '❌ ' + e.message;
+        return false;
+    }
+}
+
+// 保存设置(存本机 localStorage)
+export function saveAiSettings() {
+    const cfg = collectAiConfigFromForm();
+    if (!cfg) return false;
+    saveAiConfig(cfg);
+    if (aiTestStatus) aiTestStatus.textContent = '✅ 已保存到本机';
+    setTimeout(() => hideModal(aiSettingsModal), 400);
+    return true;
+}
+
+// ==================== 预览 AI 兜底(分块/进度/取消 → 复用预览确认管道) ====================
+
+// 预览页 AI 兜底:取粘贴框/最近原文 → 分块发官方提示词 → 结果交回 parser 走同一套规则解析,
+// 替换当前预览列表(AI 只整理格式,不编答案——提示词已写死)。
+export async function previewAiFallback() {
+    if (previewAiRunning) return;
+    const material = (pasteInput.value || '').trim() || (lastRawContent || '').trim();
+    if (!material) {
+        alert('没有可整理的原文:请先粘贴题目或选择文件');
+        return;
+    }
+    const cfg = normalizeAiConfig(loadAiConfig());
+    if (!aiConfigReady(cfg)) {
+        alert('请先在「⚙ AI 设置」里配置服务商与 API Key(自带 key,仅存本机)');
+        openAiSettings();
+        return;
+    }
+
+    previewAiRunning = true;
+    if (typeof AbortController !== 'undefined') previewAiAbort = new AbortController();
+    const signal = previewAiAbort ? previewAiAbort.signal : undefined;
+    if (previewAiBtn) previewAiBtn.disabled = true;
+    if (previewAiCancelBtn) previewAiCancelBtn.classList.remove('hidden');
+    if (previewSummary) previewSummary.textContent = '🤖 AI 整理中(第 1/… 块)…';
+
+    try {
+        const { text, chunks } = await aiFormatMaterial(cfg, material, {
+            signal,
+            onProgress: (done, total) => {
+                if (previewSummary) previewSummary.textContent = `🤖 AI 整理中…(${done}/${total} 块)`;
+            },
+        });
+        const parsed = parseQuestionsText(text);
+        recordAiUsage({ trigger: 'preview-fallback', chunks, aiQuestions: parsed.length });
+        if (parsed.length === 0) {
+            alert('AI 没有整理出任何题目(回复可能不合规)。可以改用「一键复制提示词+题目」去聊天 AI 手动整理。');
+            return;
+        }
+        // 替换预览(复用预览确认管道):缺答案/低置信默认不勾选,与常规导入一致
+        state.previewData = parsed.map(q => ({ q, include: (q.confidence || 0) > 0.6, warnings: [] }));
+        renderPreview();
+        if (previewSummary) previewSummary.textContent = `🤖 AI 整理完成:解析出 ${parsed.length} 题(${chunks} 块原文),请确认后导入`;
+    } catch (e) {
+        recordAiUsage({ trigger: 'preview-fallback', ok: false, error: String(e.message || e).slice(0, 120) });
+        alert('AI 兜底失败:' + (e.message || e));
+        renderPreview();
+    } finally {
+        previewAiRunning = false;
+        previewAiAbort = null;
+        if (previewAiBtn) previewAiBtn.disabled = false;
+        if (previewAiCancelBtn) previewAiCancelBtn.classList.add('hidden');
+    }
+}
+
+// 取消进行中的 AI 兜底
+export function cancelPreviewAi() {
+    if (previewAiAbort) {
+        previewAiAbort.abort();
+        if (previewSummary) previewSummary.textContent = '⛔ 已取消 AI 整理';
+    }
 }
 
 export function openImportPreview(questions) {

@@ -1,0 +1,128 @@
+// ==================== AI 客户端(0.9.0 · AI 导入) ====================
+// 职责:OpenAI 兼容 chat/completions 客户端 + 厂商预设 + 材料分块 + AI 兜底编排。
+// 允许依赖:prompt.js(官方提示词)。禁止:state / storage / DOM(全部经参数注入,vm 测试可跑)。
+// CORS 已实测(2026-09-09):智谱/DeepSeek 回显 Origin 放行,硅基流动 `*` —— 浏览器可直连。
+
+import { OFFICIAL_PROMPT } from './prompt.js';
+
+// 厂商预设:按成本排序;baseUrl 均为 OpenAI 兼容根(不含 /chat/completions)
+export const AI_PROVIDERS = [
+    { id: 'zhipu', name: '智谱 GLM-4-Flash（免费）', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
+    { id: 'siliconflow', name: '硅基流动（免费档）', baseUrl: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-7B-Instruct' },
+    { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+    { id: 'custom', name: '自定义（OpenAI 兼容）', baseUrl: '', model: '' },
+];
+
+export function getProvider(id) {
+    return AI_PROVIDERS.find(p => p.id === id) || AI_PROVIDERS[0];
+}
+
+// 配置兜底:缺字段时按厂商预设补齐(apiKey 永不默认)
+export function normalizeAiConfig(cfg) {
+    const c = (cfg && typeof cfg === 'object') ? cfg : {};
+    const provider = getProvider(c.providerId);
+    return {
+        providerId: provider.id,
+        baseUrl: (c.baseUrl || provider.baseUrl || '').trim().replace(/\/+$/, ''),
+        apiKey: (c.apiKey || '').trim(),
+        model: (c.model || provider.model || '').trim(),
+    };
+}
+
+export function aiConfigReady(cfg) {
+    const c = normalizeAiConfig(cfg);
+    return !!(c.baseUrl && c.apiKey && c.model);
+}
+
+// OpenAI 兼容 chat 调用(非流式)。fetchImpl 可注入(测试);timeoutMs 仅在支持 AbortController 的环境生效。
+export async function chatCompletion(config, messages, { signal, timeoutMs = 60000, fetchImpl } = {}) {
+    const cfg = normalizeAiConfig(config);
+    if (!cfg.baseUrl || !cfg.model) throw new Error('AI 配置不完整:请先在「AI 设置」里填好接口地址与模型');
+    if (!cfg.apiKey) throw new Error('AI 配置不完整:缺少 API Key');
+    const f = fetchImpl || (typeof fetch !== 'undefined' ? fetch : null);
+    if (!f) throw new Error('当前环境不支持网络请求');
+
+    let ctrl = null;
+    let sig = signal;
+    if (!sig && timeoutMs > 0 && typeof AbortController !== 'undefined') {
+        ctrl = new AbortController();
+        sig = ctrl.signal;
+        setTimeout(() => ctrl.abort(), timeoutMs); // vm 沙箱 setTimeout 是空桩,无害
+    }
+
+    let resp;
+    try {
+        resp = await f(cfg.baseUrl + '/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.apiKey },
+            body: JSON.stringify({ model: cfg.model, messages, stream: false }),
+            signal: sig,
+        });
+    } catch (e) {
+        if (e && e.name === 'AbortError') throw new Error('AI 请求已取消');
+        throw new Error('AI 请求失败(网络/CORS):' + (e && e.message ? e.message : e));
+    }
+    if (!resp.ok) {
+        let detail = '';
+        try { detail = (await resp.text()).slice(0, 200); } catch (e) { /* 忽略 */ }
+        throw new Error(`AI 接口返回 ${resp.status}${detail ? ':' + detail : ''}`);
+    }
+    const data = await resp.json();
+    const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    if (typeof content !== 'string') throw new Error('AI 返回格式异常:缺少 choices[0].message.content');
+    return content;
+}
+
+// 连接测试:发一句极短消息,2xx 且有 content 即通
+export async function testConnection(config, opts = {}) {
+    const content = await chatCompletion(config, [{ role: 'user', content: '请回复:OK' }], { timeoutMs: 15000, ...opts });
+    return { ok: true, sample: content.trim().slice(0, 40) };
+}
+
+// 材料分块:按空行分段 → 逐段累积到 maxChars;超长单段按行累积硬切。保证原文无丢失、不重排。
+export function splitIntoChunks(text, { maxChars = 2800 } = {}) {
+    const src = (text || '').replace(/\r\n/g, '\n').trim();
+    if (!src) return [];
+    const blocks = src.split(/\n{2,}/).map(b => b.trim()).filter(Boolean);
+    const chunks = [];
+    let cur = '';
+    const push = () => { if (cur.trim()) chunks.push(cur.trim()); cur = ''; };
+    for (const block of blocks) {
+        if (block.length > maxChars) {
+            push(); // 先封前一块
+            for (const line of block.split('\n')) {
+                if ((cur + '\n' + line).trim().length > maxChars) push();
+                cur = cur ? cur + '\n' + line : line;
+            }
+            push();
+        } else if ((cur + '\n\n' + block).length > maxChars) {
+            push();
+            cur = block;
+        } else {
+            cur = cur ? cur + '\n\n' + block : block;
+        }
+    }
+    push();
+    return chunks;
+}
+
+// AI 兜底编排:官方提示词 + 逐块整理 → 拼回纯文本(交回 parser 走同一套规则解析)。
+// onProgress(done, total);signal 支持取消;返回 { text, chunks }。
+export async function aiFormatMaterial(config, material, { signal, onProgress, maxChars = 2800, timeoutMs, fetchImpl } = {}) {
+    const chunks = splitIntoChunks(material, { maxChars });
+    if (chunks.length === 0) throw new Error('没有可整理的内容');
+    const outs = [];
+    for (let i = 0; i < chunks.length; i++) {
+        const content = await chatCompletion(
+            config,
+            [
+                { role: 'system', content: OFFICIAL_PROMPT },
+                { role: 'user', content: chunks[i] },
+            ],
+            { signal, timeoutMs, fetchImpl }
+        );
+        outs.push(content.trim());
+        if (onProgress) onProgress(i + 1, chunks.length);
+    }
+    return { text: outs.join('\n\n'), chunks: chunks.length };
+}

@@ -33,13 +33,14 @@ function collectDomPairs() {
     return pairs;
 }
 
-export async function loadApp({ confirmResult = true, promptValue = 'x' } = {}) {
+export async function loadApp({ confirmResult = true, promptValue = 'x', sandboxExtras = {} } = {}) {
     const alerts = [];
     const elements = {};
     const store = new Map();
     const domContentLoadedCount = { n: 0 };
 
     const sandbox = {
+        ...sandboxExtras,
         document: {
             getElementById: (id) => (elements[id] ||= makeEl()),
             querySelector: () => makeEl(),
