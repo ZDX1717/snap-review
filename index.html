@@ -251,6 +251,15 @@
                     <div class="bank-operations-panel">
                         <div class="operation-card">
                             <h3>粘贴导入</h3>
+                            <div id="prompt-guide" class="prompt-guide">
+                                <div class="prompt-guide-head">
+                                    <span class="prompt-guide-title">📋 格式乱？用 AI 一键整理（免费）</span>
+                                    <button type="button" id="prompt-toggle-btn" class="prompt-toggle">查看提示词 ▾</button>
+                                </div>
+                                <p class="prompt-guide-text">复制提示词 → 把题目发给豆包 / Kimi / DeepSeek → 整理结果粘回这里。提示词会强制 AI 保留原文、不猜答案。</p>
+                                <button id="copy-prompt-btn" class="action-btn">📋 一键复制提示词</button>
+                                <pre id="prompt-content" class="prompt-content hidden"></pre>
+                            </div>
                             <p class="import-hint">支持从 Word / PDF / 网页 / 微信直接复制粘贴，自动识别常见题目格式（编号式、字段式、单行混排、判断题），导入前可逐题预览修正。</p>
                             <textarea id="paste-input" rows="8" placeholder="把题目直接粘贴到这里，然后点击下方按钮…"></textarea>
                             <div class="paste-actions">
@@ -259,10 +268,6 @@
                             </div>
                         </div>
 
-                        <div id="prompt-guide" class="prompt-guide hidden">
-                            <p class="prompt-guide-text">格式太乱解析不出来？📋 <b>复制官方提示词</b>，把题目发给豆包 / Kimi / DeepSeek（免费），整理成标准格式后粘回来。提示词会强制 AI 保留原文、不猜答案。</p>
-                            <button id="copy-prompt-btn" class="action-btn secondary">📋 复制官方提示词</button>
-                        </div>
 
                         <div class="operation-card">
                             <h3>导入题库文件</h3>

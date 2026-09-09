@@ -44,8 +44,9 @@ const editorExplanation = document.getElementById('editor-explanation');
 const editorAnalysis = document.getElementById('editor-analysis');
 const editorPosition = document.getElementById('editor-position');
 const lastImportInfo = document.getElementById('last-import-info');
-const promptGuide = document.getElementById('prompt-guide');
 const copyPromptBtn = document.getElementById('copy-prompt-btn');
+const promptToggleBtn = document.getElementById('prompt-toggle-btn');
+const promptContent = document.getElementById('prompt-content');
 
 // 导入题目(按扩展名分流:txt 直读;docx 走零依赖抽取;.doc 明确引导另存)
 export function importQuestions() {
@@ -59,9 +60,8 @@ export function importQuestions() {
 
     const runPreview = (content, label) => {
         const importedQuestions = parseQuestionsText(content);
-        if (needsPromptHelp(importedQuestions)) showPromptGuide(); else hidePromptGuide();
         if (importedQuestions.length === 0) {
-            showImportStatus(`导入失败：${label}中没有找到有效的题目。格式太乱？试试「复制官方提示词」`, 'error');
+            showImportStatus(`导入失败：${label}中没有找到有效的题目。试试上方「复制官方提示词」用 AI 整理`, 'error');
             return;
         }
         // 解析结果先进入预览向导，由用户确认后再导入
@@ -126,12 +126,11 @@ export function updateBankSelect() {
 
 // ==================== 官方提示词引导(解析失败的自救通道) ====================
 
-export function showPromptGuide() {
-    promptGuide.classList.remove('hidden');
-}
-
-export function hidePromptGuide() {
-    promptGuide.classList.add('hidden');
+// 展开/收起提示词全文(懒渲染)
+export function togglePromptContent() {
+    if (!promptContent.textContent) promptContent.textContent = OFFICIAL_PROMPT;
+    promptContent.classList.toggle('hidden');
+    promptToggleBtn.textContent = promptContent.classList.contains('hidden') ? '查看提示词 ▾' : '收起 ▴';
 }
 
 export async function copyOfficialPrompt() {
@@ -154,9 +153,8 @@ export function parsePastedText() {
     }
     previewSourceLabel = '粘贴导入';
     const importedQuestions = parseQuestionsText(text);
-    if (needsPromptHelp(importedQuestions)) showPromptGuide(); else hidePromptGuide();
     if (importedQuestions.length === 0) {
-        showImportStatus('没有解析出有效题目。格式太乱？试试上方「复制官方提示词」', 'error');
+        showImportStatus('没有解析出有效题目。试试上方「复制官方提示词」用 AI 整理', 'error');
         return;
     }
     updatePreviewTargetBanks();
@@ -219,8 +217,6 @@ export function showImportStatus(message, type) {
 export function openImportPreview(questions) {
     // 预览防呆:缺答案/选项不足/低置信度(conf ≤ 0.6)的题默认不勾选,用户确认后可手动勾回
     state.previewData = questions.map(q => ({ q, include: (q.confidence || 0) > 0.6, warnings: [] }));
-    // 低置信占比过高 → 建议官方提示词路线
-    if (needsPromptHelp(state.previewData.map(i => i.q))) showPromptGuide(); else hidePromptGuide();
     renderPreview();
     showModal(importPreviewModal);
 }
