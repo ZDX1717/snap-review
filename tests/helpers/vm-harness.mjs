@@ -13,7 +13,7 @@ export function makeEl() {
         _listeners: {},
         addEventListener(type, fn) { this._listeners[type] = fn; },
         setAttribute() {},
-        classList: { add() {}, remove() {} },
+        classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
         style: {}, appendChild() {}, textContent: '', value: '', innerHTML: '', files: [],
         checked: false, placeholder: '', rows: 0, dataset: {},
         querySelectorAll: () => [], type: '', children: [], disabled: false,

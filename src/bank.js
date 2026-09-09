@@ -5,7 +5,7 @@ import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
 import { OFFICIAL_PROMPT, buildCopyText, copyText } from './prompt.js';
 import { aiConfigReady, aiFormatMaterial, buildAiNotes, getProvider, normalizeAiConfig, testConnection } from './ai.js';
-import { loadAiConfig, saveAiConfig, recordAiUsage } from './storage.js';
+import { isAiTested, loadAiConfig, markAiTested, saveAiConfig, recordAiUsage } from './storage.js';
 
 // 本次预览的来源标签(撤销记录展示用),由导入入口设置
 let previewSourceLabel = '导入';
@@ -21,7 +21,6 @@ let lastFilledFile = null;
 
 
 const fileInput = document.getElementById('file-input');
-const fileName = document.getElementById('file-name');
 const importStatus = document.getElementById('import-status');
 const questionBankSelect = document.getElementById('question-bank-select');
 const banksList = document.getElementById('banks-list');
@@ -53,12 +52,12 @@ const editorAnalysis = document.getElementById('editor-analysis');
 const editorPosition = document.getElementById('editor-position');
 const lastImportInfo = document.getElementById('last-import-info');
 const copyPromptBtn = document.getElementById('copy-prompt-btn');
-const fileNotice = document.getElementById('file-notice');
 const previewWarnedBtn = document.getElementById('preview-warned-btn');
 const promptToggleBtn = document.getElementById('prompt-toggle-btn');
 const promptContent = document.getElementById('prompt-content');
 // AI 设置与预览兜底
 const aiSettingsBtn = document.getElementById('ai-settings-btn');
+const rescueAiBtn = document.getElementById('rescue-ai-btn');
 const aiSettingsModal = document.getElementById('ai-settings-modal');
 const aiProviderSelect = document.getElementById('ai-provider-select');
 const aiBaseUrl = document.getElementById('ai-base-url');
@@ -74,6 +73,11 @@ const previewAiProgressText = document.getElementById('preview-ai-progress-text'
 // AI 兜底运行状态(模块级:取消控制器 + 防重入)
 let previewAiAbort = null;
 let previewAiRunning = false;
+// B 路线(救援区)运行状态;第二次点击 = 取消
+let rescueAiAbort = null;
+let rescueAiRunning = false;
+// 输入框内容由 AI 接口生成(解析入预览时打 🤖 标记;手动编辑即失效)
+let aiSourcedContent = false;
 
 // 导入题目(按扩展名分流:txt 直读;docx 走零依赖抽取;.doc 明确引导另存)
 // 导入统一管道(0.9.1):所有文件先变文字进输入框,人工过目可编辑,再点「解析并预览」;
@@ -103,11 +107,11 @@ export function importQuestions() {
     // 文字进框(不自动解析:这一眼是人工审查抽取质量的机会)
     const fillBox = (text, label) => {
         lastFilledFile = file;
+        aiSourcedContent = false;
         pasteInput.value = text;
         lastRawContent = text;
         pendingSourceLabel = `文件：${file.name}`;
         hideFileNotice();
-        updateGuideReady(`已提取《${file.name}》原文`, text.length);
         showImportStatus(`${label}已读出 ${text.length} 字,放进输入框了——可直接编辑,检查无误后点「解析并预览」`, 'success');
     };
 
@@ -134,19 +138,16 @@ export function importQuestions() {
 export function handleFileSelect(event) {
     const file = event.target.files[0];
     if (!file) {
-        fileName.textContent = '未选择文件';
+        setStatusNeutral();
         return;
     }
     const name = file.name.toLowerCase();
     if (name.endsWith('.pdf')) {
-        fileName.textContent = `已选择:${file.name}`;
         showUnreadableFileNotice(true);
     } else if (name.endsWith('.doc') && !name.endsWith('.docx')) {
-        fileName.textContent = `已选择:${file.name}`;
         showUnreadableFileNotice(false);
     } else {
-        fileName.textContent = `已选择:${file.name}`;
-        showFileNotice(`✅ 已选择 <b>${file.name}</b>——点「解析并预览」后,文字会先填进输入框供你过目`, 'info');
+        showFileNotice(`✅ 已选择 <b>${file.name}</b>——点「解析并预览」，文字会先填进输入框供你过目`, 'warning');
     }
 }
 
@@ -183,13 +184,26 @@ export function togglePromptContent() {
     promptToggleBtn.textContent = promptContent.classList.contains('hidden') ? '查看提示词 ▾' : '收起 ▴';
 }
 
-// 文件提示常驻块(选择文件/解析失败时出现,持久显示直到下次选择替换)
+// ==================== 状态区(唯一反馈面:绿=成功 黄=注意 红=错误 灰=中性提示) ====================
+
+// 中性提示:根据当前状态给出下一步指引
+function setStatusNeutral() {
+    if (!importStatus) return;
+    const len = (pasteInput.value || '').trim().length;
+    importStatus.textContent = len
+        ? `已就绪:${len} 字,点「解析并预览」`
+        : '还没有内容：粘贴文字，或点「选择文件」';
+    importStatus.className = 'status-line';
+}
+
+// 选择文件场景的 HTML 引导(双选项等)也进状态行
 function showFileNotice(html, type = 'warning') {
-    fileNotice.innerHTML = html;
-    fileNotice.className = 'file-notice ' + type;
+    if (!importStatus) return;
+    importStatus.innerHTML = html;
+    importStatus.className = 'status-line ' + type;
 }
 function hideFileNotice() {
-    fileNotice.className = 'file-notice hidden';
+    setStatusNeutral();
 }
 
 // 读不了的格式:两类文件各给两条互不混淆的路。
@@ -215,16 +229,10 @@ function showUnreadableFileNotice(isPdf) {
     );
 }
 
-// 提示块内动态按钮的事件委托(每次 innerHTML 重建,委托最稳)
-fileNotice.addEventListener('click', (e) => {
+// 状态行内动态按钮的事件委托(innerHTML 重建不丢监听)
+importStatus.addEventListener('click', (e) => {
     if (e && e.target && e.target.id === 'file-ai-copy-btn') copyOfficialPrompt(true);
 });
-
-// 文档/粘贴原文就绪后,把状态写回引导条(让"已可复制"看得见)
-function updateGuideReady(label, length) {
-    const el = document.getElementById('prompt-guide-text');
-    if (el) el.innerHTML = `✅ ${label}(${length} 字)已就绪——点下方按钮,提示词+原文一键复制,发给豆包 / Kimi / DeepSeek 整理。PDF 可直接发给 AI 转录。`;
-}
 
 export async function copyOfficialPrompt(forcePromptOnly = false) {
     // forcePromptOnly:PDF/doc 场景没有文字可合并,只要提示词(防止误合并上一次的原文)
@@ -253,14 +261,15 @@ export function parsePastedText() {
     // 来源:文件填框的用文件名,纯粘贴用"粘贴导入"(撤销记录展示用)
     previewSourceLabel = pendingSourceLabel || '粘贴导入';
     pendingSourceLabel = '';
-    updateGuideReady('已就绪:当前粘贴内容', text.length);
     const importedQuestions = parseQuestionsText(text);
     if (importedQuestions.length === 0) {
         showImportStatus('没有解析出有效题目。试试上方「复制官方提示词」用 AI 整理', 'error');
         return;
     }
+    const aiSource = aiSourcedContent;
+    aiSourcedContent = false;
     updatePreviewTargetBanks();
-    openImportPreview(importedQuestions);
+    openImportPreview(importedQuestions, aiSource);
 }
 
 
@@ -302,16 +311,16 @@ export function htmlToLines(html) {
 }
 
 
-// 显示导入状态
+// 显示导入状态(成功 4 秒后自动回中性;注意/错误常驻,直到下一个动作)
+let statusFadeTimer = null;
 export function showImportStatus(message, type) {
+    if (!importStatus) return;
+    if (statusFadeTimer) { clearTimeout(statusFadeTimer); statusFadeTimer = null; }
     importStatus.textContent = message;
-    importStatus.className = 'status-message';
-    importStatus.classList.add(type);
-    
-    // 3秒后隐藏状态消息
-    setTimeout(() => {
-        importStatus.className = 'status-message';
-    }, 3000);
+    importStatus.className = 'status-line' + (type ? ' ' + type : '');
+    if (type === 'success') {
+        statusFadeTimer = setTimeout(() => { setStatusNeutral(); statusFadeTimer = null; }, 4000);
+    }
 }
 
 
@@ -374,6 +383,8 @@ export async function testAiConnection() {
     setAiTestStatus('⏳ 正在连接,请稍候(最多 15 秒)…', 'success');
     try {
         const r = await testConnection(cfg);
+        markAiTested(cfg);
+        updateAiSettingsBadge();
         setAiTestStatus(`✅ 连接成功（模型回复：${r.sample}）`, 'success');
         return true;
     } catch (e) {
@@ -389,9 +400,19 @@ export function saveAiSettings() {
     const cfg = collectAiConfigFromForm();
     if (!cfg) return false;
     saveAiConfig(cfg);
+    updateAiSettingsBadge();
     setAiTestStatus('✅ 已保存到本机', 'success');
     setTimeout(() => hideModal(aiSettingsModal), 400);
     return true;
+}
+
+// 「⚙ AI 已连接 ✓」徽章:配置就绪且与最近一次测试成功的指纹一致才亮
+export function updateAiSettingsBadge() {
+    if (!aiSettingsBtn) return;
+    const cfg = normalizeAiConfig(loadAiConfig());
+    const ok = aiConfigReady(cfg) && isAiTested(cfg);
+    aiSettingsBtn.textContent = ok ? '⚙ AI 已连接 ✓' : '⚙ AI 设置';
+    aiSettingsBtn.classList.toggle('ai-connected', ok);
 }
 
 // ==================== 预览 AI 兜底(分块/进度/取消 → 复用预览确认管道) ====================
@@ -466,6 +487,71 @@ export async function previewAiFallback() {
     }
 }
 
+// ==================== 救援区 B 路线:AI 接口整理原文 → 自动入输入框 ====================
+
+// 手动编辑输入框即视为脱离 AI 生成状态(程序化赋值不触发 input,不受影响)
+pasteInput.addEventListener('input', () => { aiSourcedContent = false; });
+
+export async function rescueAiOrganize() {
+    if (rescueAiRunning) {  // 第二次点击 = 取消
+        if (rescueAiAbort) rescueAiAbort.abort();
+        return;
+    }
+    const material = (pasteInput.value || '').trim() || (lastRawContent || '').trim();
+    if (!material) {
+        showImportStatus('没有可整理的内容：先粘贴题目，或点「选择文件」', 'warning');
+        return;
+    }
+    const cfg = normalizeAiConfig(loadAiConfig());
+    if (!aiConfigReady(cfg)) {
+        showImportStatus('还没有配置 AI 接口：点右上角「⚙ AI 设置」，配置并测试连接后即可使用', 'warning');
+        openAiSettings();
+        return;
+    }
+
+    rescueAiRunning = true;
+    if (typeof AbortController !== 'undefined') rescueAiAbort = new AbortController();
+    const signal = rescueAiAbort ? rescueAiAbort.signal : undefined;
+    if (rescueAiBtn) {
+        rescueAiBtn.disabled = true;
+        rescueAiBtn.textContent = '🤖 整理中…（点击取消）';
+    }
+    showImportStatus('🤖 AI 整理中…', 'success');
+
+    try {
+        const { text, chunks } = await aiFormatMaterial(cfg, material, {
+            signal,
+            onProgress: (done, total) => showImportStatus(`🤖 AI 整理中（${done}/${total} 块）…再点一次按钮可取消`, 'success'),
+        });
+        const parsed = parseQuestionsText(text);
+        recordAiUsage({ trigger: 'rescue-organize', chunks, aiQuestions: parsed.length });
+        if (parsed.length === 0) {
+            showImportStatus('AI 没整理出题目：改用左边 A 路线（复制提示词发给聊天 AI 人工兜底）', 'error');
+            return;
+        }
+        // 结果替换输入框内容,标记 AI 生成;点解析后逐题带 🤖
+        aiSourcedContent = true;
+        lastFilledFile = null;
+        pendingSourceLabel = '';
+        pasteInput.value = text;
+        lastRawContent = text;
+        showImportStatus(`✅ AI 已整理出 ${parsed.length} 题（${chunks} 块原文），已放进输入框——过目后点「解析并预览」`, 'success');
+    } catch (e) {
+        if (e && /取消/.test(e.message)) {
+            showImportStatus('已取消 AI 整理', 'warning');
+        } else {
+            showImportStatus('AI 整理失败：' + (e.message || e) + '（可改用左边 A 路线）', 'error');
+        }
+    } finally {
+        rescueAiRunning = false;
+        rescueAiAbort = null;
+        if (rescueAiBtn) {
+            rescueAiBtn.disabled = false;
+            rescueAiBtn.textContent = '🤖 一键 AI 整理原文';
+        }
+    }
+}
+
 // 取消进行中的 AI 兜底
 export function cancelPreviewAi() {
     if (previewAiAbort) {
@@ -474,10 +560,11 @@ export function cancelPreviewAi() {
     }
 }
 
-export function openImportPreview(questions) {
+export function openImportPreview(questions, aiSource = false) {
     state.previewFilterWarned = false; // 新一批导入重置筛选
     // 预览防呆:缺答案/选项不足/低置信度(conf ≤ 0.6)的题默认不勾选,用户确认后可手动勾回
-    state.previewData = questions.map(q => ({ q, include: (q.confidence || 0) > 0.6, warnings: [] }));
+    // aiSource:整批来自 AI 接口整理 → 逐题 🤖 生成标记(AI 动过要留痕)
+    state.previewData = questions.map(q => ({ q, include: (q.confidence || 0) > 0.6, warnings: [], aiNote: aiSource ? 'AI 生成' : '' }));
     renderPreview();
     showModal(importPreviewModal);
 }
@@ -707,7 +794,6 @@ export function commitPreviewImport() {
     hideModal(importPreviewModal);
     hideFileNotice();
     fileInput.value = '';
-    fileName.textContent = '未选择文件';
     pasteInput.value = '';
 
     const dupeNote = (items.length - finalItems.length) > 0 ? `（跳过 ${items.length - finalItems.length} 题重复）` : '';

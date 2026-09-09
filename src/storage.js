@@ -167,6 +167,21 @@ export function saveAiConfig(cfg) {
     } catch (e) { /* 静默降级:配置不持久化,本次会话仍可用 */ }
 }
 
+// 「AI 已连接 ✓」徽章:保存最近一次测试成功的配置指纹;配置变更未复测则失配(徽章熄灭)
+export function markAiTested(cfg) {
+    try {
+        localStorage.setItem('aiConfigTested', JSON.stringify(cfg || {}));
+    } catch (e) { /* 静默 */ }
+}
+
+export function isAiTested(cfg) {
+    try {
+        return !!cfg && localStorage.getItem('aiConfigTested') === JSON.stringify(cfg);
+    } catch (e) {
+        return false;
+    }
+}
+
 // AI 兜底触发埋点:最近 50 条;用于统计"多少导入需要 AI 救"(规则算法投入决策依据)
 export function loadAiUsage() {
     try {

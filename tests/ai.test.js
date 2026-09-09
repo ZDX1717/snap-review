@@ -235,23 +235,66 @@ test('统一导入管道回归:PDF 选择 → 双选项提示块(AI 提取按钮
     run(`init()`);
     run(`fileInput.files = [{ name: '试卷.pdf' }]`);
     run(`handleFileSelect({ target: { files: [{ name: '试卷.pdf' }] } })`);
-    const notice = elements['file-notice'];
-    assert.ok(String(notice.innerHTML).includes('file-ai-copy-btn'), 'PDF 提示块要有 AI 提取按钮');
+    const notice = elements['import-status'];  // 状态区已三合一(file-notice/file-name/import-status)
+    assert.ok(String(notice.innerHTML).includes('file-ai-copy-btn'), 'PDF 提示要有 AI 提取按钮');
     assert.ok(String(notice.innerHTML).includes('上传给该 AI 服务'), '要有隐私提示');
     assert.ok(String(notice.innerHTML).includes('附到对话里'), 'AI 路径要写明附文件步骤');
     // .doc:AI 聊天读不了 .doc → 不给 AI 按钮,① 是转格式、② 是复制文字,两条路不混
     run(`handleFileSelect({ target: { files: [{ name: '试卷.doc' }] } })`);
-    const docNotice = String(elements['file-notice'].innerHTML);
+    const docNotice = String(notice.innerHTML);
     assert.ok(!docNotice.includes('file-ai-copy-btn'), '.doc 不应出现 AI 提取按钮');
     assert.ok(docNotice.includes('另存为') && docNotice.includes('.docx'), '① 必须是转格式');
     assert.ok(docNotice.includes('选中文字复制'), '② 必须是复制文字');
     // 点提示块里的 AI 按钮 → 只复制提示词(不合并旧原文);沙箱无剪贴板 → 走失败分支但必须不抛错
     run(`lastRawContent = '旧的残留原文'`);
-    notice._listeners.click({ target: { id: 'file-ai-copy-btn' } });
+    notice._listeners.click({ target: { id: 'file-ai-copy-btn' } });  // 委托现挂状态行
     await new Promise(r => setTimeout(r, 0));
     assert.ok(String(elements['import-status'].textContent).length > 0, '点击后必须有状态反馈');
     // 解析入口行为:解析时来源标签消费 pendingSourceLabel(纯粘贴 = 粘贴导入)
     run(`pasteInput.value = ''`);
     run(`parsePastedText()`);
     assert.ok(alerts.length === 0);
+});
+
+test('AI 已连接徽章:测试成功后 ✓;配置变更未复测则熄灭', async () => {
+    const { run, store, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+        sandboxExtras: { fetch: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: 'OK' } }] }) }) },
+    }));
+    store.set('aiConfig', JSON.stringify(CFG));
+    run(`init()`);
+    const btn = elements['ai-settings-btn'];
+    assert.strictEqual(btn.textContent, '⚙ AI 设置');  // 未测试过 → 不亮
+    run(`openAiSettings()`);
+    await elements['ai-test-btn']._listeners.click();
+    assert.ok(btn.textContent.includes('✓'), '测试成功 → 徽章亮');
+    assert.strictEqual(btn.textContent, '⚙ AI 已连接 ✓');
+    // 改配置保存但没复测 → 失配熄灭(改表单再保存,复现真实操作)
+    run(`aiModelInput.value = 'glm-4-plus'`);
+    run(`saveAiSettings()`);
+    assert.strictEqual(btn.textContent, '⚙ AI 设置');
+    assert.strictEqual(btn.classList.ai_connected, undefined);
+});
+
+test('救援区 B 路线:AI 接口整理 → 结果入输入框 → 解析后逐题带 AI 生成标记;手动编辑即失效', async () => {
+    const { run, store, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+        sandboxExtras: {
+            fetch: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: AI_TEXT } }] }) }),
+            AbortController,
+        },
+    }));
+    store.set('aiConfig', JSON.stringify(CFG));
+    run(`init()`);
+    run(`pasteInput.value = '一坨乱原文'`);
+    await run(`(async () => { await rescueAiOrganize(); })()`);
+    // AI 结果进了输入框
+    assert.ok(String(run(`pasteInput.value`)).includes('1+1等于几'), '输入框应为 AI 整理结果');
+    // 解析 → 预览逐题带 AI 生成标记
+    run(`parsePastedText()`);
+    assert.strictEqual(run(`previewData.length`), 2);
+    assert.strictEqual(run(`previewData[0].aiNote`), 'AI 生成');
+    // 手动编辑输入框 → 标记失效
+    run(`pasteInput.value = '1. 手写题 A.甲 B.乙 答案：A'`);
+    elements['paste-input']._listeners.input();
+    run(`parsePastedText()`);
+    assert.strictEqual(run(`previewData[0].aiNote`), '');
 });

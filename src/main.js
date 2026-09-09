@@ -6,7 +6,7 @@ import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, toggleAllBanks, updateErrorStreak, updateErrorsList, updateToggleAllBanksLabel } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
 import { backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getScopeSelection, nextQuestion, prevQuestion, renderAnswerReview, reviewErrors, showQuizResult, showQuizStatus, showSection, startQuiz, startReviewSession, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton, updateScopeSummary } from './quiz.js';
-import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, toggleWarnedFilter, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback, cancelPreviewAi, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, importQuestions, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, togglePromptContent, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks } from './bank.js';
+import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, toggleWarnedFilter, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback, cancelPreviewAi, rescueAiOrganize, updateAiSettingsBadge, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, importQuestions, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, togglePromptContent, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks } from './bank.js';
 
 // Zquiz · 期末周刷题 —— 应用装配入口
 // 依赖方向:main → 业务模块(quiz/errorbook/favorites/bank/dom)→ parser/storage/state。
@@ -45,7 +45,6 @@ const quizSection = document.getElementById('quiz-section');
 const errorsSection = document.getElementById('errors-section');
 const fileInput = document.getElementById('file-input');
 const uploadBtn = document.getElementById('upload-btn');
-const fileName = document.getElementById('file-name');
 const importStatus = document.getElementById('import-status');
 const startQuizBtn = document.getElementById('start-quiz-btn');
 const quizStatus = document.getElementById('quiz-status');
@@ -108,6 +107,7 @@ const previewConfirmBtn = document.getElementById('preview-confirm-btn');
 const previewCancelBtn = document.getElementById('preview-cancel-btn');
 // AI 设置与预览兜底
 const aiSettingsBtn = document.getElementById('ai-settings-btn');
+const rescueAiBtn = document.getElementById('rescue-ai-btn');
 const aiSettingsModal = document.getElementById('ai-settings-modal');
 const aiProviderSelect = document.getElementById('ai-provider-select');
 const aiTestBtn = document.getElementById('ai-test-btn');
@@ -167,9 +167,10 @@ function init() {
     loadCollapsedBanks();
     masteryThresholdSelect.value = String(loadMasterySetting());
 
-    // 更新题库选择下拉框与最近导入信息
+    // 更新题库选择下拉框与最近导入信息;AI 连接徽章
     updateBankSelect();
     updateLastImportInfo();
+    updateAiSettingsBadge();
 
     // 初始状态下拉框与实际加载的题库保持一致
     // （页面默认显示"全部题库"，但初始数据只加载了第一个题库，二者必须一致）
@@ -301,6 +302,7 @@ function setupEventListeners() {
 
     // AI 设置与预览兜底(0.9.0)
     aiSettingsBtn.addEventListener('click', openAiSettings);
+    rescueAiBtn.addEventListener('click', rescueAiOrganize);
     aiProviderSelect.addEventListener('change', aiProviderChanged);
     aiTestBtn.addEventListener('click', testAiConnection);
     aiSaveBtn.addEventListener('click', saveAiSettings);
@@ -521,6 +523,8 @@ if (typeof window === 'undefined') {
         testAiConnection,
         saveAiSettings,
         previewAiFallback,
+        rescueAiOrganize,
+        updateAiSettingsBadge,
         cancelPreviewAi,
         updateBankSelect,
         updateBanksList,
