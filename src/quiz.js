@@ -37,10 +37,21 @@ const favoriteBtn = document.getElementById('favorite-btn');
 // 题源 → 题目池。"复习错题/收藏"不再是独立入口,而是与题库并列的题源;
 // 范围(哪些库/哪些题型)由「题源 + 选择题库 + 题型」三组设置共同表达,
 // 因此原先的复习范围弹窗(#review-scope-modal)已退役。
+// 题源取值:只认这三种,其余(空串/未渲染/旧 DOM/测试桩)一律回退题库。
+// 不能只判断"元素是否存在"——测试桩会返回 value 为 '' 的元素,空串是非法题源。
+export const QUIZ_SOURCES = ['bank', 'errors', 'favorites'];
+
 export function getSourcePool(source) {
     if (source === 'errors') return [...state.errorQuestions];
     if (source === 'favorites') return [...state.favoriteQuestions];
     return [...state.questionBank];
+}
+
+// 读取当前题源(带合法性回退)
+export function readQuizSource() {
+    const el = document.querySelector('input[name="question-source"]:checked');
+    const v = el ? el.value : '';
+    return QUIZ_SOURCES.includes(v) ? v : 'bank';
 }
 
 // 题源为空时的提示文案(每种来源给出各自的下一步动作指引)
@@ -51,10 +62,9 @@ const EMPTY_SOURCE_HINT = {
 };
 
 export function startQuiz() {
-    // 题源:题库 / 错题本 / 收藏夹(未渲染时按题库兜底,保证旧 DOM 与测试桩兼容)
-    const sourceEl = document.querySelector('input[name="question-source"]:checked');
-    const source = sourceEl ? sourceEl.value : 'bank';
-    const pool = getSourcePool(source);
+    // 题源:题库 / 错题本 / 收藏夹
+    const source = readQuizSource();
+    let pool = getSourcePool(source);
 
     if (pool.length === 0) {
         showQuizStatus(EMPTY_SOURCE_HINT[source] || '没有可刷的题目', 'error');
@@ -65,6 +75,18 @@ export function startQuiz() {
     state.quizMode = document.querySelector('input[name="quiz-mode"]:checked').value;
     const questionType = document.querySelector('input[name="question-type"]:checked').value;
     const randomize = document.getElementById('randomize').checked;
+
+    // 「选择题库」对三种题源都生效,但实现方式不同:
+    //  - 题库题源:state.questionBank 已由下拉框 change 处理按库收窄 —— 此处**必须不再按 bankName 过滤**。
+    //    导入的题不带 bankName(靠"属于哪个库数组"表达归属),按 bankName 过滤会把整库题全滤掉。
+    //  - 错题/收藏题源:这两类在入库时会写入 bankName(见 errorbook/favorites),故按 bankName 收窄。
+    if (source !== 'bank') {
+        const bankSel = document.getElementById('question-bank-select');
+        const bankChoice = bankSel ? bankSel.value : 'all';
+        if (bankChoice && bankChoice !== 'all') {
+            pool = pool.filter(q => (q.bankName || '未知题库') === bankChoice);
+        }
+    }
 
     // 筛选题目(题型过滤对三种题源一视同仁)
     let filteredQuestions = pool;

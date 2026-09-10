@@ -6,7 +6,7 @@ import { loadCollapsedBanks, loadFromLocalStorage, loadMasterySetting, saveColla
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, toggleAllBanks, updateErrorStreak, updateErrorsList, updateToggleAllBanksLabel } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
-import { backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
+import { backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, readQuizSource, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
 import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback, cancelPreviewAi, rescueAiOrganize, updateAiSettingsBadge, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, clearPasteInput, editorHistClick, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, togglePromptContent, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks, renderErrorsForBank, renderRecycleBin, restoreRecycled, recycleBankEntry, restoreBankVersion } from './bank.js';
 
 // Zquiz · 期末周刷题 —— 应用装配入口
@@ -68,7 +68,6 @@ const clearErrorsBtn = document.getElementById('clear-errors-btn');
 const errorsList = document.getElementById('errors-list');
 const questionBankSelect = document.getElementById('question-bank-select');
 const quizSettings = document.getElementById('quiz-settings');
-const bankSelectGroup = document.getElementById('bank-select-group');
 const btnBanks = document.getElementById('btn-banks');
 const createBankBtn = document.getElementById('create-bank-btn');
 const exportAllBtn = document.getElementById('export-all-btn');
@@ -170,13 +169,18 @@ function navigate(section) {
     }
 }
 
-// 题源 UI:选「题库」时显示"选择题库"下拉;选错题本/收藏夹时隐藏它并显示题数。
-// (错题/收藏是跨题库的集合,再让用户选库只会造成"选了却没生效"的困惑)
+// 题源 UI:「选择题库」常驻(👤 验收反馈:不让它消失,避免布局跳动)。
+// 它对三种题源都生效——错题/收藏自带 bankName,可按库再收窄;
+// 标签随题源改写,使"这里在选什么"始终明确。
 function updateSourceUI() {
-    const el = document.querySelector('input[name="question-source"]:checked');
-    const source = el ? el.value : 'bank';
+    const source = readQuizSource();   // 与 startQuiz 共用同一判定,杜绝两处口径不一致
     const hint = document.getElementById('source-hint');
-    if (bankSelectGroup) bankSelectGroup.classList.toggle('hidden', source !== 'bank');
+    const bankLabel = document.getElementById('bank-select-label');
+    if (bankLabel) {
+        bankLabel.textContent = source === 'errors' ? '错题所在题库：'
+            : source === 'favorites' ? '收藏题所在题库：'
+            : '选择题库：';
+    }
     updateBankSelect();
     if (!hint) return;
     if (source === 'bank') {
@@ -186,7 +190,9 @@ function updateSourceUI() {
     }
     const n = getSourcePool(source).length;
     const label = source === 'errors' ? '错题本' : '收藏夹';
-    hint.textContent = n > 0 ? `${label}共 ${n} 题` : `${label}还没有题目`;
+    hint.textContent = n > 0
+        ? `${label}共 ${n} 题（可用上方「${source === 'errors' ? '错题所在题库' : '收藏题所在题库'}」再收窄）`
+        : `${label}还没有题目`;
     hint.classList.remove('hidden');
 }
 
@@ -505,6 +511,7 @@ if (typeof window === 'undefined') {
         finishExam,
         getSourcePool,
         updateSourceUI,
+        readQuizSource,
         formatQuestionsForExport,
         handleFileSelect,
         handlePasteEvent,

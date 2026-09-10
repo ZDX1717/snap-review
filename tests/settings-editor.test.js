@@ -64,27 +64,29 @@ test('题源池 + 题型筛选:错题本按题型过滤', () => {
     assert.strictEqual(run('globalThis.__onlySingle.length'), 1);
     assert.strictEqual(run('globalThis.__onlySingle[0].content'), 'a');
 });
-test('题源 UI:题库显示"选择题库",错题本/收藏夹隐藏它并显示题数', () => {
+test('题源 UI:「选择题库」常驻不消失,标签随题源改写并给出题数', () => {
     run(`errorQuestions = [{ content: 'e1', type: '单选', bankName: 'T' }];
          favoriteQuestions = [{ content: 'f1', type: '多选' }];`);
     const pick = (v) => { sandbox.document.querySelector = (sel) =>
         sel.includes('question-source') ? { value: v } : makeEl(); };
     // 通过 DOM 接口取,保证与 main.js 内 getElementById 拿到同一实例
-    const group = sandbox.document.getElementById('bank-select-group');
     const hint = sandbox.document.getElementById('source-hint');
+    const label = sandbox.document.getElementById('bank-select-label');
 
     pick('bank');
     run(`updateSourceUI()`);
-    assert.ok(group.classList.contains('hidden') === false, '题库题源应显示"选择题库"');
+    assert.strictEqual(label.textContent, '选择题库：');
     assert.ok(hint.classList.contains('hidden') === true, '题库题源不应有额外提示');
 
+    // 👤 验收反馈:切到错题/收藏时「选择题库」不得消失(避免布局跳动)
     pick('errors');
     run(`updateSourceUI()`);
-    assert.ok(group.classList.contains('hidden') === true, '错题本题源应隐藏"选择题库"');
+    assert.strictEqual(label.textContent, '错题所在题库：', '标签应改写而非隐藏控件');
     assert.ok(String(hint.textContent).includes('错题本共 1 题'), '应显示错题数');
 
     pick('favorites');
     run(`updateSourceUI()`);
+    assert.strictEqual(label.textContent, '收藏题所在题库：');
     assert.ok(String(hint.textContent).includes('收藏夹共 1 题'), '应显示收藏数');
 
     // 空集合:给出"还没有题目"而不是数字 0
@@ -112,6 +114,51 @@ test('题源=错题本:startQuiz 出题并归零计数(题源即复习入口)', 
     assert.strictEqual(run('quizMode'), 'immediate');
     assert.strictEqual(run('correctCount'), 0);
     assert.strictEqual(run('wrongCount'), 0);
+});
+
+test('题库题源不得按 bankName 过滤(导入的题不带该字段,会整库被滤掉)', () => {
+    // 回归:曾把"选择题库"的 bankName 过滤套用到题库题源上,
+    // 而导入的题靠"属于哪个库数组"表达归属、没有 bankName → currentQuiz 变成 0 题。
+    run(`state.questionBanks = { x: [
+            { content: '有答案', type: '单选', options:{A:'甲',B:'乙'}, answer: 'A' },
+            { content: '没答案', type: '单选', options:{A:'甲',B:'乙'}, answer: '' },
+         ] };
+         state.questionBank = state.questionBanks['x'];`);
+    const orig = sandbox.document;
+    sandbox.document.getElementById = ((o) => (id) =>
+        id === 'question-bank-select' ? { value: 'x' } : o(id))(sandbox.document.getElementById);
+    run(`startQuiz()`);
+    assert.strictEqual(run('currentQuiz.length'), 1, '待补题被排除后应剩 1 题,而不是被 bankName 过滤清空');
+    assert.strictEqual(run('currentQuiz[0].content'), '有答案');
+});
+test('题源取值健壮性:空串/未渲染一律回退题库', () => {
+    assert.strictEqual(run(`readQuizSource()`), 'bank', '测试桩 value 为 \'\' 时应回退题库');
+});
+
+test('选择题库对错题/收藏题源同样生效(按 bankName 收窄)', () => {
+    run(`errorQuestions = [
+            { content: 'a', type: '单选', options:{A:'x',B:'y'}, answer: 'A', bankName: '高数' },
+            { content: 'b', type: '单选', options:{A:'x',B:'y'}, answer: 'A', bankName: '英语' },
+            { content: 'c', type: '判断', options:{A:'正确',B:'错误'}, answer: 'A', bankName: '高数' },
+         ];`);
+    const withBank = (bank) => {
+        sandbox.document.querySelector = (sel) => {
+            if (sel.includes('question-source')) return { value: 'errors' };
+            if (sel.includes('quiz-mode')) return { value: 'immediate' };
+            if (sel.includes('question-type')) return { value: 'all' };
+            return makeEl();
+        };
+        sandbox.document.getElementById = ((orig) => (id) =>
+            id === 'question-bank-select' ? { value: bank } : orig(id))(sandbox.document.getElementById);
+    };
+    withBank('高数');
+    run(`startQuiz()`);
+    assert.strictEqual(run('currentQuiz.length'), 2, '选「高数」应只出该库的 2 道错题');
+
+    withBank('英语');
+    run(`startQuiz()`);
+    assert.strictEqual(run('currentQuiz.length'), 1);
+    assert.strictEqual(run('currentQuiz[0].content'), 'b');
 });
 
 console.log('== 功能3:题库编辑器 ==');
