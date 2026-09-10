@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=0917">
+    <link rel="stylesheet" href="styles.css?v=0918">
 </head>
 <body>
     <div class="container">
@@ -263,24 +263,24 @@
                             <input type="file" id="file-input" class="hidden" accept=".txt,.md,.csv,.json,.docx,.pdf,.doc" />
                             <div id="import-status" class="status-line">还没有内容：粘贴文字，或点「选择文件」</div>
 
-                            <!-- 救援区 A/B：默认收起，解析困难时自动展开 -->
-                            <details id="ai-rescue" class="rescue-box">
-                                <summary>格式乱 / 读不出来？让 AI 帮你整理（免费）</summary>
+                            <!-- 救援区 A/B：常驻展示，两条路一眼可选 -->
+                            <div id="ai-rescue" class="rescue-box">
+                                <p class="rescue-title">解析不出来？让 AI 帮你整理原文（二选一）</p>
                                 <div class="rescue-grid">
                                     <div class="rescue-col">
-                                        <h4>A · 自己发给聊天 AI（免费）</h4>
-                                        <button id="copy-prompt-btn" class="action-btn">📋 复制提示词+题目</button>
-                                        <button type="button" id="prompt-toggle-btn" class="prompt-toggle">查看提示词 ▾</button>
+                                        <h4>A · 发给聊天 AI（免费）</h4>
+                                        <button id="copy-prompt-btn" class="action-btn">① 📋 复制提示词+题目</button>
+                                        <p class="rescue-hint">② 粘贴到豆包 / Kimi / DeepSeek 发送<br>③ 把 AI 回复<b>粘回上方输入框</b></p>
+                                        <button type="button" id="prompt-toggle-btn" class="prompt-toggle">查看提示词内容 ▾</button>
                                         <pre id="prompt-content" class="prompt-content hidden"></pre>
-                                        <p class="rescue-hint">复制后粘到豆包 / Kimi / DeepSeek 发送，把 AI 回复全文粘回上面的输入框。无需配置，提示词强制 AI 不猜答案。</p>
                                     </div>
                                     <div class="rescue-col">
-                                        <h4>B · 用我的 AI 接口直接整理</h4>
-                                        <button type="button" id="rescue-ai-btn" class="action-btn">🤖 一键 AI 整理原文</button>
-                                        <p class="rescue-hint">用右上角「⚙ AI 设置」里配置的接口整理原文，结果自动填入输入框，解析后每题带 🤖 生成标记。需自备 API Key。</p>
+                                        <h4>B · 用我的 AI 接口（自动）</h4>
+                                        <button type="button" id="rescue-ai-btn" class="action-btn">🤖 一键整理并填入输入框</button>
+                                        <p class="rescue-hint">整理结果自动填进输入框，逐题带 🤖 标记。<br>需先点右上角 ⚙ AI 设置 配置 Key。</p>
                                     </div>
                                 </div>
-                            </details>
+                            </div>
 
                             <details id="format-help" class="rescue-box">
                                 <summary>支持的题目格式（自动识别，无需选择）</summary>
@@ -521,6 +521,6 @@ A：选项A  B：选项B
 
     </div>
 
-    <script type="module" src="src/main.js?v=0917"></script>
+    <script type="module" src="src/main.js?v=0918"></script>
 </body>
 </html>
