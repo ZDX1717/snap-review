@@ -1960,9 +1960,17 @@ html[data-theme="dark"] .container {
         padding: 10px 0 12px;
         background: transparent;
     }
-    /* 自动边距实现居中:头部贴顶,操作条贴底,题目块居中;内容超高时自然回退为顺排 */
+    /* 题干紧跟进度条,只留一行的呼吸感(居中版留白过大,按 👤 反馈改顶对齐) */
     #quiz-section.active:has(#quiz-container:not(.hidden)) .quiz-progress {
-        margin-bottom: auto;
+        margin-bottom: 10px;
+    }
+    #quiz-section.active:has(#quiz-container:not(.hidden)) .question-content {
+        margin-top: 0;
+    }
+    #quiz-section.active:has(#quiz-container:not(.hidden)) #question-text {
+        margin-top: 0;
+        font-size: 16.5px;
+        line-height: 1.55;
     }
     #quiz-section.active:has(#quiz-container:not(.hidden)) #answer-feedback:not(.hidden) {
         margin-top: 10px;
@@ -1976,21 +1984,23 @@ html[data-theme="dark"] .container {
         position: fixed;
         left: 0;
         right: 0;
-        bottom: calc(54px + env(safe-area-inset-bottom));
+        bottom: calc(52px + env(safe-area-inset-bottom));
         z-index: 90;
         display: flex;
-        gap: 8px;
-        padding: 8px 12px;
+        gap: 6px;
+        padding: 6px 10px;
         background: var(--c-surface);
         border-top: 1px solid var(--c-border);
-        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+        box-shadow: 0 -1px 6px rgba(0, 0, 0, 0.05);
     }
     .quiz-controls .action-btn {
         flex: 1;
         margin: 0;
+        padding: 8px 6px;
+        font-size: 13.5px;
     }
     #quiz-container {
-        padding-bottom: 4px;  /* 操作条已脱离文档流,无需大留白 */
+        padding-bottom: calc(48px + env(safe-area-inset-bottom));  /* 紧凑操作条的精确避让 */
     }
 }
 
@@ -2008,6 +2018,6 @@ html[data-theme="dark"] .container {
     }
     /* 反馈面板与选项之间不被操作条盖住:给反馈区也留出空间 */
     #quiz-section.active:has(#quiz-container:not(.hidden)) #answer-feedback:not(.hidden) {
-        margin-bottom: calc(58px + env(safe-area-inset-bottom));
+        margin-bottom: calc(46px + env(safe-area-inset-bottom));
     }
 }
