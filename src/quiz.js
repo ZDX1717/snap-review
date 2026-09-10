@@ -3,7 +3,7 @@ import { normalizeAnswerString, shuffleArray } from './parser.js';
 import { showModal } from './dom.js';
 import { addToErrorBook, updateErrorStreak, updateErrorsList } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
-import { updateBanksList } from './bank.js';
+import { updateBanksList, updateLastImportInfo } from './bank.js';
 
 // ==================== quiz.js ====================
 // 自动拆分自 main.js;依赖方向见各 import。
@@ -627,19 +627,12 @@ export function showSection(sectionName) {
     // 底部导航切换时滚回顶部(移动端标准行为;vm 沙箱无 window,guarded)
     if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
     
-    // 如果是错题本部分，更新错题列表
-    if (sectionName === 'errors') {
-        updateErrorsList();
-    }
-
-    // 如果是收藏夹部分，更新收藏列表
-    if (sectionName === 'favorites') {
-        updateFavoritesList();
-    }
-
-    // 如果是题库管理部分，更新题库列表
-    if (sectionName === 'manage') {
+    // 题库页:库列表 + 错题 + 收藏 + 最近导入一并刷新
+    if (sectionName === 'banks') {
         updateBanksList();
+        updateErrorsList();
+        updateFavoritesList();
+        updateLastImportInfo();
     }
 }
 

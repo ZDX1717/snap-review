@@ -40,10 +40,8 @@ import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteB
 // DOM 元素
 const btnHome = document.getElementById('btn-home');
 const btnQuiz = document.getElementById('btn-quiz');
-const btnErrors = document.getElementById('btn-errors');
 const homeSection = document.getElementById('home-section');
 const quizSection = document.getElementById('quiz-section');
-const errorsSection = document.getElementById('errors-section');
 const fileInput = document.getElementById('file-input');
 const uploadBtn = document.getElementById('upload-btn');
 const importStatus = document.getElementById('import-status');
@@ -72,11 +70,9 @@ const toggleAllBanksBtn = document.getElementById('toggle-all-banks-btn');
 const errorsList = document.getElementById('errors-list');
 const questionBankSelect = document.getElementById('question-bank-select');
 const quizSettings = document.getElementById('quiz-settings');
-const btnManage = document.getElementById('btn-manage');
-const manageSection = document.getElementById('manage-section');
+const btnBanks = document.getElementById('btn-banks');
 const createBankBtn = document.getElementById('create-bank-btn');
 const exportAllBtn = document.getElementById('export-all-btn');
-const exportCurrentBtn = document.getElementById('export-current-btn');
 const banksList = document.getElementById('banks-list');
 const createBankModal = document.getElementById('create-bank-modal');
 const renameBankModal = document.getElementById('rename-bank-modal');
@@ -125,7 +121,6 @@ const answerReview = document.getElementById('answer-review');
 const reviewOnlyWrong = document.getElementById('review-only-wrong');
 const masteryNote = document.getElementById('mastery-note');
 const favoriteBtn = document.getElementById('favorite-btn');
-const btnFavorites = document.getElementById('btn-favorites');
 const favoritesList = document.getElementById('favorites-list');
 const reviewFavoritesBtn = document.getElementById('review-favorites-btn');
 const masteryThresholdSelect = document.getElementById('mastery-threshold-select');
@@ -198,8 +193,7 @@ function setupEventListeners() {
     // 导航按钮
     btnHome.addEventListener('click', () => showSection('home'));
     btnQuiz.addEventListener('click', () => showSection('quiz'));
-    btnErrors.addEventListener('click', () => showSection('errors'));
-    btnManage.addEventListener('click', () => showSection('manage'));
+    btnBanks.addEventListener('click', () => showSection('banks'));
     
     // 文件上传
     uploadBtn.addEventListener('click', () => fileInput.click());
@@ -236,7 +230,6 @@ function setupEventListeners() {
     toggleAllBanksBtn.addEventListener('click', toggleAllBanks);
 
     // 收藏夹
-    btnFavorites.addEventListener('click', () => showSection('favorites'));
     reviewFavoritesBtn.addEventListener('click', reviewFavorites);
     favoriteBtn.addEventListener('click', toggleFavoriteCurrent);
 
@@ -287,7 +280,6 @@ function setupEventListeners() {
     cancelRenameBankBtn.addEventListener('click', () => hideModal(renameBankModal));
     confirmRenameBankBtn.addEventListener('click', renameBank);
     exportAllBtn.addEventListener('click', exportAllBanks);
-    exportCurrentBtn.addEventListener('click', () => exportBank(state.currentBankName));
 
     // 粘贴导入
     pasteInput.addEventListener('paste', handlePasteEvent);
@@ -330,7 +322,7 @@ function setupEventListeners() {
 
     // 首页快捷入口
     heroStartBtn.addEventListener('click', () => showSection('quiz'));
-    heroImportBtn.addEventListener('click', () => showSection('manage'));
+    heroImportBtn.addEventListener('click', () => { pasteInput.focus(); });
 }
 
 

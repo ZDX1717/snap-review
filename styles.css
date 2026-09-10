@@ -2100,3 +2100,31 @@ button, select, label, .option-item, .bank-toggle, .preview-item, .editor-list-i
 body, .container, .operation-card, .modal-content, .quiz-container, nav {
     transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
 }
+
+/* ==================== P0-1.8 信息架构:3 tab + 题库页/首页重排 ==================== */
+.banks-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 16px;
+}
+.collection-panel {
+    margin-top: 24px;
+}
+.collection-panel h3 {
+    margin: 0 0 12px;
+}
+/* 导入卡在首页:去双栏遗留,全宽 */
+#home-section .operation-card {
+    margin-top: 24px;
+}
+@media (max-width: 768px) {
+    .banks-header .action-btn.small {
+        padding: 7px 10px;
+        font-size: 13px;
+    }
+    .collection-panel {
+        margin-top: 16px;
+    }
+}
