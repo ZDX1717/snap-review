@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey } from './parser.js';
-import { saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportBatch, loadOverwriteSnapshot, clearOverwriteSnapshot, loadBankVersions, pushBankVersion } from './storage.js';
+import { saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportBatch, loadOverwriteSnapshot, clearOverwriteSnapshot, loadBankVersions, pushBankVersion, loadCollapsedBanks, saveCollapsedBanks } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
 import { OFFICIAL_PROMPT, buildCopyText, copyText } from './prompt.js';
