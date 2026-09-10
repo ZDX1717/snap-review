@@ -619,8 +619,8 @@ export function showSection(sectionName) {
     // 激活对应的导航按钮
     document.getElementById(`btn-${sectionName}`).classList.add('active');
 
-    // 底部导航切换时滚回顶部(移动端标准行为)
-    window.scrollTo(0, 0);
+    // 底部导航切换时滚回顶部(移动端标准行为;vm 沙箱无 window,guarded)
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
     
     // 如果是错题本部分，更新错题列表
     if (sectionName === 'errors') {
