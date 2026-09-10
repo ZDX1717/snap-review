@@ -1931,7 +1931,6 @@ html[data-theme="dark"] .container {
 /* ==================== P0-1.5 刷题聚焦模式(手机:题目居中 + 底部固定操作条) ==================== */
 @media (max-width: 768px) {
     /* 进入刷题后:隐藏配置区,让位给题目 */
-    #quiz-section.active:has(#quiz-container:not(.hidden)) > h2,
     #quiz-section.active:has(#quiz-container:not(.hidden)) #quiz-settings,
     #quiz-section.active:has(#quiz-container:not(.hidden)) #start-quiz-btn,
     #quiz-section.active:has(#quiz-container:not(.hidden)) #quiz-status:empty {
