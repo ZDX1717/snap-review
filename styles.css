@@ -1624,3 +1624,13 @@ h3 {
     box-shadow: inset 3px 0 0 #4a6cf7;
     color: #1c3d7c;
 }
+
+/* 编辑器:AI 标记题(紫条)与 AI 说明行 */
+.editor-list-item.ai-gen {
+    box-shadow: inset 3px 0 0 #8e7cc3;
+}
+.editor-list-item.ai-gen.needs-fix {
+    box-shadow: inset 3px 0 0 #b08df0;  /* 双重标记时紫橙过渡色 */
+    background: #fbf7ff;
+}
+.editor-ai-note { font-weight: 600; }

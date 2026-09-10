@@ -803,6 +803,7 @@ export function commitPreviewImport() {
         const clone = JSON.parse(JSON.stringify(item.q));
         const finalized = finalizeQuestion(clone);
         if (!finalized) continue;
+        if (item.aiNote) finalized.aiSource = 'ai';  // AI 动过 → 永久标注,编辑器可见
         const key = questionDedupKey(finalized);
         if (seen.has(key)) continue; // 批内去重
         seen.add(key);
@@ -1483,10 +1484,11 @@ export function renderBankEditor() {
         if (pendingOnly && q.answer) return; // 只看待补
         const item = document.createElement('button');
         item.type = 'button';
-        // 待修改高亮:缺答案(待补)或选项不足的题,橙底标记
+        // 待修改高亮:缺答案(待补)或选项不足的题,橙底标记;AI 标记:紫条 🤖(与预览同色系)
         const needsFix = !q.answer || Object.keys(q.options || {}).length < 2;
-        item.className = 'editor-list-item' + (idx === state.editIndex ? ' selected' : '') + (needsFix ? ' needs-fix' : '');
-        item.textContent = `${idx + 1}. ${(q.content || '（无题干）').slice(0, 22)}` + (!q.answer ? ' ⏳' : (needsFix ? ' ⚠' : ''));
+        const aiTouched = q.aiSource === 'ai';
+        item.className = 'editor-list-item' + (idx === state.editIndex ? ' selected' : '') + (needsFix ? ' needs-fix' : '') + (aiTouched ? ' ai-gen' : '');
+        item.textContent = `${idx + 1}. ` + (aiTouched ? '🤖 ' : '') + `${(q.content || '（无题干）').slice(0, 22)}` + (!q.answer ? ' ⏳' : (needsFix ? ' ⚠' : ''));
         item.addEventListener('click', () => {
             if (!editorGuard()) return;
             state.editIndex = idx;
@@ -1503,6 +1505,11 @@ export function renderBankEditor() {
     }
     editorForm.classList.remove('hidden');
     editorEmpty.classList.add('hidden');
+    const aiNoteEl = document.getElementById('editor-ai-note');
+    if (aiNoteEl) {
+        const cur = questions[state.editIndex];
+        aiNoteEl.textContent = cur && cur.aiSource === 'ai' ? '🤖 此题经 AI 整理导入；你在此保存的修改为最终版本' : '';
+    }
     editorRenderForm();
 }
 

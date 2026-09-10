@@ -351,3 +351,27 @@ test('导入按钮职责分离回归:选文件即读进框;解析按钮单监听
     assert.strictEqual(String(elements['import-status'].className), 'status-line');
     assert.ok(alerts.length === 0);
 });
+
+test('AI 标记持久化:确认导入后 aiSource=ai 写进题库数据(编辑器可见的前提)', async () => {
+    const { run, store } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+        sandboxExtras: {
+            fetch: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: AI_TEXT } }] }) }),
+            AbortController,
+        },
+    }));
+    store.set('aiConfig', JSON.stringify(CFG));
+    run(`init()`);
+    run(`pasteInput.value = '一坨乱原文'`);
+    await run(`(async () => { await rescueAiOrganize(); })()`);
+    run(`parsePastedText()`);
+    run(`previewTargetBankSelect.value = '__new__'`);
+    run(`previewConfirmBtn__fake = true`);
+    run(`prompt = () => 'AI测试库'`);
+    run(`commitPreviewImport()`);
+    assert.strictEqual(run(`questionBanks['AI测试库'][0].aiSource`), 'ai');
+    // 对照:非 AI 路径导入的题不带标记
+    run(`openImportPreview(parseQuestionsText('1. 普通题 A.甲 B.乙 答案：A'))`);
+    run(`previewTargetBankSelect.value = 'AI测试库'`);
+    run(`commitPreviewImport()`);
+    assert.strictEqual(run(`questionBanks['AI测试库'].some(q => q.content === '普通题' && q.aiSource)`), false);
+});
