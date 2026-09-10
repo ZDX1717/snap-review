@@ -1,4 +1,5 @@
 :root {
+    color-scheme: light;
     /* ===== 设计令牌(P0-1.1 令牌化:亮色值 = 历史硬编码值,零视觉变化) ===== */
     --c-bg: #f5f7fa;            /* 页面底 */
     --c-surface: #fff;           /* 卡片/表面 */
@@ -88,7 +89,7 @@ nav {
     cursor: pointer;
     font-size: 16px;
     color: var(--c-text-secondary);
-    transition: all 0.3s ease;
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
 }
 
 .nav-btn:hover {
@@ -1031,7 +1032,7 @@ h3 {
     font-size: 14px;
     color: var(--c-text-muted);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
     font-family: inherit;
 }
 
@@ -1910,7 +1911,7 @@ html[data-theme="dark"] {
     --c-surface-warm: #242320;
     --c-warn-bg-soft: #3a3320;
 }
-html[data-theme="dark"] body {
+html[data-theme="dark"] {
     color-scheme: dark;
 }
 /* 暗色下阴影收敛(硬编码阴影在暗底上过重) */
@@ -2032,3 +2033,28 @@ html[data-theme="dark"] .container {
         margin-bottom: calc(46px + env(safe-area-inset-bottom));
     }
 }
+
+/* ==================== 交互规范(Vercel web-interface-guidelines 精选适配) ==================== */
+/* 触控:去掉双击缩放延迟与安卓点按高亮 */
+button, select, label, .option-item, .bank-toggle, .preview-item, .editor-list-item {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+/* 键盘可见焦点环(鼠标点击不出现) */
+:focus-visible {
+    outline: 2px solid var(--c-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+/* 弹窗滚动不穿透背景 */
+.modal-content {
+    overscroll-behavior: contain;
+}
+/* 尊重减动效偏好 */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+    }
+}
+/* 状态不只靠颜色:错题本删除钮有文字,收藏有 ★/☆,标记有图标 —— 已符合,此处仅固化规则 */
