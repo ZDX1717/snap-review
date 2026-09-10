@@ -1596,6 +1596,7 @@ export function updateBanksList() {
         bankItem.className = 'bank-item';
 
         // 标题行:库名 + 状态徽章
+        // 左上:库名 + 状态徽章
         const bankInfo = document.createElement('div');
         bankInfo.className = 'bank-info';
         const bankTitle = document.createElement('h3');
@@ -1610,7 +1611,30 @@ export function updateBanksList() {
         if (favCount > 0) mkBadge(`藏 ${favCount}`, 'fav-badge');
         bankInfo.appendChild(badges);
 
-        // 页脚:左错题 · 中编辑/开始刷题 · 右收藏
+        // 右上:开始刷题 + 编辑
+        const bankActions = document.createElement('div');
+        bankActions.className = 'bank-actions';
+
+        const startBtn = document.createElement('button');
+        startBtn.className = 'action-btn small';
+        startBtn.textContent = '▶ 开始刷题';
+        startBtn.addEventListener('click', () => {
+            state.currentBankName = bankName;
+            state.questionBank = state.questionBanks[bankName];
+            state.isAllBanksView = false;
+            saveToLocalStorage();
+            updateBankSelect();
+            showSection('quiz');
+        });
+        bankActions.appendChild(startBtn);
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'action-btn small secondary';
+        editBtn.textContent = '✎ 编辑';
+        editBtn.addEventListener('click', () => editBank(bankName));
+        bankActions.appendChild(editBtn);
+
+        // 左下:错题按钮;右下:收藏按钮
         const cardFoot = document.createElement('div');
         cardFoot.className = 'bank-card-foot';
 
@@ -1624,25 +1648,6 @@ export function updateBanksList() {
         });
         cardFoot.appendChild(errToggle);
 
-        const startBtn = document.createElement('button');
-        startBtn.className = 'action-btn small';
-        startBtn.textContent = '▶ 开始刷题';
-        startBtn.addEventListener('click', () => {
-            state.currentBankName = bankName;
-            state.questionBank = state.questionBanks[bankName];
-            state.isAllBanksView = false;
-            saveToLocalStorage();
-            updateBankSelect();
-            showSection('quiz');
-        });
-        cardFoot.appendChild(startBtn);
-
-        const editBtn = document.createElement('button');
-        editBtn.className = 'action-btn small secondary';
-        editBtn.textContent = '✎ 编辑';
-        editBtn.addEventListener('click', () => editBank(bankName));
-        cardFoot.appendChild(editBtn);
-
         const favToggle = document.createElement('button');
         favToggle.className = 'foot-toggle fav' + (state.expandedBanks['fav:' + bankName] ? ' open' : '');
         favToggle.innerHTML = `⭐ 收藏 <b>${favCount}</b>`;
@@ -1654,6 +1659,7 @@ export function updateBanksList() {
         cardFoot.appendChild(favToggle);
 
         bankItem.appendChild(bankInfo);
+        bankItem.appendChild(bankActions);
         bankItem.appendChild(cardFoot);
 
         banksList.appendChild(bankItem);

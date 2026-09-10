@@ -2216,3 +2216,22 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     gap: 6px;
     align-items: center;
 }
+
+/* 库卡四象限布局(👤 定稿) */
+.bank-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    row-gap: 8px;
+}
+.bank-card-foot {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;  /* 左下错题 / 右下收藏 */
+    align-items: center;
+}
+.bank-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
