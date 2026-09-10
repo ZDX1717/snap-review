@@ -1961,8 +1961,12 @@ html[data-theme="dark"] .container {
         background: transparent;
     }
     /* 题干紧跟进度条,只留一行的呼吸感(居中版留白过大,按 👤 反馈改顶对齐) */
+    #quiz-section.active:has(#quiz-container:not(.hidden)) .question-header {
+        margin-bottom: 5px;
+    }
     #quiz-section.active:has(#quiz-container:not(.hidden)) .quiz-progress {
-        margin-bottom: 10px;
+        margin-bottom: 6px;
+        height: 5px;
     }
     #quiz-section.active:has(#quiz-container:not(.hidden)) .question-content {
         margin-top: 0;
@@ -1987,6 +1991,8 @@ html[data-theme="dark"] .container {
         bottom: calc(52px + env(safe-area-inset-bottom));
         z-index: 90;
         display: flex;
+        flex-direction: row;   /* 旧规则是 column(竖排占两行),强制单行 */
+        flex-wrap: nowrap;
         gap: 6px;
         padding: 6px 10px;
         background: var(--c-surface);
