@@ -1727,3 +1727,93 @@ h3 {
 
 /* 编辑器说明行:AI 与待修双状态并存时逐行显示 */
 .editor-ai-note.stacked > div { margin: 0 0 4px; }
+
+/* ==================== P0-1.2 手机版全出血适配(≤768px 提高显示效率) ==================== */
+@media (max-width: 768px) {
+    /* 页面与容器:去四边空白/圆角/阴影,内容贴边 */
+    body {
+        padding: 0;
+    }
+    .container {
+        max-width: 100%;
+        border-radius: 0;
+        box-shadow: none;
+        min-height: 100vh;
+    }
+    main {
+        padding: 14px 12px 20px;
+    }
+    section h2 {
+        font-size: 19px;
+        margin-bottom: 12px;
+    }
+    h3 {
+        font-size: 16px;
+    }
+
+    /* 卡片:收紧内边距,列表密排 */
+    .operation-card {
+        padding: 14px 12px;
+        margin-bottom: 12px;
+    }
+    .operation-card h3 {
+        margin-top: 0;
+        margin-bottom: 10px;
+    }
+    .bank-list-panel,
+    .bank-operations-panel {
+        gap: 0;
+    }
+    .banks-list,
+    .editor-question-list,
+    .favorites-list,
+    #errors-list {
+        font-size: 14px;
+    }
+
+    /* 表单与按钮:高度触控友好但不臃肿 */
+    .action-btn {
+        padding: 9px 14px;
+        font-size: 14px;
+    }
+    .form-input,
+    select,
+    textarea {
+        font-size: 16px;  /* 防 iOS 聚焦缩放 */
+    }
+
+    /* 题库管理双栏在窄屏本就单列;分组头部收紧 */
+    .bank-toggle {
+        padding: 10px 8px;
+    }
+
+    /* 粘贴框与状态行紧凑 */
+    #paste-input {
+        rows: auto;
+        min-height: 90px;
+        padding: 8px;
+        font-size: 16px;
+    }
+    .status-line {
+        margin: 8px 0 4px;
+        padding: 7px 10px;
+        font-size: 13px;
+    }
+
+    /* 预览/编辑器条目紧凑 */
+    .preview-item {
+        padding: 8px;
+    }
+    .preview-stem {
+        font-size: 14px;
+    }
+    .editor-list-item {
+        padding: 7px 8px;
+        font-size: 13.5px;
+    }
+
+    /* 首页 hero 收紧 */
+    .home-hero h2 {
+        font-size: 20px;
+    }
+}
