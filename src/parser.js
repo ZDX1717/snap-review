@@ -126,8 +126,20 @@ export function finalizeQuestion(q) {
     q.confidence = Math.max(0, Math.min(1, conf));
     q.raw = Array.isArray(q.raw) ? q.raw.join('\n') : (q.raw || '');
 
+    // 来源标注(0.11.0 AI 双模式地基):记录答案/解析是谁给的。
+    normalizeSourceField(q, 'answerSource');
+    normalizeSourceField(q, 'analysisSource');
+
     if (!q.content) return null; // 没有题干的散行直接丢弃
     return q;
+}
+
+// 来源标注标准化:'ai'(🤖 AI 生成,未经权威核验)/ 'manual'(人工录入即已核验)/ null(材料原文,缺省)。
+// 关键约束:仅当调用方已显式带该键时才写回,因此导入材料这条老路径不会凭空多出新键
+// (旧数据无此字段 → 字段缺失,语义等价于 null;不触发数据格式迁移)。
+function normalizeSourceField(q, key) {
+    if (!(key in q)) return;
+    q[key] = q[key] === 'ai' || q[key] === 'manual' ? q[key] : null;
 }
 
 // 查重指纹：题干（去空白）+ 全部选项文本。同一题重新导入（即使改了答案）会被识别为重复；

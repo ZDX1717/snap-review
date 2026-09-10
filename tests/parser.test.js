@@ -70,6 +70,31 @@ test('家族D:判断题自动配 A正确/B错误', () => {
     assert.deepStrictEqual(q.options, { A: '正确', B: '错误' });
 });
 
+test('答案/解析来源标注:ai|manual 保留,非法值归 null,材料原文路径不产生新键', () => {
+    const stem = '1. 测试题 A.甲 B.乙 答案：A';
+    // 材料原文(旧数据形态):不得凭空多出字段 —— 字段缺失即等价 null,不触发数据格式迁移
+    assert.strictEqual('answerSource' in P(stem)[0], false, '导入材料路径不应产生 answerSource 键');
+    assert.strictEqual('analysisSource' in P(stem)[0], false, '导入材料路径不应产生 analysisSource 键');
+
+    // 显式标注:保留
+    const ai = finalizeQuestion({ content: '测试题', answer: 'A', options: { A: '甲', B: '乙' }, answerSource: 'ai', analysisSource: 'ai' });
+    assert.strictEqual(ai.answerSource, 'ai');
+    assert.strictEqual(ai.analysisSource, 'ai');
+
+    // 人工录入即已核验,撤 🤖 标
+    assert.strictEqual(finalizeQuestion({ content: '测试题', answer: 'A', options: { A: '甲' }, answerSource: 'manual' }).answerSource, 'manual');
+
+    // 非法值(含 '', undefined, 任意字符串)一律归 null,不污染数据
+    for (const bad of ['', 'guessed', 'AI', 'ai ', 0, true]) {
+        const q = finalizeQuestion({ content: '测试题', answer: 'A', options: { A: '甲' }, answerSource: bad });
+        assert.strictEqual(q.answerSource, null, `非法值 ${JSON.stringify(bad)} 应归 null`);
+    }
+
+    // 归 null 后仍须幂等(重复 finalize 不改变结果)
+    const once = finalizeQuestion({ content: '测试题', answer: 'A', options: { A: '甲' }, answerSource: 'guessed' });
+    assert.strictEqual(JSON.stringify(finalizeQuestion(once)), JSON.stringify(once));
+});
+
 test('finalizeQuestion 幂等 + 缺答案保留进预览', () => {
     const before = JSON.stringify(P(`1. 测试 A.1 B.2 答案：B`)[0]);
     const again = JSON.stringify(finalizeQuestion(P(`1. 测试 A.1 B.2 答案：B`)[0]));
