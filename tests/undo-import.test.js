@@ -73,16 +73,16 @@ console.log('== 覆盖前快照与恢复 ==');
     elements['preview-overwrite'].checked = true;
     run('commitPreviewImport()');
 
-    test('覆盖导入成功且自动生成覆盖前快照', () => {
+    test('覆盖导入成功且自动存"覆盖导入前"版本', () => {
         assert.strictEqual(run(`questionBanks['英语'].length`), 1);
         assert.strictEqual(run(`questionBanks['英语'][0].content`), 'REPLACED');
-        const snap = JSON.parse(store.get('overwriteSnapshot'));
-        assert.strictEqual(snap.bank, '英语');
-        assert.strictEqual(snap.questions.length, 2);
+        const versions = JSON.parse(store.get('bankVersions'));
+        assert.strictEqual(versions['英语'][0].action, '覆盖导入前');
+        assert.strictEqual(versions['英语'][0].questions.length, 2);
     });
 
-    test('恢复覆盖前快照:题库还原,快照清除', () => {
-        run('restoreOverwriteSnapshot()');
+    test('恢复此版本:题库还原,当前内容先自动存版', () => {
+        run(`restoreBankVersion('英语', 0)`);
         assert.strictEqual(run(`questionBanks['英语'].length`), 2);
         assert.strictEqual(run(`questionBanks['英语'][0].content`), 'OLD1');
         assert.strictEqual(store.get('overwriteSnapshot'), undefined);

@@ -255,3 +255,49 @@ export function restoreRecycledBank(name) {
     saveRecycledBanks(bin);
     return pkg;
 }
+
+// ==================== 库级版本快照(P0-1.11:破坏性操作自动存版,每库 3 版全站 10 版) ====================
+
+export function loadBankVersions() {
+    try {
+        const obj = JSON.parse(localStorage.getItem('bankVersions') || '{}');
+        return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+export function saveBankVersions(obj) {
+    try {
+        localStorage.setItem('bankVersions', JSON.stringify(obj || {}));
+    } catch (e) { /* 超容量:版本不入盘 */ }
+}
+
+// 存版:每库保留 3 版;全站超 10 版时按时间 LRU 淘汰最旧
+export function pushBankVersion(name, action, questions) {
+    const all = loadBankVersions();
+    const time = new Date().toISOString();
+    const entry = { time, action, questions: JSON.parse(JSON.stringify(questions || [])) };
+    const list = all[name] || [];
+    list.push(entry);
+    while (list.length > 3) list.shift();
+    all[name] = list;
+    // 全站 LRU(排除刚存的那条)
+    const flat = [];
+    Object.entries(all).forEach(([bank, versions]) => {
+        versions.forEach(v => { if (!(v === entry && bank === name)) flat.push([bank, v]); });
+    });
+    flat.sort((a, b) => (b[1].time || '').localeCompare(a[1].time || ''));
+    let overflow = flat.length + 1 - 10;
+    if (overflow > 0) {
+        for (const [bank, v] of flat) {
+            if (overflow <= 0) break;
+            const versions = all[bank];
+            const idx = versions.indexOf(v);
+            if (idx !== -1) { versions.splice(idx, 1); overflow--; }
+            if (versions.length === 0) delete all[bank];
+        }
+    }
+    saveBankVersions(all);
+    return entry;
+}

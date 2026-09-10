@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey } from './parser.js';
-import { saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportBatch, saveOverwriteSnapshot, loadOverwriteSnapshot, clearOverwriteSnapshot } from './storage.js';
+import { saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportBatch, loadOverwriteSnapshot, clearOverwriteSnapshot, loadBankVersions, pushBankVersion } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
 import { OFFICIAL_PROMPT, buildCopyText, copyText } from './prompt.js';
@@ -826,7 +826,7 @@ export function commitPreviewImport() {
     if (overwrite) {
         // 覆盖前自动快照,支持"恢复覆盖前快照"(消灭"此操作不可恢复")
         if (state.questionBanks[targetName].length > 0) {
-            saveOverwriteSnapshot(targetName, JSON.parse(JSON.stringify(state.questionBanks[targetName])));
+            pushBankVersion(targetName, '覆盖导入前', state.questionBanks[targetName]);
         }
         state.questionBanks[targetName] = finalItems;
     } else {
@@ -1067,6 +1067,43 @@ export function deleteBank(bankName) {
     alert(`题库"${bankName}"已移入回收站(可恢复)`);
 }
 
+// ==================== 库级版本快照 UI(P0-1.11) ====================
+
+function renderVersionsForBank(bankName) {
+    const versions = (loadBankVersions()[bankName] || []).slice().reverse();  // 新的在上
+    if (versions.length === 0) return null;
+    const wrap = document.createElement('div');
+    wrap.className = 'bank-versions-panel';
+    const head = document.createElement('h4');
+    head.className = 'bank-panel-title';
+    head.textContent = `🕘 版本(${versions.length})`;
+    wrap.appendChild(head);
+    versions.forEach(v => {
+        const item = document.createElement('div');
+        item.className = 'version-item';
+        const when = new Date(v.time);
+        const info = document.createElement('span');
+        info.textContent = `${v.action} · ${when.getMonth() + 1}/${when.getDate()} ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')} · ${(v.questions || []).length} 题`;
+        item.appendChild(info);
+        const restoreBtn = document.createElement('button');
+        restoreBtn.className = 'action-btn small';
+        restoreBtn.textContent = '恢复此版';
+        restoreBtn.addEventListener('click', () => {
+            const current = state.questionBanks[bankName] || [];
+            if (confirm(`将"${bankName}"恢复到「${v.action}」版本?当前内容会先自动存为新版本。`)) {
+                pushBankVersion(bankName, '恢复前自动存', current);
+                state.questionBanks[bankName] = JSON.parse(JSON.stringify(v.questions));
+                saveToLocalStorage();
+                refreshQuestionBankView();
+                updateBanksList();
+            }
+        });
+        item.appendChild(restoreBtn);
+        wrap.appendChild(item);
+    });
+    return wrap;
+}
+
 // ==================== 回收站 UI(P0-1.10) ====================
 
 export function renderRecycleBin() {
@@ -1105,6 +1142,20 @@ export function renderRecycleBin() {
         item.appendChild(purgeBtn);
         list.appendChild(item);
     });
+}
+
+export function restoreBankVersion(name, index) {
+    const versions = loadBankVersions()[name] || [];
+    const v = versions[index];
+    if (!v) return false;
+    pushBankVersion(name, '恢复前自动存', state.questionBanks[name] || []);
+    state.questionBanks[name] = JSON.parse(JSON.stringify(v.questions));
+    // 先对齐当前视图引用,再落盘(否则旧引用会把恢复结果覆盖回去)
+    if (state.currentBankName === name) state.questionBank = state.questionBanks[name];
+    saveToLocalStorage();
+    refreshQuestionBankView();
+    updateBanksList();
+    return true;
 }
 
 export function recycleBankEntry(name, pkg) {
@@ -1170,6 +1221,7 @@ export function exportAllBanks() {
 // 题库一键去重：按"题干+选项"指纹清理重复题（保留最早导入的版本）
 export function dedupBank(bankName) {
     const questions = state.questionBanks[bankName] || [];
+    pushBankVersion(bankName, '去重前', questions);
     const seen = new Set();
     const kept = [];
     questions.forEach(q => {
@@ -1702,12 +1754,14 @@ export function updateBanksList() {
 
         banksList.appendChild(bankItem);
 
-        // 内嵌手风琴:错题(遮挡式)+ 收藏
+        // 内嵌手风琴:错题(遮挡式)+ 收藏 + 版本
         if (state.expandedBanks[bankName]) {
             const errPanel = renderErrorsForBank(bankName);
             if (errPanel) banksList.appendChild(errPanel);
             const favPanel = renderFavoritesForBank(bankName);
             if (favPanel) banksList.appendChild(favPanel);
+            const verPanel = renderVersionsForBank(bankName);
+            if (verPanel) banksList.appendChild(verPanel);
         }
     });
 

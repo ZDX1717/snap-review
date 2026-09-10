@@ -7,7 +7,7 @@ import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, toggleAllBanks, updateErrorStreak, updateErrorsList, updateToggleAllBanksLabel } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
 import { backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getScopeSelection, nextQuestion, prevQuestion, renderAnswerReview, reviewErrors, showQuizResult, showQuizStatus, showSection, startQuiz, startReviewSession, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton, updateScopeSummary } from './quiz.js';
-import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback, cancelPreviewAi, rescueAiOrganize, updateAiSettingsBadge, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, clearPasteInput, editorHistClick, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, togglePromptContent, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks, renderErrorsForBank, renderRecycleBin, restoreRecycled, recycleBankEntry } from './bank.js';
+import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback, cancelPreviewAi, rescueAiOrganize, updateAiSettingsBadge, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, clearPasteInput, editorHistClick, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, togglePromptContent, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks, renderErrorsForBank, renderRecycleBin, restoreRecycled, recycleBankEntry, restoreBankVersion } from './bank.js';
 
 // Zquiz · 期末周刷题 —— 应用装配入口
 // 依赖方向:main → 业务模块(quiz/errorbook/favorites/bank/dom)→ parser/storage/state。
@@ -95,7 +95,6 @@ const promptToggleBtn = document.getElementById('prompt-toggle-btn');
 const viewAllBtn = document.getElementById('view-all-btn');
 const viewWarnedBtn = document.getElementById('view-warned-btn');
 const undoImportBtn = document.getElementById('undo-import-btn');
-const restoreSnapshotBtn = document.getElementById('restore-snapshot-btn');
 const previewSkipDupes = document.getElementById('preview-skip-dupes');
 const previewList = document.getElementById('preview-list');
 const previewTargetBankSelect = document.getElementById('preview-target-bank');
@@ -294,7 +293,6 @@ function setupEventListeners() {
 
     // 导入撤销与覆盖快照恢复
     undoImportBtn.addEventListener('click', undoLastImport);
-    restoreSnapshotBtn.addEventListener('click', restoreOverwriteSnapshot);
     previewConfirmBtn.addEventListener('click', commitPreviewImport);
 
     // AI 设置与预览兜底(0.9.0)
@@ -456,7 +454,7 @@ if (typeof window === 'undefined') {
         currentEditBank,
         dedupBank,
         deleteBank,
-        restoreOverwriteSnapshot,
+        restoreBankVersion,
         deleteError,
         displayQuestion,
         undoLastImport,
@@ -540,6 +538,7 @@ if (typeof window === 'undefined') {
         renderErrorsForBank,
         restoreRecycled,
         recycleBankEntry,
+        restoreBankVersion,
         updateFavoriteButton,
         updateFavoritesList,
         updatePreviewSummary,
