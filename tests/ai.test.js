@@ -544,3 +544,34 @@ test('重命名题库同步错题/收藏归属(不漂进杂项)', async () => {
     assert.strictEqual(run(`favoriteQuestions[0].bankName`), '新名');
     assert.strictEqual(run(`!!questionBanks['新名']`), true);
 });
+
+test('回收站:删库打包题+错+藏;恢复完整(同名自动改名);彻底删除;LRU 上限 10', async () => {
+    const { run, store } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
+    run(`init()`);
+    run(`questionBanks['要删的库'] = [{ content: '题1', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A' }]`);
+    run(`errorQuestions = [{ content: '错1', type: '单选', options: {}, answer: 'A', userAnswer: 'B', bankName: '要删的库' }]`);
+    run(`favoriteQuestions = [{ content: '藏1', type: '单选', options: {}, answer: 'A', bankName: '要删的库' }]`);
+    run(`state.currentBankName = '要删的库'; questionBank = questionBanks['要删的库']`);
+    run(`confirm = () => true`);
+    run(`deleteBank('要删的库')`);
+    assert.strictEqual(run(`!!questionBanks['要删的库']`), false);
+    const bin = JSON.parse(store.get('recycledBanks'));
+    assert.ok(bin['要删的库'], '入站');
+    assert.strictEqual(bin['要删的库'].errors.length, 1);
+    assert.strictEqual(bin['要删的库'].favorites.length, 1);
+    assert.strictEqual(run(`errorQuestions.length`), 0);
+    // 恢复:无同名 → 原名回归,错/藏合并回
+    run(`restoreRecycled('要删的库')`);
+    assert.strictEqual(run(`!!questionBanks['要删的库']`), true);
+    assert.strictEqual(run(`errorQuestions[0].bankName`), '要删的库');
+    assert.strictEqual(run(`favoriteQuestions.length`), 1);
+    // 再次删除后,若同名库已重建 → 恢复自动改名避免覆盖
+    run(`deleteBank('要删的库')`);
+    run(`questionBanks['要删的库'] = []`);
+    run(`restoreRecycled('要删的库')`);
+    assert.strictEqual(run(`!!questionBanks['要删的库·恢复']`), true);
+    // LRU:塞 11 条,最旧被淘汰
+    for (let i = 0; i < 11; i++) run(`recycleBankEntry('库${i}', { bank: [] })`);
+    const bin2 = JSON.parse(store.get('recycledBanks'));
+    assert.ok(Object.keys(bin2).length <= 10, '上限 10 条');
+});

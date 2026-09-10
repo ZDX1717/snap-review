@@ -6,7 +6,7 @@ import { docxToText } from './docx.js';
 import { OFFICIAL_PROMPT, buildCopyText, copyText } from './prompt.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
 import { aiConfigReady, aiFixQuestions, aiFormatMaterial, aiMatchKey, aiDiffParts, buildAiNotes, getProvider, normalizeAiConfig, testConnection } from './ai.js';
-import { isAiTested, loadAiConfig, markAiTested, saveAiConfig, recordAiUsage } from './storage.js';
+import { isAiTested, loadAiConfig, loadRecycledBanks, markAiTested, purgeRecycledBank, recycleBank, restoreRecycledBank, saveAiConfig, saveRecycledBanks, recordAiUsage } from './storage.js';
 
 // 本次预览的来源标签(撤销记录展示用),由导入入口设置
 let previewSourceLabel = '导入';
@@ -1032,9 +1032,18 @@ export function renameBank() {
 
 // 删除题库
 export function deleteBank(bankName) {
-    if (!confirm(`确定要删除题库"${bankName}"吗？此操作不可恢复！`)) {
+    if (!confirm(`确定删除题库"${bankName}"吗？\n该库的错题与收藏将一并移入回收站,可随时恢复。`)) {
         return;
     }
+
+    // 整体打包入回收站(题 + 该库错题 + 该库收藏)
+    recycleBank(bankName, {
+        bank: state.questionBanks[bankName] || [],
+        errors: state.errorQuestions.filter(q => (q.bankName || '未知题库') === bankName),
+        favorites: state.favoriteQuestions.filter(q => (q.bankName || '未知题库') === bankName),
+    });
+    state.errorQuestions = state.errorQuestions.filter(q => (q.bankName || '未知题库') !== bankName);
+    state.favoriteQuestions = state.favoriteQuestions.filter(q => (q.bankName || '未知题库') !== bankName);
 
     if (state.currentBankName === bankName) {
         const bankNames = Object.keys(state.questionBanks).filter(name => name !== bankName);
@@ -1055,7 +1064,66 @@ export function deleteBank(bankName) {
     updateBankSelect();
     updateBanksList();
 
-    alert('题库删除成功');
+    alert(`题库"${bankName}"已移入回收站(可恢复)`);
+}
+
+// ==================== 回收站 UI(P0-1.10) ====================
+
+export function renderRecycleBin() {
+    const list = document.getElementById('recycle-list');
+    const binWrap = document.getElementById('recycle-bin');
+    if (!list || !binWrap) return;
+    const bin = loadRecycledBanks();
+    const entries = Object.entries(bin).sort((a, b) => (b[1].deletedAt || '').localeCompare(a[1].deletedAt || ''));
+    binWrap.querySelector('summary').textContent = `🗑 回收站 (${entries.length})`;
+    list.innerHTML = '';
+    if (entries.length === 0) {
+        list.innerHTML = '<p class="empty-message">回收站为空</p>';
+        return;
+    }
+    entries.forEach(([name, pkg]) => {
+        const item = document.createElement('div');
+        item.className = 'recycle-item';
+        const when = new Date(pkg.deletedAt);
+        const info = document.createElement('span');
+        info.textContent = `${name} · ${((pkg.bank) || []).length} 题 · ${when.getMonth() + 1}/${when.getDate()} 删除`;
+        item.appendChild(info);
+        const restoreBtn = document.createElement('button');
+        restoreBtn.className = 'action-btn small';
+        restoreBtn.textContent = '恢复';
+        restoreBtn.addEventListener('click', () => restoreRecycled(name));
+        const purgeBtn = document.createElement('button');
+        purgeBtn.className = 'action-btn small secondary';
+        purgeBtn.textContent = '彻底删除';
+        purgeBtn.addEventListener('click', () => {
+            if (confirm(`彻底删除"${name}"?此操作不可恢复!`)) {
+                purgeRecycledBank(name);
+                renderRecycleBin();
+            }
+        });
+        item.appendChild(restoreBtn);
+        item.appendChild(purgeBtn);
+        list.appendChild(item);
+    });
+}
+
+export function recycleBankEntry(name, pkg) {
+    return recycleBank(name, pkg);
+}
+
+export function restoreRecycled(name) {
+    let target = name;
+    if (state.questionBanks[target]) target = `${name}·恢复`;
+    const pkg = restoreRecycledBank(name);
+    if (!pkg) return;
+    state.questionBanks[target] = pkg.bank || [];
+    (pkg.errors || []).forEach(e => { e.bankName = target; state.errorQuestions.push(e); });
+    (pkg.favorites || []).forEach(f => { f.bankName = target; state.favoriteQuestions.push(f); });
+    saveToLocalStorage();
+    updateBankSelect();
+    updateBanksList();
+    renderRecycleBin();
+    alert(`已恢复为"${target}"`);
 }
 
 

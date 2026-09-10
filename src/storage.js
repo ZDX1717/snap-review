@@ -213,3 +213,45 @@ export function saveThemeSetting(v) {
         localStorage.setItem('themeSetting', ['auto', 'light', 'dark'].includes(v) ? v : 'auto');
     } catch (e) { /* 静默 */ }
 }
+
+// ==================== 回收站(P0-1.10:删除题库整体打包,上限 10 条 LRU) ====================
+
+export function loadRecycledBanks() {
+    try {
+        const obj = JSON.parse(localStorage.getItem('recycledBanks') || '{}');
+        return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+export function saveRecycledBanks(obj) {
+    try {
+        localStorage.setItem('recycledBanks', JSON.stringify(obj || {}));
+    } catch (e) { /* 超容量等异常:保留内存态,本次不入站 */ }
+}
+
+// 入站 + LRU 淘汰(按 deletedAt 保留最近 10 条)
+export function recycleBank(name, pkg) {
+    const bin = loadRecycledBanks();
+    bin[name] = { ...pkg, deletedAt: new Date().toISOString() };
+    const entries = Object.entries(bin).sort((a, b) => (b[1].deletedAt || '').localeCompare(a[1].deletedAt || ''));
+    while (entries.length > 10) { const [old] = entries.pop(); delete bin[old]; }
+    saveRecycledBanks(bin);
+    return bin;
+}
+
+export function purgeRecycledBank(name) {
+    const bin = loadRecycledBanks();
+    delete bin[name];
+    saveRecycledBanks(bin);
+}
+
+export function restoreRecycledBank(name) {
+    const bin = loadRecycledBanks();
+    const pkg = bin[name];
+    if (!pkg) return null;
+    delete bin[name];
+    saveRecycledBanks(bin);
+    return pkg;
+}

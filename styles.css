@@ -2128,3 +2128,16 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
         margin-top: 16px;
     }
 }
+
+/* 回收站条目 */
+.recycle-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--c-border-light);
+    font-size: 14px;
+    color: var(--c-text-secondary);
+}
+.recycle-item span { flex: 1; }

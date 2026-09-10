@@ -3,7 +3,7 @@ import { normalizeAnswerString, shuffleArray } from './parser.js';
 import { showModal } from './dom.js';
 import { addToErrorBook, updateErrorStreak, updateErrorsList } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
-import { updateBanksList, updateLastImportInfo } from './bank.js';
+import { updateBanksList, updateLastImportInfo, renderRecycleBin } from './bank.js';
 
 // ==================== quiz.js ====================
 // 自动拆分自 main.js;依赖方向见各 import。
@@ -633,6 +633,7 @@ export function showSection(sectionName) {
         updateErrorsList();
         updateFavoritesList();
         updateLastImportInfo();
+        renderRecycleBin();
     }
 }
 
