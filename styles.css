@@ -10,10 +10,10 @@
     --c-text-faint: #adb5bd;
     --c-border: #dee2e6;
     --c-border-light: #e9ecef;
-    --c-primary: #4a6cf7;
-    --c-primary-deep: #3a5bd9;
-    --c-primary-alt: #4a6fa5;
-    --c-primary-alt-deep: #3a5bd9;
+    --c-primary: #2563eb;
+    --c-primary-deep: #1d4ed8;
+    --c-primary-alt: #2563eb;
+    --c-primary-alt-deep: #1d4ed8;
     --c-success: #28a745;
     --c-success-deep: #2e9e5b;
     --c-success-bg: #d4edda;
@@ -1842,7 +1842,8 @@ h3 {
     align-items: center;
     gap: 8px;
 }
-.nav-ico { font-size: 14px; line-height: 1; }
+.nav-ico { display: inline-flex; }
+span.nav-ico svg.nav-ico, svg.nav-ico { width: 16px; height: 16px; display: block; }
 
 @media (max-width: 768px) {
     /* 底部固定 tab 栏:拇指区操作,内容区留出等高空间 */
@@ -1865,7 +1866,7 @@ h3 {
         font-size: 12px;
         border-radius: 6px;
     }
-    .nav-ico { font-size: 20px; }
+    svg.nav-ico { width: 22px; height: 22px; }
     .nav-btn.active {
         color: var(--c-primary);
         background: var(--c-surface);
@@ -1892,10 +1893,10 @@ html[data-theme="dark"] {
     --c-text-faint: #868e96;
     --c-border: #3f444b;
     --c-border-light: #2c3138;
-    --c-primary: #6b8afd;
-    --c-primary-deep: #89a2ff;
-    --c-primary-alt: #6b8afd;
-    --c-primary-alt-deep: #89a2ff;
+    --c-primary: #3b82f6;
+    --c-primary-deep: #60a5fa;
+    --c-primary-alt: #3b82f6;
+    --c-primary-alt-deep: #60a5fa;
     --c-success: #3fbf6a;
     --c-success-deep: #4cd07d;
     --c-success-bg: #1d3a26;
