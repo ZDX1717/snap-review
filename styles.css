@@ -50,14 +50,14 @@ body {
     line-height: 1.6;
     color: var(--c-text);
     background-color: var(--c-bg);
-    padding: 20px;
+    padding: 24px;
 }
 
 .container {
     max-width: 1000px;
     margin: 0 auto;
     background-color: var(--c-surface);
-    border-radius: 8px;
+    border-radius: 6px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     overflow: hidden;
 }
@@ -65,12 +65,12 @@ body {
 header {
     background-color: var(--c-primary);
     color: #fff;
-    padding: 20px;
+    padding: 24px;
     text-align: center;
 }
 
 header h1 {
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 500;
 }
 
@@ -82,7 +82,7 @@ nav {
 
 .nav-btn {
     flex: 1;
-    padding: 15px;
+    padding: 16px;
     border: none;
     background: none;
     cursor: pointer;
@@ -102,7 +102,7 @@ nav {
 }
 
 main {
-    padding: 30px;
+    padding: 32px;
 }
 
 .section {
@@ -114,30 +114,30 @@ main {
 }
 
 h2 {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
     color: var(--c-text);
     font-size: 24px;
 }
 
 h3 {
-    margin-bottom: 15px;
+    margin-bottom: 16px;
     color: var(--c-text-secondary);
-    font-size: 18px;
+    font-size: 16px;
 }
 
 .info-card {
     background-color: var(--c-surface-alt);
     border-radius: 6px;
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 24px;
+    margin-bottom: 24px;
 }
 
 .info-card ul {
-    margin-left: 20px;
+    margin-left: 24px;
 }
 
 .info-card li {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 #file-input {
@@ -148,8 +148,8 @@ h3 {
     background-color: var(--c-primary);
     color: white;
     border: none;
-    padding: 10px 20px;
-    border-radius: 4px;
+    padding: 8px 24px;
+    border-radius: 6px;
     cursor: pointer;
     font-size: 16px;
     transition: background-color 0.3s;
@@ -160,19 +160,19 @@ h3 {
 }
 
 #file-name {
-    margin-top: 10px;
+    margin-top: 8px;
     color: var(--c-text-muted);
 }
 
 .import-options, .quiz-options {
     background-color: var(--c-surface-alt);
     border-radius: 6px;
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 24px;
+    margin-bottom: 24px;
 }
 
 .option-group {
-    margin-bottom: 15px;
+    margin-bottom: 16px;
 }
 
 .option-group label {
@@ -186,7 +186,7 @@ h3 {
     color: white;
     border: none;
     padding: 12px 24px;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
     font-size: 16px;
     transition: background-color 0.3s;
@@ -205,9 +205,9 @@ h3 {
 }
 
 .status-message {
-    margin-top: 15px;
-    padding: 10px 15px;
-    border-radius: 4px;
+    margin-top: 16px;
+    padding: 8px 16px;
+    border-radius: 6px;
     display: none;
 }
 
@@ -226,15 +226,15 @@ h3 {
 .quiz-container {
     background-color: var(--c-surface-alt);
     border-radius: 6px;
-    padding: 20px;
-    margin-top: 20px;
+    padding: 24px;
+    margin-top: 24px;
 }
 
 .question-header {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 15px;
+    margin-bottom: 16px;
     font-weight: 500;
     color: var(--c-text-secondary);
 }
@@ -245,28 +245,28 @@ h3 {
 }
 
 .question-content {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
 }
 
 .question-content h3 {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     color: var(--c-text);
 }
 
 .explanation {
     color: var(--c-success);
     font-style: italic;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .options-container {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
 }
 
 .option-item {
-    margin-bottom: 15px;
-    padding: 10px;
-    border-radius: 4px;
+    margin-bottom: 16px;
+    padding: 8px;
+    border-radius: 6px;
     transition: background-color 0.3s;
 }
 
@@ -276,7 +276,7 @@ h3 {
 
 .option-item input[type="radio"],
 .option-item input[type="checkbox"] {
-    margin-right: 10px;
+    margin-right: 8px;
 }
 
 .option-label {
@@ -291,24 +291,24 @@ h3 {
 .option-explanation {
     color: #fd7e14;
     font-style: italic;
-    margin-top: 5px;
+    margin-top: 4px;
     padding-left: 25px;
 }
 
 .answer-feedback {
     background-color: var(--c-surface-alt);
-    border-radius: 4px;
-    padding: 15px;
-    margin-bottom: 20px;
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 24px;
 }
 
 .answer-feedback p {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .quiz-controls {
     display: flex;
-    gap: 10px;
+    gap: 8px;
 }
 
 .quiz-controls button {
@@ -322,12 +322,12 @@ h3 {
 .quiz-result {
     background-color: var(--c-surface-alt);
     border-radius: 6px;
-    padding: 20px;
-    margin-top: 20px;
+    padding: 24px;
+    margin-top: 24px;
 }
 
 .quiz-result p {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .quiz-result span {
@@ -337,8 +337,8 @@ h3 {
 
 .error-actions {
     display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
+    gap: 8px;
+    margin-bottom: 24px;
 }
 
 .error-actions button {
@@ -348,7 +348,7 @@ h3 {
 .errors-list {
     background-color: var(--c-surface-alt);
     border-radius: 6px;
-    padding: 20px;
+    padding: 24px;
 }
 
 .empty-message {
@@ -365,14 +365,14 @@ h3 {
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     background-color: var(--c-surface-alt);
     border: 1px solid var(--c-border-light);
     border-left: 4px solid var(--c-primary);
     border-radius: 6px;
-    padding: 12px 15px;
+    padding: 12px 16px;
     cursor: pointer;
-    font-size: 15px;
+    font-size: 14px;
     color: var(--c-text);
     text-align: left;
     transition: background-color 0.2s;
@@ -402,14 +402,14 @@ h3 {
     font-size: 12px;
     background-color: var(--c-border-light);
     color: var(--c-text-secondary);
-    padding: 2px 10px;
+    padding: 2px 8px;
     border-radius: 10px;
 }
 
 .bank-errors {
     background-color: var(--c-surface-alt);
-    border-radius: 4px;
-    padding: 10px;
+    border-radius: 6px;
+    padding: 8px;
     margin-top: 8px;
 }
 
@@ -419,26 +419,26 @@ h3 {
 
 .error-item {
     background-color: var(--c-surface);
-    border-radius: 4px;
-    padding: 15px;
-    margin-bottom: 15px;
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 16px;
     border-left: 4px solid var(--c-danger);
 }
 
 .error-item h4 {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     color: var(--c-text);
 }
 
 .error-item p {
-    margin-bottom: 5px;
+    margin-bottom: 4px;
 }
 
 .error-options {
     background-color: var(--c-surface-alt);
-    border-radius: 4px;
-    padding: 15px;
-    margin: 15px 0;
+    border-radius: 6px;
+    padding: 16px;
+    margin: 16px 0;
 }
 
 .error-option {
@@ -447,7 +447,7 @@ h3 {
     margin-bottom: 8px;
     padding: 8px;
     background-color: var(--c-surface);
-    border-radius: 4px;
+    border-radius: 6px;
 }
 
 .error-option:last-child {
@@ -480,10 +480,10 @@ h3 {
     background-color: var(--c-danger);
     color: white;
     border: none;
-    padding: 5px 10px;
-    border-radius: 4px;
+    padding: 4px 8px;
+    border-radius: 6px;
     cursor: pointer;
-    margin-top: 10px;
+    margin-top: 8px;
 }
 
 .error-item .delete-btn:hover {
@@ -501,7 +501,7 @@ h3 {
     
     .nav-btn {
         flex: 1 1 50%;
-        padding: 10px;
+        padding: 8px;
         font-size: 14px;
     }
     
@@ -518,21 +518,21 @@ h3 {
 .manage-layout {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-top: 20px;
+    gap: 24px;
+    margin-top: 24px;
 }
 
 .bank-list-panel {
     background-color: var(--c-surface-alt);
     border-radius: 6px;
-    padding: 20px;
+    padding: 24px;
 }
 
 .panel-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
 }
 
 .panel-header h3 {
@@ -552,9 +552,9 @@ h3 {
 
 .bank-item {
     background-color: var(--c-surface);
-    border-radius: 4px;
-    padding: 15px;
-    margin-bottom: 15px;
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 16px;
     border-left: 4px solid var(--c-primary);
     display: flex;
     justify-content: space-between;
@@ -580,31 +580,31 @@ h3 {
 
 .bank-item .bank-actions button {
     flex: none;
-    padding: 6px 12px;
-    font-size: 13px;
+    padding: 8px 12px;
+    font-size: 14px;
 }
 
 .bank-operations-panel {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 24px;
 }
 
 .operation-card {
     background-color: var(--c-surface-alt);
     border-radius: 6px;
-    padding: 20px;
+    padding: 24px;
 }
 
 .operation-card h3 {
-    margin-bottom: 15px;
+    margin-bottom: 16px;
     color: var(--c-text);
 }
 
 .export-options {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 
 .export-options button {
@@ -627,20 +627,20 @@ h3 {
 
 .modal-content {
     background-color: var(--c-surface);
-    border-radius: 8px;
-    padding: 30px;
+    border-radius: 6px;
+    padding: 32px;
     max-width: 500px;
     width: 90%;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
 .modal-content h3 {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
     color: var(--c-text);
 }
 
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
 }
 
 .form-group label {
@@ -652,9 +652,9 @@ h3 {
 
 .form-input {
     width: 100%;
-    padding: 10px;
+    padding: 8px;
     border: 1px solid #ced4da;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 16px;
     font-family: inherit;
 }
@@ -667,7 +667,7 @@ h3 {
 
 .modal-actions {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     justify-content: flex-end;
 }
 
@@ -682,7 +682,7 @@ h3 {
     }
 
     .bank-item .bank-actions {
-        margin-top: 15px;
+        margin-top: 16px;
         width: 100%;
         flex-wrap: wrap;
     }
@@ -695,7 +695,7 @@ h3 {
 /* ==================== 粘贴导入 + 导入预览向导（批次1） ==================== */
 
 .import-hint {
-    font-size: 13px;
+    font-size: 14px;
     color: var(--c-text-muted);
     margin-bottom: 12px;
     line-height: 1.6;
@@ -706,7 +706,7 @@ h3 {
     box-sizing: border-box;
     border: 1px solid var(--c-border);
     border-radius: 6px;
-    padding: 10px;
+    padding: 8px;
     font-size: 16px;   /* >=16px:避免 iOS 聚焦自动放大 */
     line-height: 1.7;
     resize: vertical;
@@ -723,9 +723,9 @@ h3 {
 }
 
 .paste-actions {
-    margin-top: 10px;
+    margin-top: 8px;
     display: flex;
-    gap: 10px;
+    gap: 8px;
 }
 
 .modal-lg {
@@ -740,16 +740,16 @@ h3 {
 
 .preview-toolbar {
     display: flex;
-    gap: 20px;
-    margin-bottom: 10px;
-    font-size: 13px;
+    gap: 24px;
+    margin-bottom: 8px;
+    font-size: 14px;
     color: var(--c-text-secondary);
 }
 
 .inline-label {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     cursor: pointer;
 }
 
@@ -766,7 +766,7 @@ h3 {
     background-color: var(--c-surface);
     border: 1px solid var(--c-border-light);
     border-radius: 6px;
-    padding: 10px 12px;
+    padding: 8px 12px;
     margin-bottom: 8px;
 }
 
@@ -785,12 +785,12 @@ h3 {
 .preview-num {
     font-weight: bold;
     color: var(--c-primary-alt);
-    font-size: 13px;
+    font-size: 14px;
 }
 
 .badge {
     display: inline-block;
-    font-size: 11px;
+    font-size: 12px;
     padding: 2px 8px;
     border-radius: 10px;
     background: var(--c-border-light);
@@ -813,9 +813,9 @@ h3 {
     width: 100%;
     box-sizing: border-box;
     border: 1px solid var(--c-border-light);
-    border-radius: 4px;
-    padding: 6px 8px;
-    font-size: 13px;
+    border-radius: 6px;
+    padding: 8px 8px;
+    font-size: 14px;
     line-height: 1.5;
     font-family: inherit;
     resize: vertical;
@@ -837,7 +837,7 @@ h3 {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 13px;
+    font-size: 14px;
     color: var(--c-text-secondary);
     flex-wrap: wrap;
 }
@@ -845,9 +845,9 @@ h3 {
 .preview-answer {
     width: 90px;
     border: 1px solid var(--c-border);
-    border-radius: 4px;
+    border-radius: 6px;
     padding: 4px 8px;
-    font-size: 13px;
+    font-size: 14px;
 }
 
 .preview-answer:focus {
@@ -868,8 +868,8 @@ h3 {
 .preview-import-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-top: 14px;
+    gap: 8px;
+    margin-top: 16px;
     font-size: 14px;
     color: var(--c-text-secondary);
     flex-wrap: wrap;
@@ -887,8 +887,8 @@ h3 {
 /* ==================== 套题模式 + 答题回顾 ==================== */
 
 .review-toolbar {
-    margin: 10px 0;
-    font-size: 13px;
+    margin: 8px 0;
+    font-size: 14px;
     color: var(--c-text-secondary);
 }
 
@@ -900,14 +900,14 @@ h3 {
     border-radius: 6px;
     padding: 8px;
     background: var(--c-surface-alt);
-    margin-bottom: 14px;
+    margin-bottom: 16px;
 }
 
 .review-item {
     background-color: var(--c-surface);
     border: 1px solid var(--c-border-light);
     border-radius: 6px;
-    padding: 10px 12px;
+    padding: 8px 12px;
     margin-bottom: 8px;
 }
 
@@ -925,13 +925,13 @@ h3 {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
 
 .review-num {
     font-weight: bold;
     color: var(--c-primary-alt);
-    font-size: 13px;
+    font-size: 14px;
 }
 
 .badge.ok-badge {
@@ -950,12 +950,12 @@ h3 {
 .review-options {
     font-size: 12px;
     color: var(--c-text-muted);
-    margin: 6px 0;
+    margin: 8px 0;
     line-height: 1.8;
 }
 
 .review-answers {
-    font-size: 13px;
+    font-size: 14px;
     color: var(--c-text-secondary);
     margin: 4px 0;
 }
@@ -985,32 +985,32 @@ h3 {
 .feature-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-    gap: 14px;
+    gap: 16px;
     margin-bottom: 24px;
 }
 
 .feature-card {
     background-color: var(--c-surface);
     border: 1px solid var(--c-border-light);
-    border-radius: 8px;
-    padding: 16px 18px;
+    border-radius: 6px;
+    padding: 16px 16px;
 }
 
 .feature-card h3 {
-    font-size: 15px;
+    font-size: 14px;
     color: var(--c-text);
     margin-bottom: 8px;
 }
 
 .feature-card p {
-    font-size: 13px;
+    font-size: 14px;
     color: var(--c-text-muted);
     line-height: 1.75;
 }
 
 .quick-start ol {
-    padding-left: 20px;
-    margin-top: 6px;
+    padding-left: 24px;
+    margin-top: 8px;
 }
 
 .quick-start li {
@@ -1026,9 +1026,9 @@ h3 {
     margin-left: auto;
     background: none;
     border: 1px solid var(--c-border);
-    border-radius: 14px;
+    border-radius: 999px;
     padding: 3px 12px;
-    font-size: 13px;
+    font-size: 14px;
     color: var(--c-text-muted);
     cursor: pointer;
     transition: all 0.2s;
@@ -1060,13 +1060,13 @@ h3 {
 
 .error-item .mastery-note {
     font-size: 12px;
-    margin: 6px 0 0;
+    margin: 8px 0 0;
 }
 
 /* ==================== 错题移出规则 + 复习范围 + 题库编辑器 ==================== */
 
 .mastery-config {
-    margin: 10px 0 14px;
+    margin: 8px 0 16px;
     font-size: 14px;
     color: var(--c-text-secondary);
 }
@@ -1074,15 +1074,15 @@ h3 {
 .mastery-config select {
     padding: 4px 8px;
     border: 1px solid var(--c-border);
-    border-radius: 4px;
-    font-size: 13px;
+    border-radius: 6px;
+    font-size: 14px;
 }
 
 .scope-options {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px 18px;
-    margin-top: 6px;
+    gap: 8px 16px;
+    margin-top: 8px;
 }
 
 .scope-summary {
@@ -1095,7 +1095,7 @@ h3 {
 .editor-layout {
     display: grid;
     grid-template-columns: 220px 1fr;
-    gap: 14px;
+    gap: 16px;
     margin-top: 12px;
 }
 
@@ -1112,7 +1112,7 @@ h3 {
     border: 1px solid var(--c-border-light);
     border-radius: 6px;
     background: var(--c-surface-alt);
-    padding: 6px;
+    padding: 8px;
 }
 
 .editor-list-item {
@@ -1121,9 +1121,9 @@ h3 {
     text-align: left;
     background: none;
     border: none;
-    border-radius: 4px;
-    padding: 8px 10px;
-    font-size: 13px;
+    border-radius: 6px;
+    padding: 8px 8px;
+    font-size: 14px;
     color: var(--c-text-secondary);
     cursor: pointer;
     font-family: inherit;
@@ -1152,9 +1152,9 @@ h3 {
     width: 100%;
     box-sizing: border-box;
     border: 1px solid var(--c-border);
-    border-radius: 4px;
-    padding: 6px 8px;
-    font-size: 13px;
+    border-radius: 6px;
+    padding: 8px 8px;
+    font-size: 14px;
     font-family: inherit;
     line-height: 1.5;
 }
@@ -1169,21 +1169,21 @@ h3 {
 .editor-inline-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
 .editor-inline-row select {
     padding: 4px 8px;
     border: 1px solid var(--c-border);
-    border-radius: 4px;
-    font-size: 13px;
+    border-radius: 6px;
+    font-size: 14px;
 }
 
 .editor-option-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
 
 .editor-option-letter {
@@ -1195,19 +1195,19 @@ h3 {
 .editor-option-actions {
     display: flex;
     gap: 8px;
-    margin-top: 6px;
+    margin-top: 8px;
 }
 
 .editor-nav-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin: 14px 0;
+    margin: 16px 0;
     flex-wrap: wrap;
 }
 
 .editor-position {
-    font-size: 13px;
+    font-size: 14px;
     color: var(--c-text-faint);
 }
 
@@ -1219,8 +1219,8 @@ h3 {
 
 .hero-version {
     color: var(--c-text-faint);
-    font-size: 13px;
-    margin: -4px 0 14px;
+    font-size: 14px;
+    margin: -4px 0 16px;
 }
 
 /* ==================== 手机适配补丁(题库管理 + 模态框) ==================== */
@@ -1229,7 +1229,7 @@ h3 {
 .operation-card pre {
     white-space: pre-wrap;
     word-break: break-word;
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 1.65;
     overflow-x: auto;
 }
@@ -1238,8 +1238,8 @@ h3 {
 .undo-actions {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 8px;
+    margin-bottom: 8px;
 }
 .undo-actions .action-btn {
     width: 100%;
@@ -1247,14 +1247,14 @@ h3 {
 
 @media (max-width: 768px) {
     .operation-card {
-        padding: 16px 14px;
+        padding: 16px 16px;
     }
     .panel-header {
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 8px;
     }
     .modal-content {
-        padding: 20px 14px;
+        padding: 24px 16px;
     }
     .modal-actions {
         flex-wrap: wrap;
@@ -1297,7 +1297,7 @@ h3 {
 .quiz-progress {
     height: 6px;
     background: var(--c-border-light);
-    border-radius: 3px;
+    border-radius: 999px;
     overflow: hidden;
     margin-bottom: 12px;
 }
@@ -1309,12 +1309,12 @@ h3 {
 }
 
 .streak-badge {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     color: #b4690e;
     background: #fff4e0;
     border-radius: 12px;
-    padding: 2px 10px;
+    padding: 2px 8px;
 }
 
 /* 选项整行卡片:整行可点,触达 ≥44px */
@@ -1322,8 +1322,8 @@ h3 {
     display: block;
     border: 2px solid var(--c-border-light);
     border-radius: 10px;
-    padding: 12px 14px;
-    margin-bottom: 10px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
     cursor: pointer;
     background-color: var(--c-surface);
     transition: border-color 0.15s, background-color 0.15s;
@@ -1352,9 +1352,9 @@ h3 {
 }
 .option-item label {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: flex-start;
-    font-size: 15px;
+    font-size: 14px;
     line-height: 1.55;
     cursor: pointer;
 }
@@ -1376,7 +1376,7 @@ h3 {
     #prev-question-btn,
     #end-quiz-btn {
         width: 100%;
-        padding: 14px;
+        padding: 16px;
         font-size: 16px;
     }
     .question-header {
@@ -1390,16 +1390,16 @@ h3 {
     background: var(--c-info-bg);
     border: 1px solid var(--c-info-border);
     border-radius: 6px;
-    padding: 12px 14px;
-    margin-bottom: 20px;
+    padding: 12px 16px;
+    margin-bottom: 24px;
 }
 .prompt-guide.hidden {
     display: none;
 }
 .prompt-guide-text {
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.6;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     color: var(--c-text);
 }
 
@@ -1408,8 +1408,8 @@ h3 {
     background: var(--c-info-bg);
     border: 2px solid var(--c-primary-alt);
     border-radius: 10px;
-    padding: 12px 14px;
-    margin-bottom: 14px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
 }
 .prompt-guide-head {
     display: flex;
@@ -1427,24 +1427,24 @@ h3 {
 .prompt-toggle {
     background: none;
     border: 1px solid var(--c-info-border);
-    border-radius: 14px;
-    padding: 3px 10px;
+    border-radius: 999px;
+    padding: 3px 8px;
     font-size: 12px;
     color: var(--c-primary-alt);
     cursor: pointer;
 }
 .prompt-guide-text {
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.6;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     color: var(--c-text-secondary);
 }
 .prompt-guide .action-btn {
     width: 100%;
 }
 .prompt-content {
-    margin-top: 10px;
-    padding: 10px;
+    margin-top: 8px;
+    padding: 8px;
     background-color: var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: 6px;
@@ -1463,8 +1463,8 @@ h3 {
 /* ==================== 文件常驻提示块 + 预览筛选 ==================== */
 .file-notice {
     border-radius: 6px;
-    padding: 10px 12px;
-    font-size: 13px;
+    padding: 8px 12px;
+    font-size: 14px;
     line-height: 1.6;
     margin-bottom: 12px;
 }
@@ -1487,7 +1487,7 @@ h3 {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     flex-wrap: wrap;
 }
 .ai-progress {
@@ -1495,7 +1495,7 @@ h3 {
     min-width: 80px;
     height: 8px;
     background: var(--c-border-light);
-    border-radius: 4px;
+    border-radius: 6px;
     overflow: hidden;
 }
 .ai-progress-fill {
@@ -1540,13 +1540,13 @@ h3 {
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 .card-link {
     background: none;
     border: 1px solid var(--c-border);
-    border-radius: 14px;
-    padding: 3px 10px;
+    border-radius: 999px;
+    padding: 3px 8px;
     font-size: 0.85em;
     color: var(--c-text-secondary);
     cursor: pointer;
@@ -1558,7 +1558,7 @@ h3 {
     font-weight: 600;
 }
 .status-line {
-    margin: 10px 0 4px;
+    margin: 8px 0 4px;
     padding: 8px 12px;
     border-radius: 6px;
     font-size: 0.9em;
@@ -1568,15 +1568,15 @@ h3 {
 .status-line.success { background: var(--c-success-bg); color: var(--c-success-text); }
 .status-line.warning { background: var(--c-warn-bg); color: var(--c-warn-text); }
 .status-line.error   { background: var(--c-danger-bg); color: var(--c-danger-text); }
-.status-line button { margin: 4px 6px 2px 0; }
+.status-line button { margin: 4px 8px 2px 0; }
 .rescue-box {
     margin-top: 12px;
     border: 1px solid var(--c-border-light);
-    border-radius: 8px;
+    border-radius: 6px;
     padding: 8px 12px;
 }
 .rescue-title {
-    margin: 0 0 10px;
+    margin: 0 0 8px;
     font-weight: 700;
     color: var(--c-text);
     font-size: 0.95em;
@@ -1585,18 +1585,18 @@ h3 {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
-    margin-top: 10px;
+    margin-top: 8px;
 }
 @media (max-width: 600px) {
     .rescue-grid { grid-template-columns: 1fr; }
 }
 .rescue-col {
     border: 1px solid #eef0f3;
-    border-radius: 8px;
-    padding: 10px;
+    border-radius: 6px;
+    padding: 8px;
 }
 .rescue-col h4 { margin: 0 0 8px; font-size: 0.9em; color: var(--c-text); }
-.rescue-col .prompt-toggle { margin-top: 6px; }
+.rescue-col .prompt-toggle { margin-top: 8px; }
 .rescue-hint {
     font-size: 0.82em;
     color: var(--c-text-faint);
@@ -1633,8 +1633,8 @@ h3 {
     }
     .paste-actions .action-btn {
         flex: 1 1 auto;
-        padding: 10px 14px;
-        font-size: 15px;
+        padding: 8px 16px;
+        font-size: 14px;
     }
     #paste-input {
         min-height: 100px;
@@ -1646,14 +1646,14 @@ h3 {
 .preview-toolbar .tool-group {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
 }
 .preview-toolbar .tool-label {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--c-text-faint);
     background: var(--c-panel-bg);
-    border-radius: 4px;
-    padding: 2px 6px;
+    border-radius: 6px;
+    padding: 2px 8px;
     font-weight: 600;
 }
 
@@ -1688,12 +1688,12 @@ h3 {
 .hist-chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     background: var(--c-panel-bg);
     color: var(--c-text-faint);
     border: 1px solid var(--c-border);
-    border-radius: 14px;
-    padding: 3px 6px 3px 12px;
+    border-radius: 999px;
+    padding: 3px 8px 3px 12px;
     font-size: 0.85em;
     font-weight: 600;
 }
@@ -1706,7 +1706,7 @@ h3 {
     height: 18px;
     line-height: 1;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 14px;
     padding: 0;
 }
 .editor-list-item .hist-suffix { color: var(--c-text-faint); }
@@ -1716,13 +1716,13 @@ h3 {
     display: flex;
     gap: 8px;
     justify-content: flex-end;
-    margin-top: 6px;
+    margin-top: 8px;
 }
 .error-item .fav-toggle-btn {
     background: none;
     border: 1px solid var(--c-border);
-    border-radius: 4px;
-    padding: 4px 10px;
+    border-radius: 6px;
+    padding: 4px 8px;
     font-size: 0.85em;
     color: var(--c-warn-accent);
     cursor: pointer;
@@ -1749,10 +1749,10 @@ h3 {
         min-height: 100vh;
     }
     main {
-        padding: 14px 12px 20px;
+        padding: 16px 12px 24px;
     }
     section h2 {
-        font-size: 19px;
+        font-size: 20px;
         margin-bottom: 12px;
     }
     h3 {
@@ -1761,12 +1761,12 @@ h3 {
 
     /* 卡片:收紧内边距,列表密排 */
     .operation-card {
-        padding: 14px 12px;
+        padding: 16px 12px;
         margin-bottom: 12px;
     }
     .operation-card h3 {
         margin-top: 0;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
     }
     .bank-list-panel,
     .bank-operations-panel {
@@ -1781,7 +1781,7 @@ h3 {
 
     /* 表单与按钮:高度触控友好但不臃肿 */
     .action-btn {
-        padding: 9px 14px;
+        padding: 9px 16px;
         font-size: 14px;
     }
     .form-input,
@@ -1792,7 +1792,7 @@ h3 {
 
     /* 题库管理双栏在窄屏本就单列;分组头部收紧 */
     .bank-toggle {
-        padding: 10px 8px;
+        padding: 8px 8px;
     }
 
     /* 粘贴框与状态行紧凑 */
@@ -1804,8 +1804,8 @@ h3 {
     }
     .status-line {
         margin: 8px 0 4px;
-        padding: 7px 10px;
-        font-size: 13px;
+        padding: 8px 8px;
+        font-size: 14px;
     }
 
     /* 预览/编辑器条目紧凑 */
@@ -1816,8 +1816,8 @@ h3 {
         font-size: 14px;
     }
     .editor-list-item {
-        padding: 7px 8px;
-        font-size: 13.5px;
+        padding: 8px 8px;
+        font-size: 14px;
     }
 
     /* 首页 hero 收紧 */
@@ -1831,9 +1831,9 @@ h3 {
     display: inline-flex;
     flex-direction: row;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
 }
-.nav-ico { font-size: 15px; line-height: 1; }
+.nav-ico { font-size: 14px; line-height: 1; }
 
 @media (max-width: 768px) {
     /* 底部固定 tab 栏:拇指区操作,内容区留出等高空间 */
@@ -1852,11 +1852,11 @@ h3 {
         flex: 1 1 20%;
         flex-direction: column;
         gap: 1px;
-        padding: 6px 2px 5px;
-        font-size: 11px;
-        border-radius: 8px;
+        padding: 8px 2px 4px;
+        font-size: 12px;
+        border-radius: 6px;
     }
-    .nav-ico { font-size: 19px; }
+    .nav-ico { font-size: 20px; }
     .nav-btn.active {
         color: var(--c-primary);
         background: var(--c-surface);
@@ -1923,16 +1923,16 @@ html[data-theme="dark"] .container {
     display: inline-flex;
     gap: 0;
     border: 1px solid var(--c-border);
-    border-radius: 16px;
+    border-radius: 999px;
     overflow: hidden;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
 }
 .theme-opt {
     border: none;
     background: var(--c-surface);
     color: var(--c-text-muted);
-    padding: 5px 12px;
-    font-size: 13px;
+    padding: 4px 12px;
+    font-size: 14px;
     cursor: pointer;
     font-family: inherit;
 }
@@ -1963,12 +1963,12 @@ html[data-theme="dark"] .container {
         display: flex;
         flex-direction: column;
         margin-top: 0;
-        padding: 10px 0 12px;
+        padding: 8px 0 12px;
         background: transparent;
     }
     /* 题干紧跟进度条,只留一行的呼吸感(居中版留白过大,按 👤 反馈改顶对齐) */
     #quiz-section.active:has(#quiz-container:not(.hidden)) .question-header {
-        margin-bottom: 6px;
+        margin-bottom: 8px;
     }
     #quiz-section.active:has(#quiz-container:not(.hidden)) .quiz-progress {
         height: 5px;
@@ -1982,7 +1982,7 @@ html[data-theme="dark"] .container {
         line-height: 1.55;
     }
     #quiz-section.active:has(#quiz-container:not(.hidden)) #answer-feedback:not(.hidden) {
-        margin-top: 10px;
+        margin-top: 8px;
     }
     #quiz-section.active:has(#quiz-container:not(.hidden)) .quiz-controls {
         margin-top: auto;
@@ -1998,8 +1998,8 @@ html[data-theme="dark"] .container {
         display: flex;
         flex-direction: row;   /* 旧规则是 column(竖排占两行),强制单行 */
         flex-wrap: nowrap;
-        gap: 6px;
-        padding: 6px 10px;
+        gap: 8px;
+        padding: 8px 8px;
         background: var(--c-surface);
         border-top: 1px solid var(--c-border);
         box-shadow: 0 -1px 6px rgba(0, 0, 0, 0.05);
@@ -2007,8 +2007,8 @@ html[data-theme="dark"] .container {
     .quiz-controls .action-btn {
         flex: 1;
         margin: 0;
-        padding: 8px 6px;
-        font-size: 13.5px;
+        padding: 8px 8px;
+        font-size: 14px;
     }
     #quiz-container {
         padding-bottom: calc(48px + env(safe-area-inset-bottom));  /* 紧凑操作条的精确避让 */
