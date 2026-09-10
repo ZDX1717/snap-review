@@ -1624,12 +1624,8 @@ export function updateBanksList() {
             state.isAllBanksView = false;
             saveToLocalStorage();
             updateBankSelect();
-            if (typeof location !== 'undefined') {
-                if (location.hash === '#quiz') {
-                    if (typeof showSection === 'function') showSection('quiz');
-                } else {
-                    location.hash = '#quiz';  // hashchange 路由触发 showSection
-                }
+            if (typeof CustomEvent !== 'undefined' && document.dispatchEvent) {
+                document.dispatchEvent(new CustomEvent('zquiz:navigate', { detail: { section: 'quiz' } }));
             }
         });
         bankActions.appendChild(startBtn);

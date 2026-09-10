@@ -161,16 +161,38 @@ const themeSwitch = document.getElementById('theme-switch');
 const heroStartBtn = document.getElementById('hero-start-btn');
 const heroImportBtn = document.getElementById('hero-import-btn');
 
+const SECTIONS = ['home', 'quiz', 'banks'];
+
+// 统一切换分区:hash 已一致时直接切(否则赋相同 hash 不会触发 hashchange,按钮会失效)
+function navigate(section) {
+    if (!SECTIONS.includes(section)) return;
+    if (typeof location !== 'undefined') {
+        if (location.hash === '#' + section) {
+            showSection(section);
+        } else {
+            location.hash = '#' + section;  // 触发 hashchange → showSection
+        }
+    } else {
+        showSection(section);
+    }
+}
+
 // 初始化
 function init() {
     // 主题(暗色模式)先行,避免闪白
     initTheme();
 
-    // hash 路由:任何模块改 location.hash 即切换分区(替代跨模块 import showSection)
+    // hash 路由 + 跨模块导航事件(替代跨模块 import showSection,避免循环依赖)
     if (typeof window !== 'undefined' && window.addEventListener) {
         window.addEventListener('hashchange', () => {
             const hash = location.hash.slice(1);
-            if (['home', 'quiz', 'banks'].includes(hash)) showSection(hash);
+            if (SECTIONS.includes(hash)) showSection(hash);
+        });
+    }
+    if (typeof document !== 'undefined' && document.addEventListener) {
+        document.addEventListener('zquiz:navigate', (e) => {
+            const target = e && e.detail && e.detail.section;
+            if (SECTIONS.includes(target)) navigate(target);
         });
     }
 
@@ -202,9 +224,9 @@ function init() {
 // 设置事件监听器
 function setupEventListeners() {
     // 导航按钮
-    btnHome.addEventListener('click', () => showSection('home'));
-    btnQuiz.addEventListener('click', () => showSection('quiz'));
-    btnBanks.addEventListener('click', () => showSection('banks'));
+    btnHome.addEventListener('click', () => navigate('home'));
+    btnQuiz.addEventListener('click', () => navigate('quiz'));
+    btnBanks.addEventListener('click', () => navigate('banks'));
     
     // 文件上传
     uploadBtn.addEventListener('click', () => fileInput.click());
@@ -344,7 +366,7 @@ function setupEventListeners() {
     });
 
     // 首页快捷入口
-    heroStartBtn.addEventListener('click', () => showSection('quiz'));
+    heroStartBtn.addEventListener('click', () => navigate('quiz'));
     heroImportBtn.addEventListener('click', () => { pasteInput.focus(); });
 }
 
@@ -472,6 +494,7 @@ if (typeof window === 'undefined') {
         backToQuizOptions,
         applyTheme,
         setThemeSetting,
+        navigate,
         clearErrors,
         clearPasteInput,
         collectUserAnswer,

@@ -575,3 +575,24 @@ test('回收站:删库打包题+错+藏;恢复完整(同名自动改名);彻底�
     const bin2 = JSON.parse(store.get('recycledBanks'));
     assert.ok(Object.keys(bin2).length <= 10, '上限 10 条');
 });
+
+test('导航一致性:hash 已相同时也能切换(navigate 不再依赖 hashchange)', async () => {
+    const { run, elements, sandbox } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+        sandboxExtras: { location: { hash: '#quiz' } },
+    }));
+    run(`init()`);
+    // hash 已是 #quiz,再点「题库」→ hash 变 #banks,视图应切到题库
+    run(`navigate('banks')`);
+    assert.strictEqual(run(`location.hash`), '#banks');
+    // hash 已是 #banks,再点「题库」→ 不产生 hashchange,但视图仍需切到题库
+    run(`navigate('banks')`);
+    assert.strictEqual(run(`location.hash`), '#banks');
+    // 库卡开始刷题:通过事件通道导航
+    run(`questionBanks['T'] = [{ content: '题', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A' }]`);
+    const before = String(sandbox.location.hash);
+    run(`updateBanksList()`);
+    const startBtns = run(`__created`).filter(c => c.el._listeners?.click && String(c.el.textContent).includes('开始刷题'));
+    assert.ok(startBtns.length >= 1, '库卡有开始刷题按钮');
+    startBtns[startBtns.length - 1].el._listeners.click();
+    assert.strictEqual(run(`location.hash`), '#quiz', '开始刷题应切到 #quiz');
+});

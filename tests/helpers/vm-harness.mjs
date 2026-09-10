@@ -41,7 +41,10 @@ export async function loadApp({ confirmResult = true, promptValue = 'x', sandbox
     const domContentLoadedCount = { n: 0 };
     const created = [];
 
+    const docListeners = {};
     const sandbox = {
+        // 最小 CustomEvent + document 事件总线(供事件通道导航测试)
+        CustomEvent: class { constructor(type, opts = {}) { this.type = type; if (opts.detail !== undefined) this.detail = opts.detail; } },
         ...sandboxExtras,
         document: {
             getElementById: (id) => (elements[id] ||= makeEl()),
@@ -49,7 +52,14 @@ export async function loadApp({ confirmResult = true, promptValue = 'x', sandbox
             querySelectorAll: () => [],
             createElement: (tag) => { const el = makeEl(); created.push({ tag: String(tag || '').toUpperCase(), el }); return el; },
             createTextNode: (t) => ({ text: t }),
-            addEventListener(type) { if (type === 'DOMContentLoaded') domContentLoadedCount.n++; },
+            addEventListener(type, fn) {
+                if (type === 'DOMContentLoaded') domContentLoadedCount.n++;
+                (docListeners[type] = docListeners[type] || []).push(fn);
+            },
+            dispatchEvent(evt) {
+                (docListeners[evt && evt.type] || []).forEach(fn => fn(evt));
+                return true;
+            },
             body: makeEl(),
         },
         localStorage: {
