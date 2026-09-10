@@ -2,7 +2,7 @@
     /* ===== 设计令牌(P0-1.1 令牌化:亮色值 = 历史硬编码值,零视觉变化) ===== */
     --c-bg: #f5f7fa;            /* 页面底 */
     --c-surface: #fff;           /* 卡片/表面 */
-    --c-surface-alt: #f8f9fa;    /* 次级表面 */
+    --c-surface-alt: var(--c-surface-alt);    /* 次级表面 */
     --c-text: var(--c-text);
     --c-text-secondary: var(--c-text-secondary);
     --c-text-muted: var(--c-text-muted);
@@ -74,7 +74,7 @@ header h1 {
 
 nav {
     display: flex;
-    background-color: #f8f9fa;
+    background-color: var(--c-surface-alt);
     border-bottom: 1px solid var(--c-border-light);
 }
 
@@ -124,7 +124,7 @@ h3 {
 }
 
 .info-card {
-    background-color: #f8f9fa;
+    background-color: var(--c-surface-alt);
     border-radius: 6px;
     padding: 20px;
     margin-bottom: 20px;
@@ -163,7 +163,7 @@ h3 {
 }
 
 .import-options, .quiz-options {
-    background-color: #f8f9fa;
+    background-color: var(--c-surface-alt);
     border-radius: 6px;
     padding: 20px;
     margin-bottom: 20px;
@@ -222,7 +222,7 @@ h3 {
 }
 
 .quiz-container {
-    background-color: #f8f9fa;
+    background-color: var(--c-surface-alt);
     border-radius: 6px;
     padding: 20px;
     margin-top: 20px;
@@ -288,7 +288,7 @@ h3 {
 }
 
 .answer-feedback {
-    background-color: #f8f9fa;
+    background-color: var(--c-surface-alt);
     border-radius: 4px;
     padding: 15px;
     margin-bottom: 20px;
@@ -312,7 +312,7 @@ h3 {
 }
 
 .quiz-result {
-    background-color: #f8f9fa;
+    background-color: var(--c-surface-alt);
     border-radius: 6px;
     padding: 20px;
     margin-top: 20px;
@@ -338,7 +338,7 @@ h3 {
 }
 
 .errors-list {
-    background-color: #f8f9fa;
+    background-color: var(--c-surface-alt);
     border-radius: 6px;
     padding: 20px;
 }
@@ -358,7 +358,7 @@ h3 {
     display: flex;
     align-items: center;
     gap: 10px;
-    background-color: #f8f9fa;
+    background-color: var(--c-surface-alt);
     border: 1px solid var(--c-border-light);
     border-left: 4px solid var(--c-primary);
     border-radius: 6px;
@@ -399,7 +399,7 @@ h3 {
 }
 
 .bank-errors {
-    background-color: #f8f9fa;
+    background-color: var(--c-surface-alt);
     border-radius: 4px;
     padding: 10px;
     margin-top: 8px;
@@ -427,7 +427,7 @@ h3 {
 }
 
 .error-options {
-    background-color: #f8f9fa;
+    background-color: var(--c-surface-alt);
     border-radius: 4px;
     padding: 15px;
     margin: 15px 0;
@@ -515,7 +515,7 @@ h3 {
 }
 
 .bank-list-panel {
-    background-color: #f8f9fa;
+    background-color: var(--c-surface-alt);
     border-radius: 6px;
     padding: 20px;
 }
@@ -583,7 +583,7 @@ h3 {
 }
 
 .operation-card {
-    background-color: #f8f9fa;
+    background-color: var(--c-surface-alt);
     border-radius: 6px;
     padding: 20px;
 }
@@ -751,7 +751,7 @@ h3 {
     border: 1px solid var(--c-border-light);
     border-radius: 6px;
     padding: 8px;
-    background: #f8f9fa;
+    background: var(--c-surface-alt);
 }
 
 .preview-item {
@@ -891,7 +891,7 @@ h3 {
     border: 1px solid var(--c-border-light);
     border-radius: 6px;
     padding: 8px;
-    background: #f8f9fa;
+    background: var(--c-surface-alt);
     margin-bottom: 14px;
 }
 
@@ -1103,7 +1103,7 @@ h3 {
     overflow-y: auto;
     border: 1px solid var(--c-border-light);
     border-radius: 6px;
-    background: #f8f9fa;
+    background: var(--c-surface-alt);
     padding: 6px;
 }
 
