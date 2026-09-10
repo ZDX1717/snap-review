@@ -270,20 +270,16 @@ h3 {
     flex: 1;
 }
 
-.setting-more summary {
+/* 随机出题顺序:单开关,裸露(👤 反馈:折叠碍事,故题型与随机都不再收进 details)。
+   注意 .seg label 是 flex:1,这里必须显式 flex:none,否则会被拉满整行。 */
+.setting-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: 14px;
-    color: var(--c-text-muted);
-    cursor: pointer;
-}
-
-.setting-more[open] summary {
-    margin-bottom: 10px;
-}
-
-.setting-more {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    color: var(--c-text-secondary);
+    flex: none;
+    min-height: 40px;   /* 触控目标下限(界面规范 §8) */
 }
 
 .action-btn {

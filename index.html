@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=0953">
+    <link rel="stylesheet" href="styles.css?v=0954">
 </head>
 <body>
     <div class="container">
@@ -119,19 +119,18 @@ A：选项A  B：选项B
                         <label><input type="radio" name="quiz-mode" value="exam"><span>套题</span></label>
                     </div>
 
-                    <!-- ④ 低频项收进折叠:题型与随机 -->
-                    <details class="setting-more">
-                        <summary>更多设置</summary>
-                        <div class="seg" role="group" aria-label="题型">
-                            <label><input type="radio" name="question-type" value="all" checked><span>全部</span></label>
-                            <label><input type="radio" name="question-type" value="single"><span>单选</span></label>
-                            <label><input type="radio" name="question-type" value="multiple"><span>多选</span></label>
-                            <label><input type="radio" name="question-type" value="judge"><span>判断</span></label>
-                        </div>
-                        <label class="inline-label">
-                            <input type="checkbox" id="randomize" checked> 随机出题顺序
-                        </label>
-                    </details>
+                    <!-- ④ 题型:与模式同权重,裸露(👤 反馈:折叠碍事) -->
+                    <div class="seg" role="group" aria-label="题型">
+                        <label><input type="radio" name="question-type" value="all" checked><span>全部</span></label>
+                        <label><input type="radio" name="question-type" value="single"><span>单选</span></label>
+                        <label><input type="radio" name="question-type" value="multiple"><span>多选</span></label>
+                        <label><input type="radio" name="question-type" value="judge"><span>判断</span></label>
+                    </div>
+
+                    <!-- ⑤ 随机:单开关,裸露 -->
+                    <label class="inline-label setting-check">
+                        <input type="checkbox" id="randomize" checked> 随机出题顺序
+                    </label>
                 </div>
 
                 <button id="start-quiz-btn" class="action-btn">开始刷题</button>
@@ -426,6 +425,6 @@ A：选项A  B：选项B
 
     </div>
 
-    <script type="module" src="src/main.js?v=0953"></script>
+    <script type="module" src="src/main.js?v=0954"></script>
 </body>
 </html>
