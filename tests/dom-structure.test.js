@@ -56,3 +56,42 @@ test('主题开关住在标题栏里(每个 tab 都能切主题)', () => {
     // 首页不得再有第二个开关
     assert.strictEqual((html.match(/id="theme-switch"/g) || []).length, 1, 'theme-switch 只能有一个');
 });
+
+test('品牌块:logo + 右下小字,tagline 是 h1 的嵌套 small', () => {
+    const header = html.slice(html.indexOf('<header>'), html.indexOf('</header>'));
+    assert.ok(/<h1[^>]*class="brand"/.test(header), 'h1 应带 class="brand"(保留一级标题语义)');
+    assert.ok(header.includes('Zquiz'), '应显示 Zquiz');
+    assert.ok(/<small class="brand-tagline">期末周刷题助手<\/small>/.test(header), 'tagline 应是 h1 内的 small');
+});
+
+test('开始刷题按钮必须全屏宽隐藏(不能只写在手机媒体查询里)', () => {
+    // 回归:该规则原先只写在 @media (max-width:768px) 内,
+    // 导致桌面上"结果页上方还挂着一个开始刷题按钮"(👤 反馈)。
+    // 判据:把所有媒体查询整体剔除后,该规则仍应存在 —— 剔除后不存在即说明它是手机专属。
+    const stripMedia = (cssText) => {
+        let out = '', i = 0;
+        while (i < cssText.length) {
+            const at = cssText.indexOf('@media', i);
+            if (at === -1) { out += cssText.slice(i); break; }
+            out += cssText.slice(i, at);
+            const open = cssText.indexOf('{', at);
+            let depth = 1, j = open + 1;
+            while (j < cssText.length && depth > 0) {
+                if (cssText[j] === '{') depth++;
+                else if (cssText[j] === '}') depth--;
+                j++;
+            }
+            i = j;
+        }
+        return out;
+    };
+    const noMedia = stripMedia(String(cssNoComments));
+    assert.ok(
+        noMedia.includes('#start-quiz-btn'),
+        '#start-quiz-btn 的隐藏规则必须有一条不在任何媒体查询内(否则桌面端失效)',
+    );
+    assert.ok(
+        /#quiz-result:not\(\.hidden\)\)\s*#start-quiz-btn/.test(String(cssNoComments)),
+        '隐藏规则需覆盖 #quiz-result 显示时的状态(结果页也要隐藏该按钮)',
+    );
+});

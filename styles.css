@@ -111,9 +111,24 @@ header {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
 }
 
-header h1 {
+/* 品牌块:logo + 右下角小字。用 h1 保留"页面唯一一级标题"的语义,
+   small 作副题并右对齐到 logo 末端,形成从属关系(👤 要求小字在 logo 右下) */
+h1.brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;     /* 小字右对齐 → 落在 logo 右下方 */
+    min-width: 0;              /* 窄屏可收缩,不把主题开关挤出屏幕 */
     font-size: 16px;
     font-weight: 600;
+    line-height: 1.2;
+}
+
+.brand-tagline {
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 1.2;
+    color: rgba(255, 255, 255, 0.75);
+    white-space: nowrap;
 }
 
 nav {
@@ -1939,15 +1954,21 @@ html[data-theme="dark"] .container {
     color: var(--c-primary);
 }
 
+/* 刷题进行中 / 出结果后:隐藏配置区与「开始刷题」。
+   ⚠️ 这条**必须全屏宽生效**,不能只写在手机媒体查询里 ——
+   否则会在桌面上出现"结果页上方还挂着一个开始刷题按钮"(👤 反馈)。
+   条件同时覆盖 #quiz-container(作答中)与 #quiz-result(结果页)。 */
+#quiz-section.active:has(#quiz-container:not(.hidden)) #quiz-settings,
+#quiz-section.active:has(#quiz-container:not(.hidden)) #start-quiz-btn,
+#quiz-section.active:has(#quiz-container:not(.hidden)) #quiz-status:empty,
+#quiz-section.active:has(#quiz-result:not(.hidden)) #quiz-settings,
+#quiz-section.active:has(#quiz-result:not(.hidden)) #start-quiz-btn,
+#quiz-section.active:has(#quiz-result:not(.hidden)) #quiz-status:empty {
+    display: none;
+}
+
 /* ==================== P0-1.5 刷题聚焦模式(手机:题目居中 + 底部固定操作条) ==================== */
 @media (max-width: 768px) {
-    /* 进入刷题后:隐藏配置区,让位给题目 */
-    #quiz-section.active:has(#quiz-container:not(.hidden)) #quiz-settings,
-    #quiz-section.active:has(#quiz-container:not(.hidden)) #start-quiz-btn,
-    #quiz-section.active:has(#quiz-container:not(.hidden)) #quiz-status:empty {
-        display: none;
-    }
-
     /* 聚焦布局:quiz 容器占满首屏,题干+选项垂直居中 */
     #quiz-section.active:has(#quiz-container:not(.hidden)) {
         display: flex;
