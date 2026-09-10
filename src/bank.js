@@ -654,6 +654,7 @@ export function renderPreview() {
         const clearAiMark = () => {
             if (!item.aiNote) return;
             item.aiNote = '';
+            item.histAI = true;  // 痕迹:导入后记入历史日志
             box.classList.remove('ai-touched');
             const badge = box.querySelector('.ai-badge');
             if (badge && badge.remove) badge.remove();
@@ -803,7 +804,11 @@ export function commitPreviewImport() {
         const clone = JSON.parse(JSON.stringify(item.q));
         const finalized = finalizeQuestion(clone);
         if (!finalized) continue;
-        if (item.aiNote) finalized.aiSource = 'ai';  // AI 动过 → 永久标注,编辑器可见
+        if (item.aiNote) {
+            finalized.aiSource = 'ai';  // AI 动过 → 永久标注,编辑器可见
+        } else if (item.histAI) {
+            pushHistMark(finalized, 'ai');  // 预览中已人工改掉 AI 痕迹 → 直接进历史
+        }
         const key = questionDedupKey(finalized);
         if (seen.has(key)) continue; // 批内去重
         seen.add(key);
@@ -1184,14 +1189,20 @@ export function editorSaveCurrent(silent) {
         return false;
     }
 
+    const wasAi = q.aiSource === 'ai';
+    const wasPending = !q.answer;
     q.content = stem;
     q.type = type;
     q.options = options;
     q.answer = answer;
     q.explanation = editorExplanation.value.trim();
     q.analysis = editorAnalysis.value.trim();
-    // 人工保存 = 人工核验完成:撤销 AI 永久标记(人动过就以人为准)
-    if (q.aiSource === 'ai') delete q.aiSource;
+    // 人工保存 = 人工核验完成:撤销 AI 标记,并把消散的自动标记记入历史日志
+    if (wasAi) {
+        delete q.aiSource;
+        pushHistMark(q, 'ai');
+    }
+    if (wasPending && q.answer) pushHistMark(q, 'pending');
 
     saveToLocalStorage();
     state.editorDirty = false;
@@ -1477,38 +1488,45 @@ export function updateBanksList() {
 
 
 // 渲染编辑器整体（题目列表 + 当前题表单）
-export // ==================== 历史标记(人工旗标:保存不消,仅 × 删除) ====================
+export // ==================== 历史标记(自动标记消散后的痕迹日志,仅 × 删除) ====================
+
+// 追加一条历史(去重:同类型已存在则不重复记)
+function pushHistMark(q, type) {
+    if (!q) return;
+    q.histMarks = Array.isArray(q.histMarks) ? q.histMarks : [];
+    if (q.histMarks.some(m => m.type === type)) return;
+    q.histMarks.push({ type, time: new Date().toISOString() });
+}
+
 
 // 行内渲染:走事件委托,innerHTML 重建不丢监听
 function renderEditorHistRow(q) {
     const row = document.getElementById('editor-hist-row');
     if (!row) return;
-    if (q && q.histMark) {
-        const t = new Date(q.histMark);
-        const when = isNaN(t) ? '' : `（${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}）`;
-        row.innerHTML = `<span class="hist-chip">⚑ 历史标记${when}<button type="button" id="hist-remove-btn" title="删除历史标记">×</button></span>`;
-    } else {
-        row.innerHTML = `<button type="button" id="hist-add-btn" class="action-btn small secondary">⚑ 加历史标记</button>`;
-    }
-}
-
-// 委托处理:加/删历史标记(即时生效并落盘,不依赖「保存」)
-export function editorHistClick(e) {
-    const target = e && e.target;
-    if (!target) return;
-    const questions = currentEditBank();
-    const q = questions[state.editIndex];
-    if (!q) return;
-    if (target.id === 'hist-add-btn') {
-        q.histMark = new Date().toISOString();
-    } else if (target.id === 'hist-remove-btn') {
-        delete q.histMark;
-    } else {
+    const marks = (q && Array.isArray(q.histMarks)) ? q.histMarks : [];
+    if (marks.length === 0) {
+        row.innerHTML = '';
+        row.style.display = 'none';
         return;
     }
+    row.style.display = '';
+    const label = { ai: '🤖 曾 AI 整理', pending: '⏳ 曾待补' };
+    row.innerHTML = marks.map((m, i) =>
+        `<span class="hist-chip">${label[m.type] || m.type}<button type="button" data-hist-del="${i}" title="删除这条历史标记">×</button></span>`
+    ).join('');
+}
+
+// 委托处理:删除某条历史标记(即时生效并落盘)
+export function editorHistClick(e) {
+    const target = e && e.target;
+    if (!target || target.dataset.histDel === undefined) return;
+    const questions = currentEditBank();
+    const q = questions[state.editIndex];
+    if (!q || !Array.isArray(q.histMarks)) return;
+    q.histMarks.splice(parseInt(target.dataset.histDel, 10), 1);
+    if (q.histMarks.length === 0) delete q.histMarks;
     saveToLocalStorage();
     renderEditorHistRow(q);
-    renderBankEditor();
 }
 
 export function renderBankEditor() {
@@ -1523,9 +1541,9 @@ export function renderBankEditor() {
         // 待修改高亮:缺答案(待补)或选项不足的题,橙底标记;AI 标记:紫条 🤖(与预览同色系)
         const needsFix = !q.answer || Object.keys(q.options || {}).length < 2;
         const aiTouched = q.aiSource === 'ai';
-        const hasHist = !!q.histMark;
-        item.className = 'editor-list-item' + (idx === state.editIndex ? ' selected' : '') + (needsFix ? ' needs-fix' : '') + (aiTouched ? ' ai-gen' : '') + (hasHist ? ' has-hist' : '');
-        item.textContent = `${idx + 1}. ` + (aiTouched ? '🤖 ' : '') + `${(q.content || '（无题干）').slice(0, 22)}` + (!q.answer ? ' ⏳' : (needsFix ? ' ⚠' : '')) + (hasHist ? ' ⚑' : '');
+        const hasHist = Array.isArray(q.histMarks) && q.histMarks.length > 0;
+        item.className = 'editor-list-item' + (idx === state.editIndex ? ' selected' : '') + (needsFix ? ' needs-fix' : '') + (aiTouched ? ' ai-gen' : '');
+        item.textContent = `${idx + 1}. ` + (aiTouched ? '🤖 ' : '') + `${(q.content || '（无题干）').slice(0, 22)}` + (!q.answer ? ' ⏳' : (needsFix ? ' ⚠' : '')) + (hasHist ? ' 🕘' : '');
         item.addEventListener('click', () => {
             if (!editorGuard()) return;
             state.editIndex = idx;

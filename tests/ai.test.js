@@ -408,24 +408,47 @@ test('编辑器:AI 题人工保存后消标;待修题说明行随状态切换', 
     assert.ok(note.includes('缺答案'), '待修题要有橙色说明');
 });
 
-test('历史标记:添加即时落盘,保存不消,仅 × 删除;列表 ⚑ 记号', async () => {
-    const { run, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
+test('历史标记日志:AI 题人工保存后转"曾AI整理";待补题补答后转"曾待补";仅 × 删除', async () => {
+    const h = await import('./helpers/vm-harness.mjs').then(m => m.loadApp({
+        sandboxExtras: {
+            fetch: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: AI_TEXT } }] }) }),
+            AbortController,
+        },
+    }));
+    const { run, store, elements } = h;
+    store.set('aiConfig', JSON.stringify(CFG));
     run(`init()`);
-    run(`openImportPreview(parseQuestionsText('1. 里程碑题 A.甲 B.乙 答案：A'))`);
+    run(`pasteInput.value = '一坨乱原文'`);
+    await run(`(async () => { await rescueAiOrganize(); })()`);
+    run(`parsePastedText()`);
     run(`previewTargetBankSelect.value = '__new__'`);
-    run(`prompt = () => '标记测试库'`);
+    run(`prompt = () => '史库'`);
     run(`commitPreviewImport()`);
-    run(`editBank('标记测试库')`);
-    // 加标记(委托点击) → 落盘
-    elements['editor-hist-row']._listeners.click({ target: { id: 'hist-add-btn' } });
-    assert.ok(run(`questionBanks['标记测试库'][0].histMark`), '加标记要写时间戳');
-    assert.ok(String(elements['editor-hist-row'].innerHTML).includes('hist-remove-btn'), '出现 × 删除按钮');
-    // 人工保存不消标(与 AI 标记的本质区别)
-    run(`editorStem.value = '里程碑题(改)'; editorType.value = '判断'; editorAnswer.value = 'A'`);
+    // 补一题缺答案进来,人工补答 → pending 历史
+    run(`openImportPreview(parseQuestionsText('1. 待补的题 A.甲 B.乙'))`);
+    run(`previewData[0].include = true; renderPreview()`);
+    run(`previewTargetBankSelect.value = '史库'`);
+    run(`commitPreviewImport()`);
+    run(`editBank('史库')`);
+    run(`state.editIndex = 2; renderBankEditor()`);
+    // 人工补答保存 → 待补标记消散 → 转历史
+    run(`editorStem.value = '待补的题'; editorType.value = '判断'; editorAnswer.value = 'A'`);
     run(`editorSaveCurrent(true)`);
-    assert.ok(run(`questionBanks['标记测试库'][0].histMark`), '保存不消历史标记');
-    // × 删除
-    elements['editor-hist-row']._listeners.click({ target: { id: 'hist-remove-btn' } });
-    assert.strictEqual(run(`questionBanks['标记测试库'][0].histMark`), undefined);
-    assert.ok(String(elements['editor-hist-row'].innerHTML).includes('hist-add-btn'), '回到加标记按钮');
+    assert.strictEqual(run(`questionBanks['史库'][2].answer`), 'A');
+    const marks = h.run(`JSON.stringify(questionBanks['史库'][2].histMarks || [])`);
+    assert.ok(marks.includes('pending'), '消散的待补要进历史日志');
+    assert.ok(String(elements['editor-hist-row'].innerHTML).includes('曾待补'), '出现"曾待补"chip');
+    assert.ok(String(elements['editor-hist-row'].innerHTML).includes('data-hist-del'), 'chip 带 × 删除');
+    // AI 题人工保存 → ai 标记消散转历史
+    run(`state.editIndex = 0; renderBankEditor()`);
+    run(`editorType.value = '判断'; editorAnswer.value = 'A'`);
+    run(`editorSaveCurrent(true)`);
+    const marks0 = h.run(`JSON.stringify(questionBanks['史库'][0].histMarks || [])`);
+    assert.ok(marks0.includes('"ai"'), '消散的 AI 标记要进历史日志');
+    assert.ok(String(elements['editor-hist-row'].innerHTML).includes('曾 AI 整理'), '出现"曾 AI 整理"chip');
+    // × 删除对应条目
+    h.elements['editor-hist-row']._listeners.click({ target: { dataset: { histDel: '0' }, id: 'x' } });
+    const after = h.run(`JSON.stringify(questionBanks['史库'][0].histMarks || [])`);
+    assert.ok(!after.includes('"ai"'), '× 删除对应历史条目');
 });
+
