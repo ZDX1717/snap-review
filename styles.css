@@ -36,6 +36,8 @@
     --c-chip-bg: #e9ecef;
     --c-surface-warm: #fffdf5;
     --c-warn-bg-soft: #fff8e6;
+    --c-success-soft: #ecfdf5;
+    --c-danger-soft: #fff1f2;
 }
 
 /* Zquiz · 期末周刷题 样式 */
@@ -1352,11 +1354,11 @@ h3 {
 }
 .option-item.correct-card {
     border-color: var(--c-success-deep);
-    background: #eaf7ef;
+    background: var(--c-success-soft);
 }
 .option-item.wrong-card {
     border-color: var(--c-danger-deep);
-    background: #fdf0ef;
+    background: var(--c-danger-soft);
 }
 .option-item input {
     accent-color: var(--c-primary-alt);
@@ -1919,6 +1921,8 @@ html[data-theme="dark"] {
     --c-chip-bg: #2c3138;
     --c-surface-warm: #242320;
     --c-warn-bg-soft: #3a3320;
+    --c-success-soft: #0a2e1f;
+    --c-danger-soft: #3f0d18;
 }
 html[data-theme="dark"] {
     color-scheme: dark;
