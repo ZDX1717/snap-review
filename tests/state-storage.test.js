@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert';
 import { state } from '../src/state.js';
 import {
-    loadFromLocalStorage, saveToLocalStorage, loadMasterySetting,
+    loadFromLocalStorage, saveToLocalStorage, loadMasterySetting, saveMasterySetting,
     loadCollapsedBanks, saveCollapsedBanks,
 } from '../src/storage.js';
 
@@ -35,6 +35,22 @@ test('错题移出规则加载(含非法值回退默认 2,支持 0=关闭)', () 
     store.set('masteryThresholdSetting', '0');
     assert.strictEqual(loadMasterySetting(), 0);
     state.masteryThreshold = 0;
+});
+
+test('错题移出规则保存与加载对称:非法值一律落回默认 2', () => {
+    // 合法值往返
+    for (const v of [0, 1, 2, 3]) {
+        assert.strictEqual(saveMasterySetting(v), v);
+        assert.strictEqual(loadMasterySetting(), v);
+    }
+    // 脏输入(含旧实现 parseInt(...) || 0 会误判为"关闭自动移出"的一类)必须回退默认 2
+    for (const bad of ['99', '-1', 'abc', '', null, undefined, '2.9', {}, NaN]) {
+        assert.strictEqual(saveMasterySetting(bad), 2, `非法输入 ${JSON.stringify(bad)} 应落回 2`);
+        assert.strictEqual(loadMasterySetting(), 2);
+    }
+    // 字符串数字(真实 <select> 的形态)必须按数字处理
+    assert.strictEqual(saveMasterySetting('1'), 1);
+    assert.strictEqual(store.get('masteryThresholdSetting'), '1');
 });
 
 test('错题本展开状态持久化往返', () => {

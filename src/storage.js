@@ -106,6 +106,17 @@ export function loadMasterySetting() {
     return state.masteryThreshold;
 }
 
+// 保存错题移出规则设置(白名单校验必须与 loadMasterySetting 对称:
+// 非法值一律落回默认 2,防止把"任意整数"写进本机后再被读成 0=关闭自动移出)
+export function saveMasterySetting(value) {
+    const n = parseInt(value, 10);
+    state.masteryThreshold = [0, 1, 2, 3].includes(n) ? n : 2;
+    try {
+        localStorage.setItem('masteryThresholdSetting', String(state.masteryThreshold));
+    } catch (e) { /* 存储异常时静默降级:本次会话内仍生效,仅不持久化 */ }
+    return state.masteryThreshold;
+}
+
 // ==================== 导入批次记录(撤销)与覆盖前快照 ====================
 
 // 批次记录:最近 5 次;损坏时静默降级为无记录(仅失去撤销能力,不影响题库数据)

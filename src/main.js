@@ -2,7 +2,7 @@ import { buildAiNotes } from './ai.js';
 import { state } from './state.js';
 import { applyTheme, initTheme, setThemeSetting } from './theme.js';
 import { finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey, shuffleArray, splitInlineOptions } from './parser.js';
-import { loadCollapsedBanks, loadFromLocalStorage, loadMasterySetting, saveCollapsedBanks, saveToLocalStorage, recordImportBatch } from './storage.js';
+import { loadCollapsedBanks, loadFromLocalStorage, loadMasterySetting, saveCollapsedBanks, saveMasterySetting, saveToLocalStorage, recordImportBatch } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, toggleAllBanks, updateErrorStreak, updateErrorsList, updateToggleAllBanksLabel } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
@@ -267,8 +267,7 @@ function setupEventListeners() {
 
     // 错题移出规则设置
     masteryThresholdSelect.addEventListener('change', function() {
-        state.masteryThreshold = parseInt(this.value, 10) || 0;
-        localStorage.setItem('masteryThresholdSetting', String(state.masteryThreshold));
+        saveMasterySetting(this.value);
         updateErrorsList();
     });
 
@@ -554,6 +553,7 @@ if (typeof window === 'undefined') {
         reviewErrors,
         reviewFavorites,
         saveCollapsedBanks,
+        saveMasterySetting,
         saveToLocalStorage,
         setupEventListeners,
         showImportStatus,
