@@ -2,37 +2,39 @@
     /* ===== 设计令牌(P0-1.1 令牌化:亮色值 = 历史硬编码值,零视觉变化) ===== */
     --c-bg: #f5f7fa;            /* 页面底 */
     --c-surface: #fff;           /* 卡片/表面 */
-    --c-surface-alt: var(--c-surface-alt);    /* 次级表面 */
-    --c-text: var(--c-text);
-    --c-text-secondary: var(--c-text-secondary);
-    --c-text-muted: var(--c-text-muted);
-    --c-text-faint: var(--c-text-faint);
-    --c-border: var(--c-border);
-    --c-border-light: var(--c-border-light);
-    --c-primary: var(--c-primary);
-    --c-primary-deep: var(--c-primary-deep);
-    --c-primary-alt: var(--c-primary-alt);
-    --c-primary-alt-deep: var(--c-primary-deep);
-    --c-success: var(--c-success);
-    --c-success-deep: var(--c-success-deep);
-    --c-success-bg: var(--c-success-bg);
-    --c-success-text: var(--c-success-text);
-    --c-danger: var(--c-danger);
-    --c-danger-deep: var(--c-danger-deep);
-    --c-danger-bg: var(--c-danger-bg);
-    --c-danger-text: var(--c-danger-text);
-    --c-warn: var(--c-warn);
-    --c-warn-bg: var(--c-warn-bg);
-    --c-warn-text: var(--c-warn-text);
-    --c-warn-accent: var(--c-warn-accent);
-    --c-accent-purple: var(--c-accent-purple);
-    --c-accent-purple-bg: var(--c-accent-purple-bg);
-    --c-accent-purple-text: var(--c-accent-purple-text);
-    --c-accent-orange: var(--c-accent-orange);
-    --c-info-bg: var(--c-info-bg);
-    --c-info-border: var(--c-info-border);
-    --c-panel-bg: var(--c-panel-bg);
-    --c-chip-bg: var(--c-border-light);
+    --c-surface-alt: #f8f9fa;    /* 次级表面 */
+    --c-text: #343a40;
+    --c-text-secondary: #495057;
+    --c-text-muted: #6c757d;
+    --c-text-faint: #adb5bd;
+    --c-border: #dee2e6;
+    --c-border-light: #e9ecef;
+    --c-primary: #4a6cf7;
+    --c-primary-deep: #3a5bd9;
+    --c-primary-alt: #4a6fa5;
+    --c-primary-alt-deep: #3a5bd9;
+    --c-success: #28a745;
+    --c-success-deep: #2e9e5b;
+    --c-success-bg: #d4edda;
+    --c-success-text: #155724;
+    --c-danger: #dc3545;
+    --c-danger-deep: #d9534f;
+    --c-danger-bg: #f8d7da;
+    --c-danger-text: #721c24;
+    --c-warn: #ffc107;
+    --c-warn-bg: #fff3cd;
+    --c-warn-text: #7a5c00;
+    --c-warn-accent: #b8860b;
+    --c-accent-purple: #8e7cc3;
+    --c-accent-purple-bg: #efeaff;
+    --c-accent-purple-text: #6a4fb6;
+    --c-accent-orange: #f0a500;
+    --c-info-bg: #eef3fb;
+    --c-info-border: #b9c6dd;
+    --c-panel-bg: #f1f3f5;
+    --c-chip-bg: #e9ecef;
+    --c-surface-warm: #fffdf5;
+    --c-warn-bg-soft: #fff8e6;
 }
 
 /* Zquiz · 期末周刷题 样式 */
