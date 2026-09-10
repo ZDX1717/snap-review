@@ -29,6 +29,7 @@ export function toggleFavorite(question, bankName) {
 
 // 刷新收藏夹列表
 export function updateFavoritesList() {
+    if (!favoritesList) return;  // 收藏改库卡内嵌
     if (state.favoriteQuestions.length === 0) {
         favoritesList.innerHTML = '<p class="empty-message">暂无收藏题目，刷题时点击题目右上角的"☆ 收藏"即可加入</p>';
         return;

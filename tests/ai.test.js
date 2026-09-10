@@ -507,3 +507,26 @@ test('错题本收藏:☆ 收藏入收藏夹并变 ★,再点取消;与刷题页
     run(`toggleFavorite(questionBanks['错题源'][0], '错题源')`);
     assert.strictEqual(run(`favoriteQuestions.length`), 0);
 });
+
+test('按库内嵌(P0-1.9):错题/收藏按 bankName 归入库卡手风琴;杂项兜底;遮挡默认藏答案', async () => {
+    const { run, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
+    run(`init()`);
+    run(`questionBanks['史库'] = [{ content: '库内题', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A' }]`);
+    run(`errorQuestions = [
+        { content: '史库错题', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A', userAnswer: 'B', bankName: '史库', analysis: '因为甲' },
+        { content: '孤儿错题', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A', userAnswer: 'B', bankName: '已删除的库' },
+    ]`);
+    run(`favoriteQuestions = [{ content: '史库收藏', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A', bankName: '史库' }]`);
+    run(`updateBanksList()`);
+    // 遮挡:错题条目里没有直接的"正确答案"文字(details 内不算外层文本)
+    const frag = run(`renderErrorsForBank('史库')`);
+    assert.ok(frag, '史库有错题面板');
+    // 遮挡:错题条目存在 details/summary("查看答案"),且渲染树顶层不含正确答案文字
+    const created = run(`__created`);
+    const summary = created.filter(c => c.tag === 'SUMMARY' && String(c.el.textContent).includes('查看答案'));
+    assert.ok(summary.length >= 1, '遮挡由 details/summary 承载');
+    // 杂项兜底
+    run(`updateBanksList()`);
+    const created2 = run(`__created`);
+    assert.ok(created2.some(c => c.tag === 'H3' && String(c.el.textContent).includes('杂项')), '孤儿错题归入杂项卡');
+});

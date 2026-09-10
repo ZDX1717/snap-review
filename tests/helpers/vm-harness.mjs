@@ -16,7 +16,8 @@ export function makeEl() {
         classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
         style: {}, appendChild() {}, textContent: '', value: '', innerHTML: '', files: [],
         checked: false, placeholder: '', rows: 0, dataset: {},
-        querySelectorAll: () => [], type: '', children: [], disabled: false,
+        querySelector: () => makeEl(), querySelectorAll: () => [],
+        type: '', children: [], disabled: false,
         focus() {},
     };
 }
@@ -38,6 +39,7 @@ export async function loadApp({ confirmResult = true, promptValue = 'x', sandbox
     const elements = {};
     const store = new Map();
     const domContentLoadedCount = { n: 0 };
+    const created = [];
 
     const sandbox = {
         ...sandboxExtras,
@@ -45,7 +47,7 @@ export async function loadApp({ confirmResult = true, promptValue = 'x', sandbox
             getElementById: (id) => (elements[id] ||= makeEl()),
             querySelector: () => makeEl(),
             querySelectorAll: () => [],
-            createElement: () => makeEl(),
+            createElement: (tag) => { const el = makeEl(); created.push({ tag: String(tag || '').toUpperCase(), el }); return el; },
             createTextNode: (t) => ({ text: t }),
             addEventListener(type) { if (type === 'DOMContentLoaded') domContentLoadedCount.n++; },
             body: makeEl(),
@@ -84,6 +86,7 @@ export async function loadApp({ confirmResult = true, promptValue = 'x', sandbox
     for (const [name, id] of collectDomPairs()) {
         if (elements[id]) domConsts[name] = elements[id];
     }
+    sandbox.__created = created;
     sandbox.__inject = domConsts;
     vm.runInContext('Object.assign(globalThis.__zquiz, __inject)', context);
 

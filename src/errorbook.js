@@ -57,6 +57,7 @@ export function updateErrorStreak(question, isCorrect, userAnswer) {
 
 
 export function updateErrorsList() {
+    if (!errorsList) return;  // 堆叠面板已移除,错题改库卡内嵌(兼容旧测试:沙箱自动建元素)
     if (state.errorQuestions.length === 0) {
         errorsList.innerHTML = '<p class="empty-message">暂无错题记录</p>';
         toggleAllBanksBtn.classList.add('hidden');
@@ -253,9 +254,11 @@ export function toggleAllBanks() {
 
 // 根据当前展开/折叠状态更新"全部展开/全部折叠"按钮文案（展示将要执行的动作）
 export function updateToggleAllBanksLabel(bankNameList) {
+    if (!toggleAllBanksBtn) return;  // 按钮 已随堆叠面板移除
     const names = bankNameList || new Set(state.errorQuestions.map(q => q.bankName || '未知题库'));
     const list = Array.isArray(names) ? names : [...names];
     if (list.length === 0) return;
     const anyExpanded = list.some(name => !!state.expandedBanks[name]);
     toggleAllBanksBtn.textContent = anyExpanded ? '全部折叠' : '全部展开';
 }
+

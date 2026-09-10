@@ -4,6 +4,7 @@ import { saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportB
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
 import { OFFICIAL_PROMPT, buildCopyText, copyText } from './prompt.js';
+import { toggleFavorite, updateFavoritesList } from './favorites.js';
 import { aiConfigReady, aiFixQuestions, aiFormatMaterial, aiMatchKey, aiDiffParts, buildAiNotes, getProvider, normalizeAiConfig, testConnection } from './ai.js';
 import { isAiTested, loadAiConfig, markAiTested, saveAiConfig, recordAiUsage } from './storage.js';
 
@@ -1412,6 +1413,146 @@ export function refreshQuestionBankView() {
 
 
 // 更新题库列表
+
+// ==================== 按库内嵌渲染(P0-1.9:错题归题库卡手风琴) ====================
+
+// 生成单个遮挡式错题条目:默认只显示题干;「查看答案」展开后红绿对比 + 解析
+// index = 该错题在 state.errorQuestions 中的真实下标(删除/掌握用);bankName = 归属库
+function buildErrorItem(question, index) {
+    const item = document.createElement('div');
+    item.className = 'error-item';
+
+    const title = document.createElement('h4');
+    title.textContent = question.content;
+    item.appendChild(title);
+
+    const type = document.createElement('p');
+    type.className = 'error-type-line';
+    type.textContent = `题型:${question.type}` + (question.userAnswer ? ` · 你答:${question.userAnswer}` : '');
+    item.appendChild(type);
+
+    // 主动回忆遮挡:答案/解析藏进 details,展开才见红绿对比
+    const reveal = document.createElement('details');
+    reveal.className = 'answer-reveal';
+    const summary = document.createElement('summary');
+    summary.textContent = '查看答案';
+    reveal.appendChild(summary);
+
+    const yourAnswer = document.createElement('p');
+    yourAnswer.className = 'your-answer';
+    yourAnswer.textContent = `你的答案:${question.userAnswer || '(未答)'}`;
+    reveal.appendChild(yourAnswer);
+
+    const correctAnswer = document.createElement('p');
+    correctAnswer.className = 'correct-answer';
+    correctAnswer.textContent = `正确答案:${question.answer}`;
+    reveal.appendChild(correctAnswer);
+
+    const analysis = document.createElement('p');
+    analysis.textContent = `解析:${question.analysis || question.explanation || '暂无解析'}`;
+    reveal.appendChild(analysis);
+    item.appendChild(reveal);
+
+    if ((question.correctStreak || 0) > 0 && state.masteryThreshold > 0) {
+        const mastery = document.createElement('p');
+        mastery.className = 'mastery-note';
+        mastery.textContent = `已连对 ${question.correctStreak} 次,再答对 ${state.masteryThreshold - question.correctStreak} 次自动移出错题本`;
+        item.appendChild(mastery);
+    }
+
+    const isFav = state.favoriteQuestions.some(fq => fq.content === question.content);
+    const favBtn = document.createElement('button');
+    favBtn.className = 'fav-toggle-btn';
+    favBtn.textContent = isFav ? '★ 已收藏' : '☆ 收藏';
+    favBtn.addEventListener('click', () => {
+        toggleFavorite(question, question.bankName);
+        if (typeof CustomEvent !== 'undefined' && document.dispatchEvent) {
+            document.dispatchEvent(new CustomEvent('zquiz:embeds-dirty'));
+        }
+    });
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'delete-btn';
+    deleteBtn.textContent = '删除';
+    deleteBtn.addEventListener('click', () => {
+        state.errorQuestions.splice(index, 1);
+        saveToLocalStorage();
+        updateBanksList();
+    });
+
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'error-actions';
+    actionsRow.appendChild(favBtn);
+    actionsRow.appendChild(deleteBtn);
+    item.appendChild(actionsRow);
+    return item;
+}
+
+// 某题库的错题手风琴面板(空库返回 null)
+export function renderErrorsForBank(bankName) {
+    const indices = [];
+    state.errorQuestions.forEach((q, i) => {
+        if ((q.bankName || '未知题库') === bankName) indices.push(i);
+    });
+    if (indices.length === 0) return null;
+    const wrap = document.createElement('div');
+    wrap.className = 'bank-errors-panel';
+    const head = document.createElement('h4');
+    head.className = 'bank-panel-title';
+    head.textContent = `错题(${indices.length})`;
+    wrap.appendChild(head);
+    indices.forEach(i => wrap.appendChild(buildErrorItem(state.errorQuestions[i], i)));
+    return wrap;
+}
+
+// 某题库的收藏面板(空返回 null)
+function renderFavoritesForBank(bankName) {
+    const favs = state.favoriteQuestions.filter(fq => (fq.bankName || '未知题库') === bankName);
+    if (favs.length === 0) return null;
+    const wrap = document.createElement('div');
+    wrap.className = 'bank-favorites-panel';
+    const head = document.createElement('h4');
+    head.className = 'bank-panel-title';
+    head.textContent = `收藏(${favs.length})`;
+    wrap.appendChild(head);
+    favs.forEach(fq => {
+        const item = document.createElement('div');
+        item.className = 'error-item';
+        const title = document.createElement('h4');
+        title.textContent = fq.content;
+        item.appendChild(title);
+        const inErrors = state.errorQuestions.some(eq => eq.content === fq.content);
+        if (inErrors) {
+            const tag = document.createElement('span');
+            tag.className = 'badge';
+            tag.textContent = '📕 在错题本';
+            item.appendChild(tag);
+        }
+        const answer = document.createElement('p');
+        answer.className = 'correct-answer';
+        answer.textContent = `答案:${fq.answer || '(待补)'}`;
+        item.appendChild(answer);
+        const analysis = document.createElement('p');
+        analysis.textContent = `解析:${fq.analysis || fq.explanation || '暂无解析'}`;
+        item.appendChild(analysis);
+        const actionsRow = document.createElement('div');
+        actionsRow.className = 'error-actions';
+        const unfavBtn = document.createElement('button');
+        unfavBtn.className = 'delete-btn';
+        unfavBtn.textContent = '取消收藏';
+        unfavBtn.addEventListener('click', () => {
+            toggleFavorite(fq, fq.bankName);
+            if (typeof CustomEvent !== 'undefined' && document.dispatchEvent) {
+                document.dispatchEvent(new CustomEvent('zquiz:embeds-dirty'));
+            }
+        });
+        actionsRow.appendChild(unfavBtn);
+        item.appendChild(actionsRow);
+        wrap.appendChild(item);
+    });
+    return wrap;
+}
+
 export function updateBanksList() {
     const bankNames = Object.keys(state.questionBanks);
 
@@ -1478,8 +1619,58 @@ export function updateBanksList() {
         bankItem.appendChild(bankInfo);
         bankItem.appendChild(bankActions);
 
+        // 库卡点击体 = 展开本库错题/收藏手风琴(按钮区独立,不误触)
+        bankItem.addEventListener('click', (e) => {
+            if (e.target && e.target.closest && e.target.closest('button')) return;
+            state.expandedBanks[bankName] = !state.expandedBanks[bankName];
+            saveCollapsedBanks();
+            updateBanksList();
+        });
+
         banksList.appendChild(bankItem);
+
+        // 内嵌手风琴:错题(遮挡式)+ 收藏
+        if (state.expandedBanks[bankName]) {
+            const errPanel = renderErrorsForBank(bankName);
+            if (errPanel) banksList.appendChild(errPanel);
+            const favPanel = renderFavoritesForBank(bankName);
+            if (favPanel) banksList.appendChild(favPanel);
+        }
     });
+
+    // 杂项兜底:错题/收藏的 bankName 已不在题库列表(库被删等)
+    const liveNames = new Set(bankNames);
+    const miscNames = new Set();
+    state.errorQuestions.forEach(q => { const n = q.bankName || '未知题库'; if (!liveNames.has(n)) miscNames.add(n); });
+    state.favoriteQuestions.forEach(q => { const n = q.bankName || '未知题库'; if (!liveNames.has(n)) miscNames.add(n); });
+    miscNames.forEach(name => {
+        const miscItem = document.createElement('div');
+        miscItem.className = 'bank-item misc-bank';
+        const info = document.createElement('div');
+        info.className = 'bank-info';
+        const t = document.createElement('h3');
+        t.textContent = `杂项 · ${name}`;
+        info.appendChild(t);
+        miscItem.appendChild(info);
+        miscItem.addEventListener('click', () => {
+            state.expandedBanks['misc:' + name] = !state.expandedBanks['misc:' + name];
+            saveCollapsedBanks();
+            updateBanksList();
+        });
+        banksList.appendChild(miscItem);
+        if (state.expandedBanks['misc:' + name]) {
+            const errPanel = renderErrorsForBank(name);
+            if (errPanel) banksList.appendChild(errPanel);
+            const favPanel = renderFavoritesForBank(name);
+            if (favPanel) banksList.appendChild(favPanel);
+        }
+    });
+
+    // 内嵌操作(收藏/删除)后刷新
+    if (typeof window !== 'undefined' && !window.__embedsListener) {
+        window.__embedsListener = true;  // 仅浏览器注册(vm 沙箱无 window)
+        document.addEventListener('zquiz:embeds-dirty', () => updateBanksList());
+    }
 }
 
 
