@@ -530,3 +530,17 @@ test('按库内嵌(P0-1.9):错题/收藏按 bankName 归入库卡手风琴;杂�
     const created2 = run(`__created`);
     assert.ok(created2.some(c => c.tag === 'H3' && String(c.el.textContent).includes('杂项')), '孤儿错题归入杂项卡');
 });
+
+test('重命名题库同步错题/收藏归属(不漂进杂项)', async () => {
+    const { run } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
+    run(`init()`);
+    run(`questionBanks['旧名'] = [{ content: '题', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A' }]`);
+    run(`errorQuestions = [{ content: '题', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A', userAnswer: 'B', bankName: '旧名' }]`);
+    run(`favoriteQuestions = [{ content: '题', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A', bankName: '旧名' }]`);
+    run(`state.currentRenameBank = '旧名'`);
+    run(`renameBankNameInput.value = '新名'`);
+    run(`renameBank()`);
+    assert.strictEqual(run(`errorQuestions[0].bankName`), '新名');
+    assert.strictEqual(run(`favoriteQuestions[0].bankName`), '新名');
+    assert.strictEqual(run(`!!questionBanks['新名']`), true);
+});

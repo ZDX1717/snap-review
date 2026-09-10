@@ -1010,6 +1010,11 @@ export function renameBank() {
     state.questionBanks[newName] = state.questionBanks[state.currentRenameBank];
     delete state.questionBanks[state.currentRenameBank];
 
+    // 归属同步(P0-1.9):错题/收藏跟随新库名,避免漂进"杂项"
+    const oldName = state.currentRenameBank;
+    state.errorQuestions.forEach(q => { if (q.bankName === oldName) q.bankName = newName; });
+    state.favoriteQuestions.forEach(q => { if (q.bankName === oldName) q.bankName = newName; });
+
     if (state.currentBankName === state.currentRenameBank) {
         state.currentBankName = newName;
         state.questionBank = state.questionBanks[state.currentBankName];
