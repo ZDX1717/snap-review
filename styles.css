@@ -114,19 +114,18 @@ header {
 /* 品牌块:logo + 右下角小字。用 h1 保留"页面唯一一级标题"的语义,
    small 作副题并右对齐到 logo 末端,形成从属关系(👤 要求小字在 logo 右下) */
 h1.brand {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;     /* 小字右对齐 → 落在 logo 右下方 */
     min-width: 0;              /* 窄屏可收缩,不把主题开关挤出屏幕 */
     font-size: 16px;
     font-weight: 600;
     line-height: 1.2;
 }
 
+/* 小字紧跟在 logo 后面的右下角:同一行、按基线对齐,所以它天然贴在 logo 的右下,
+   且不会像右对齐块那样在 logo 下方多占一行(👤 两次反馈)。 */
 .brand-tagline {
+    margin-left: 6px;
     font-size: 10px;
     font-weight: 400;
-    line-height: 1.2;
     color: rgba(255, 255, 255, 0.75);
     white-space: nowrap;
 }
@@ -159,7 +158,9 @@ nav {
 }
 
 main {
-    padding: 32px;
+    /* 顶部不留内边距:标题栏之下紧接内容块。原先 32px 会在"导入题库"与"刷题统计"
+       等首个模块上方留出一大块空白(👤 反馈)。 */
+    padding: 0 32px 32px;
 }
 
 .section {
@@ -464,6 +465,12 @@ h3 {
     border-radius: 6px;
     padding: 24px;
     margin-top: 24px;
+}
+
+/* 每个分区里的首个元素不再自带上外边距 —— 顶部空白统一由 main 控制,
+   避免"改了 main 却仍看到空白"(子元素 margin 叠加) */
+.section.active > *:first-child {
+    margin-top: 0;
 }
 
 /* ==================== 结果页(重设计:1 行大字 + 1 行 chips) ====================
@@ -1735,7 +1742,7 @@ h3 {
         min-height: 100vh;
     }
     main {
-        padding: 16px 12px 24px;
+        padding: 0 12px 24px;
     }
     section h2 {
         font-size: 20px;

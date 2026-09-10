@@ -95,3 +95,33 @@ test('开始刷题按钮必须全屏宽隐藏(不能只写在手机媒体查询�
         '隐藏规则需覆盖 #quiz-result 显示时的状态(结果页也要隐藏该按钮)',
     );
 });
+
+test('首个模块上方不留空白:main 无上内边距 + 首元素 margin-top 归零', () => {
+    // 👤 两次反馈"模块框上面空白太大"。根因是 main 的 32px 上内边距,
+    // 且子元素自带上外边距会把它抵消掉,所以两处都要守。
+    const cssText = String(cssNoComments);
+    const mains = [...cssText.matchAll(/(?:^|[\s,])main\s*\{([^}]*)\}/g)].map(m => m[1]);
+    assert.ok(mains.length >= 1, '应有 main 规则');
+    for (const body of mains) {
+        const pad = (body.match(/padding\s*:\s*([^;]+)/) || [])[1];
+        if (pad) {
+            const top = pad.trim().split(/\s+/)[0];
+            assert.strictEqual(top, '0', `main 的 padding 上值应为 0,实际 ${top}`);
+        }
+    }
+    assert.ok(
+        /\.section\.active\s*>\s*\*:first-child\s*\{[^}]*margin-top\s*:\s*0/.test(cssText),
+        '每个分区的首元素应 margin-top:0,否则会抵消 main 的收窄',
+    );
+});
+
+test('品牌小字紧随 logo 的右下角(在同一行,不单独占一行)', () => {
+    const cssText = String(cssNoComments);
+    const brand = cssText.match(/h1\.brand\s*\{([^}]*)\}/);
+    assert.ok(brand, '应有 h1.brand 规则');
+    // 不得再用"纵向堆叠 + 右对齐"的旧方案(会让小字多占一行)
+    assert.ok(!/flex-direction\s*:\s*column/.test(brand[1]), 'h1.brand 不应为 column 布局');
+    const tagline = cssText.match(/\.brand-tagline\s*\{([^}]*)\}/);
+    assert.ok(tagline, '应有 .brand-tagline 规则');
+    assert.ok(/font-size\s*:\s*10px/.test(tagline[1]), '小字应为 10px');
+});
