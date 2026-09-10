@@ -265,6 +265,7 @@ h3 {
 }
 
 .option-item {
+    position: relative;
     margin-bottom: 16px;
     padding: 8px;
     border-radius: 6px;
@@ -277,7 +278,13 @@ h3 {
 
 .option-item input[type="radio"],
 .option-item input[type="checkbox"] {
-    margin-right: 8px;
+    /* 原生圆点隐藏:选中态由卡片高亮表达(👤 验收反馈);保留可聚焦可切换 */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .option-label {
@@ -1320,6 +1327,7 @@ h3 {
 
 /* 选项整行卡片:整行可点,触达 ≥44px */
 .option-item {
+    position: relative;
     display: block;
     border: 2px solid var(--c-border-light);
     border-radius: 10px;
@@ -1346,10 +1354,6 @@ h3 {
 }
 .option-item input {
     accent-color: var(--c-primary-alt);
-    width: 18px;
-    height: 18px;
-    margin: 2px 0 0;
-    flex: none;
 }
 .option-item label {
     display: flex;
