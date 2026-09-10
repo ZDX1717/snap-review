@@ -1993,3 +1993,21 @@ html[data-theme="dark"] .container {
         padding-bottom: 4px;  /* 操作条已脱离文档流,无需大留白 */
     }
 }
+
+/* ==================== 验收修复(Y04/Y05) ==================== */
+/* 修复1:站名标题只在首页显示,其他分区收起(手机屏寸金) */
+@media (max-width: 768px) {
+    body:has(.section.active:not(#home-section)) header {
+        display: none;
+    }
+}
+/* 修复2:刷题聚焦时选项被固定操作条遮挡 —— 容器预留操作条+底栏高度,可完整滚动 */
+@media (max-width: 768px) {
+    #quiz-section.active:has(#quiz-container:not(.hidden)) #quiz-container {
+        padding-bottom: calc(64px + env(safe-area-inset-bottom));  /* 操作条 50 + 底栏 54 的重叠区 */
+    }
+    /* 反馈面板与选项之间不被操作条盖住:给反馈区也留出空间 */
+    #quiz-section.active:has(#quiz-container:not(.hidden)) #answer-feedback:not(.hidden) {
+        margin-bottom: calc(58px + env(safe-area-inset-bottom));
+    }
+}
