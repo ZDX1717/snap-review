@@ -182,8 +182,9 @@ function init() {
     // 设置事件监听器
     setupEventListeners();
     
-    // 显示首页
-    showSection('home');
+    // 显示首页;URL hash 深链(#banks/#quiz 等)直达对应分区
+    const hash = typeof location !== 'undefined' && location.hash ? location.hash.slice(1) : '';
+    showSection(['home', 'quiz', 'banks'].includes(hash) ? hash : 'home');
 }
 
 // 设置事件监听器
