@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { normalizeAnswerString, shuffleArray } from './parser.js';
+import { formatAnswerForDisplay, normalizeAnswerString, shuffleArray } from './parser.js';
 import { addToErrorBook, updateErrorStreak, updateErrorsList } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
 import { updateBanksList, updateLastImportInfo, renderRecycleBin } from './bank.js';
@@ -350,7 +350,7 @@ export function submitAnswer() {
         ? (removedFromErrorBook > 0
             ? `回答正确！已连对 ${state.masteryThreshold} 次，移出错题本 🎉`
             : '回答正确！')
-        : `回答错误！正确答案是：${question.answer}`;
+        : `回答错误！正确答案是：${formatAnswerForDisplay(question.answer, question)}`;
     answerResult.className = isCorrect ? 'correct-answer' : 'wrong-answer';
     answerExplanation.textContent = question.analysis || '';
     answerFeedback.classList.remove('hidden');
@@ -542,7 +542,7 @@ export function renderAnswerReview() {
 
         const answers = document.createElement('p');
         answers.className = 'review-answers';
-        answers.textContent = `你的答案：${ua || '未作答'}　正确答案：${question.answer}`;
+        answers.textContent = `你的答案：${ua ? formatAnswerForDisplay(ua, question) : '未作答'}　正确答案：${formatAnswerForDisplay(question.answer, question)}`;
         item.appendChild(answers);
 
         if (question.analysis) {

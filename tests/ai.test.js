@@ -601,3 +601,37 @@ test('题库页只负责管理:库卡不再有「开始刷题」,刷题入口统
     const editBtns = created.filter(c => String(c.el.textContent).includes('编辑'));
     assert.ok(editBtns.length >= 1, '库卡应保留「编辑」入口');
 });
+
+test('错题条目渲染:题型在题干前、选项裸露、不泄露用户错选、判断题显对错', async () => {
+    const { run } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
+    run(`init()`);
+    run(`questionBanks['T'] = [{ content: '选择题', type: '单选', options: { A: '甲甲甲', B: '乙乙乙' }, answer: 'A' }]`);
+    run(`errorQuestions = [
+        { content: '选择题', type: '单选', options: { A: '甲甲甲', B: '乙乙乙' }, answer: 'A', userAnswer: 'B', bankName: 'T' },
+        { content: '判断题', type: '判断', options: { A: '正确', B: '错误' }, answer: 'A', userAnswer: 'B', bankName: 'T' },
+    ]`);
+    run(`expandedBanks['err:T'] = true`);   // 错题面板需展开才渲染
+    run(`updateBanksList()`);
+    const created = run(`__created`);
+
+    // ① 题型标在题干之前
+    const types = created.filter(c => /^［.+］$/.test(String(c.el.textContent)));
+    assert.ok(types.length >= 2, '题型标应存在(［单选］/［判断］)');
+
+    // ② 选项裸露(错题复盘要能看到选项)
+    const optionLines = created.filter(c => String(c.el.className).includes('error-options'));
+    assert.ok(optionLines.length >= 2, '选择题与判断题都应列出选项');
+
+    // ③ 折叠态不得泄露用户错选:题型行不得出现"你答"
+    const typeTexts = created
+        .filter(c => String(c.el.className).includes('error-type-line'))
+        .map(c => String(c.el.textContent));
+    assert.ok(typeTexts.every(t => !t.includes('你答')), '题型行不得带"你答"');
+
+    // ④ 判断题答案显示对错而非 A/B
+    const revealTexts = created
+        .filter(c => String(c.el.className).includes('correct-answer') || String(c.el.className).includes('your-answer'))
+        .map(c => String(c.el.textContent));
+    assert.ok(revealTexts.some(t => t.includes('对')), '判断题正确答案应显示"对"');
+    assert.ok(!revealTexts.some(t => /答案[：:]\s*[AB]\s*$/.test(t)), '不得显示裸 A/B');
+});

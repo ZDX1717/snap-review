@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import {
-    parseQuestionsText, finalizeQuestion, normalizeAnswerString, questionDedupKey,
+    parseQuestionsText, finalizeQuestion, normalizeAnswerString, questionDedupKey, formatAnswerForDisplay,
     splitInlineOptions,
 } from '../src/parser.js';
 
@@ -248,4 +248,24 @@ B. 乙使用工业酒精勾兑白酒
 A. 对 B. 错
 答案：A`);
     assert.strictEqual(stemWrap[0].content, '甲潜入某机关大院\n在乙家门口放火');
+});
+
+test('展示用答案:判断题显示「对/错」而非 A/B,选择题附选项文本', () => {
+    // 判断题:数据层统一存 A/B,展示必须映射回对错(👤 反馈:显示 A/B 没意义)
+    assert.strictEqual(formatAnswerForDisplay('A', { type: '判断', options: { A: '正确', B: '错误' } }), '对');
+    assert.strictEqual(formatAnswerForDisplay('B', { type: '判断', options: { A: '正确', B: '错误' } }), '错');
+    // 判断题但选项为空(旧数据):按题型仍映射
+    assert.strictEqual(formatAnswerForDisplay('A', { type: '判断' }), '对');
+
+    // 选择题:附选项文本,便于「缺选项」的错题条目也看得懂
+    const single = { type: '单选', options: { A: '甲选项内容', B: '乙选项内容' } };
+    assert.strictEqual(formatAnswerForDisplay('A', single), 'A. 甲选项内容');
+    // 选项文本过短(占位/模板)则只给字母,避免噪声
+    assert.strictEqual(formatAnswerForDisplay('A', { type: '单选', options: { A: '甲' } }), 'A');
+    // 多选:原样返回(不逐项展开)
+    assert.strictEqual(formatAnswerForDisplay('AB', { type: '多选', options: { A: '甲甲甲', B: '乙乙乙' } }), 'AB');
+    // 空答案 / 缺参数不得抛错
+    assert.strictEqual(formatAnswerForDisplay('', single), '');
+    assert.strictEqual(formatAnswerForDisplay(null, single), '');
+    assert.strictEqual(formatAnswerForDisplay('A'), 'A');
 });

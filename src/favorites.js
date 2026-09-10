@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { formatAnswerForDisplay } from './parser.js';
 import { saveToLocalStorage } from './storage.js';
 
 // ==================== favorites.js ====================
@@ -71,7 +72,7 @@ export function updateFavoritesList() {
 
         const correctAnswer = document.createElement('p');
         correctAnswer.className = 'correct-answer';
-        correctAnswer.textContent = `正确答案：${question.answer}`;
+        correctAnswer.textContent = `正确答案：${formatAnswerForDisplay(question.answer, question)}`;
         item.appendChild(correctAnswer);
 
         if (question.analysis) {

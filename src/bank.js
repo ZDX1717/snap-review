@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey } from './parser.js';
+import { finalizeQuestion, formatAnswerForDisplay, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey } from './parser.js';
 import { saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportBatch, loadOverwriteSnapshot, clearOverwriteSnapshot, loadBankVersions, pushBankVersion, loadCollapsedBanks, saveCollapsedBanks } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
@@ -1445,14 +1445,26 @@ function buildErrorItem(question, index) {
     const item = document.createElement('div');
     item.className = 'error-item';
 
+    // 题型标在题干之前(👤 反馈):先知道是什么题型再读题,比读完备注更顺
+    const type = document.createElement('p');
+    type.className = 'error-type-line';
+    type.textContent = `［${question.type}］`;
+    item.appendChild(type);
+
     const title = document.createElement('h4');
     title.textContent = question.content;
     item.appendChild(title);
 
-    const type = document.createElement('p');
-    type.className = 'error-type-line';
-    type.textContent = `题型:${question.type}` + (question.userAnswer ? ` · 你答:${question.userAnswer}` : '');
-    item.appendChild(type);
+    // 选项裸露:错题常是"选项没印象了",不列选项无法复盘(👤 反馈:错题本缺选项)
+    // 注意**不标注哪个是用户选错的** —— 选错本身没有信息量,且会提前泄底;
+    // 正确答案在下方 details 里,靠主动回忆遮挡。
+    const optKeys = Object.keys(question.options || {}).sort();
+    if (optKeys.length) {
+        const opts = document.createElement('p');
+        opts.className = 'error-options';
+        opts.textContent = optKeys.map(k => `${k}. ${question.options[k]}`).join('　');
+        item.appendChild(opts);
+    }
 
     // 主动回忆遮挡:答案/解析藏进 details,展开才见红绿对比
     const reveal = document.createElement('details');
@@ -1463,12 +1475,13 @@ function buildErrorItem(question, index) {
 
     const yourAnswer = document.createElement('p');
     yourAnswer.className = 'your-answer';
-    yourAnswer.textContent = `你的答案:${question.userAnswer || '(未答)'}`;
+    // 判断题按对错展示,不显示 A/B(👤 反馈)
+    yourAnswer.textContent = `你的答案:${question.userAnswer ? formatAnswerForDisplay(question.userAnswer, question) : '(未答)'}`;
     reveal.appendChild(yourAnswer);
 
     const correctAnswer = document.createElement('p');
     correctAnswer.className = 'correct-answer';
-    correctAnswer.textContent = `正确答案:${question.answer}`;
+    correctAnswer.textContent = `正确答案:${formatAnswerForDisplay(question.answer, question)}`;
     reveal.appendChild(correctAnswer);
 
     const analysis = document.createElement('p');

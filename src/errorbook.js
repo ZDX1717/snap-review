@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { formatAnswerForDisplay } from './parser.js';
 import { saveCollapsedBanks, saveToLocalStorage } from './storage.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
 
@@ -165,7 +166,7 @@ export function updateErrorsList() {
 
         const correctAnswer = document.createElement('p');
         correctAnswer.className = 'correct-answer';
-        correctAnswer.textContent = `正确答案：${question.answer}`;
+        correctAnswer.textContent = `正确答案：${formatAnswerForDisplay(question.answer, question)}`;
 
         const yourAnswer = document.createElement('p');
         yourAnswer.className = 'your-answer';

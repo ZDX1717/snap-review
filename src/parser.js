@@ -142,6 +142,21 @@ function normalizeSourceField(q, key) {
     q[key] = q[key] === 'ai' || q[key] === 'manual' ? q[key] : null;
 }
 
+// 展示用答案文案:判断题显示「对/错」而不是 A/B(👤 反馈:错题本/结果页显示 A/B 没意义)。
+// 判断题在数据层统一存 A/B(见 finalizeQuestion,保证判分一致),只在**展示时**映射回对错。
+// 非判断题返回原答案字母;带选项文本时附带选项内容,便于「缺选项」的错题/收藏条目仍看得懂。
+// ⚠️ 这是**唯一**的答案展示入口:新增展示位必须走它,不要直接拼接 question.answer。
+export function formatAnswerForDisplay(answer, question) {
+    const a = String(answer == null ? '' : answer).trim();
+    if (!a) return '';
+    const q = question || {};
+    if (q.type === '判断') return a === 'A' ? '对' : a === 'B' ? '错' : a;
+    const opts = q.options || {};
+    const text = (opts[a] || '').trim();
+    // 只有"真实选项文本"才附加(过短的占位文本只会制造噪声)
+    return text.length > 2 ? `${a}. ${text}` : a;
+}
+
 // 查重指纹：题干（去空白）+ 全部选项文本。同一题重新导入（即使改了答案）会被识别为重复；
 // 题干相同但选项不同的题（如"下列说法正确的是()"）不会被误判
 export function questionDedupKey(q) {

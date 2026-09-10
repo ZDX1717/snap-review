@@ -96,13 +96,17 @@ body {
 header {
     background-color: var(--c-primary);
     color: #fff;
-    padding: 24px;
-    text-align: center;
+    /* 收窄:标题栏只承载站名与主题开关,给内容让位(👤 反馈) */
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
 }
 
 header h1 {
-    font-size: 24px;
-    font-weight: 500;
+    font-size: 16px;
+    font-weight: 600;
 }
 
 nav {
@@ -487,22 +491,6 @@ h3 {
 .chip.ok { background: var(--c-success-bg); color: var(--c-success-text); }
 .chip.bad { background: var(--c-danger-bg); color: var(--c-danger-text); }
 
-.error-actions {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 24px;
-}
-
-.error-actions button {
-    flex: 1;
-}
-
-.errors-list {
-    background-color: var(--c-surface-alt);
-    border-radius: 6px;
-    padding: 24px;
-}
-
 .empty-message {
     text-align: center;
     color: var(--c-text-muted);
@@ -586,36 +574,18 @@ h3 {
     margin-bottom: 4px;
 }
 
+/* 选项:一行流式展示(错题复盘要看得到选项,但不必做成卡片块) */
 .error-options {
-    background-color: var(--c-surface-alt);
-    border-radius: 6px;
-    padding: 16px;
-    margin: 16px 0;
-}
-
-.error-option {
-    display: flex;
-    align-items: flex-start;
-    margin-bottom: 8px;
-    padding: 8px;
-    background-color: var(--c-surface);
-    border-radius: 6px;
-}
-
-.error-option:last-child {
-    margin-bottom: 0;
-}
-
-.error-option .option-label {
-    font-weight: 600;
     color: var(--c-text-secondary);
-    margin-right: 8px;
-    min-width: 30px;
+    margin-bottom: 8px;
 }
 
-.error-option .option-text {
+/* 题型标:置于题干之前,小字弱化,只做定位不抢视线 */
+.error-type-line {
+    font-size: 12px;
+    font-weight: 600;
     color: var(--c-text-muted);
-    flex: 1;
+    margin-bottom: 2px;
 }
 
 .error-item .correct-answer {
@@ -661,9 +631,6 @@ h3 {
         flex-direction: column;
     }
     
-    .error-actions {
-        flex-direction: column;
-    }
 }
 
 
@@ -1084,14 +1051,6 @@ h3 {
     margin: 4px 0 0;
     line-height: 1.6;
 }
-
-/* ==================== 首页介绍 ==================== */
-
-.home-hero {
-    text-align: center;
-    padding: 26px 8px 8px;
-}
-
 
 
 
@@ -1771,8 +1730,7 @@ h3 {
     }
     .banks-list,
     .editor-question-list,
-    .favorites-list,
-    #errors-list {
+    .favorites-list {
         font-size: 14px;
     }
 
@@ -1946,27 +1904,28 @@ html[data-theme="dark"] .container {
 }
 
 /* 主题三档开关 */
+/* 主题开关:住在标题栏蓝底上,故用半透明白而非令牌色(令牌是为浅色表面设计的) */
 .theme-switch {
     display: inline-flex;
     gap: 0;
-    border: 1px solid var(--c-border);
+    border: 1px solid rgba(255, 255, 255, 0.45);
     border-radius: 999px;
     overflow: hidden;
-    margin-bottom: 16px;
+    flex: none;
 }
 .theme-opt {
     border: none;
-    background: var(--c-surface);
-    color: var(--c-text-muted);
-    padding: 4px 12px;
-    font-size: 14px;
+    background: none;
+    color: rgba(255, 255, 255, 0.75);
+    padding: 2px 10px;
+    font-size: 12px;
     cursor: pointer;
     font-family: inherit;
 }
-.theme-opt + .theme-opt { border-left: 1px solid var(--c-border); }
+.theme-opt + .theme-opt { border-left: 1px solid rgba(255, 255, 255, 0.45); }
 .theme-opt.active {
-    background: var(--c-primary);
-    color: #fff;
+    background: #fff;
+    color: var(--c-primary);
 }
 
 /* ==================== P0-1.5 刷题聚焦模式(手机:题目居中 + 底部固定操作条) ==================== */
@@ -2043,12 +2002,7 @@ html[data-theme="dark"] .container {
 }
 
 /* ==================== 验收修复(Y04/Y05) ==================== */
-/* 修复1:站名标题只在首页显示,其他分区收起(手机屏寸金) */
-@media (max-width: 768px) {
-    body:has(.section.active:not(#home-section)) header {
-        display: none;
-    }
-}
+/* 标题栏现为常驻应用栏(站名 + 主题开关),不再随分区隐藏 —— 见 header 规则 */
 /* 修复2:刷题聚焦时选项被固定操作条遮挡 —— 容器预留操作条+底栏高度,可完整滚动 */
 @media (max-width: 768px) {
     #quiz-section.active:has(#quiz-container:not(.hidden)) #quiz-container {
