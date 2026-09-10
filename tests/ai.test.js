@@ -399,10 +399,11 @@ test('编辑器:AI 题人工保存后消标;待修题说明行随状态切换', 
     assert.strictEqual(run(`questionBanks['AI测试库'][0].aiSource`), undefined);
     // 待修题(导入一题缺答案) → 说明行走橙字分支
     run(`openImportPreview(parseQuestionsText('1. 缺答案的题 A.甲 B.乙'))`);
+    run(`previewData[0].include = true; renderPreview()`);
     run(`previewTargetBankSelect.value = 'AI测试库'`);
     run(`commitPreviewImport()`);
     run(`editBank('AI测试库')`);
-    run(`state.editIndex = 1; renderBankEditor()`);
+    run(`state.editIndex = 2; renderBankEditor()`);
     const note = String(elements['editor-ai-note'].textContent);
     assert.ok(note.includes('缺答案'), '待修题要有橙色说明');
 });
