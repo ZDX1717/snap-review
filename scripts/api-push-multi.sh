@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 # api-push-multi.sh —— api-push.sh 的多提交版本(443 阻断时用)
+#
+# ⚠️ 已知限制:**批注标签(annotated tag)不能靠本地重建对齐 SHA**。
+#   实测 `gh api git/tags` 造出的标签对象 SHA 与本地 `git tag -a` 的不一致
+#   (逐字段核对过 object/type/tag/tagger/epoch 全同,仍不同;换行/编码都试过)。
+#   因此打 tag 时:**先用本地 `git tag -a`,再单独用 API 建 refs/tags/<name>**,
+#   并只校验"远端 tag 指向的 commit 正确",不必要求 tag 对象 SHA 一致。
+#   (提交对象的 SHA 对齐见 align-remote-sha.mjs,那是可对齐的。)
+#
 # 用法:bash scripts/api-push-multi.sh [<远端锚点 sha>]   (默认取远端 main 当前 sha)
 # 与 api-push.sh 的区别:支持一次推 N 个提交(远端是本地 HEAD 的祖先且线性,即干净 fast-forward)
 # 相同保证:逐提交重建 tree/commit 后与本地 SHA 比对,不一致即中止(绝不留分叉)
