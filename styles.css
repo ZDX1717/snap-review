@@ -195,21 +195,95 @@ h3 {
     color: var(--c-text-muted);
 }
 
-.quiz-options {
+/* ==================== 刷题设置(重设计:三级结构 + 分段控件) ====================
+   顺序 = 决策顺序:题源 → 范围 → 模式 → (折叠)题型/随机。
+   题源与模式每次都要选,裸露;题型与随机低频,收进 details。 */
+.quiz-settings {
     background-color: var(--c-surface-alt);
-    border-radius: 6px;
-    padding: 24px;
-    margin-bottom: 24px;
-}
-
-.option-group {
+    border-radius: 12px;
+    padding: 16px;
     margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
-.option-group label {
-    display: block;
-    margin-bottom: 8px;
+/* 分段控件:一行多选一,替代竖排 radio,省行数 */
+.seg {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--c-border-light);
+    border-radius: 6px;
+}
+
+.seg label {
+    flex: 1;
+    position: relative;
     cursor: pointer;
+}
+
+/* 隐藏原生圆点,选中态由整段高亮表达(与刷题选项卡片同一套语言) */
+.seg input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.seg span {
+    display: block;
+    text-align: center;
+    padding: 8px 4px;
+    font-size: 14px;
+    color: var(--c-text-secondary);
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.seg input:checked + span {
+    background: var(--c-surface);
+    color: var(--c-primary);
+    font-weight: 600;
+}
+
+/* 分段控件在 :focus-visible 时给出键盘可达性反馈(原生 input 已隐藏) */
+.seg input:focus-visible + span {
+    outline: 2px solid var(--c-primary);
+    outline-offset: 1px;
+}
+
+.setting-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.setting-row label {
+    font-size: 14px;
+    color: var(--c-text-muted);
+    flex: none;
+}
+
+.setting-row select {
+    flex: 1;
+}
+
+.setting-more summary {
+    font-size: 14px;
+    color: var(--c-text-muted);
+    cursor: pointer;
+}
+
+.setting-more[open] summary {
+    margin-bottom: 10px;
+}
+
+.setting-more {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 .action-btn {
@@ -370,14 +444,52 @@ h3 {
     margin-top: 24px;
 }
 
-.quiz-result p {
-    margin-bottom: 8px;
+/* ==================== 结果页(重设计:1 行大字 + 1 行 chips) ====================
+   原则:数字即主张,标签退让。全部统计信息从 5 行压成 1 行大字 + 1 行 chip。 */
+.result-stat {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
-.quiz-result span {
-    font-weight: 500;
-    color: var(--c-primary);
+.result-accuracy {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--c-text);
 }
+
+.result-accuracy.ok { color: var(--c-success-text); }
+.result-accuracy.bad { color: var(--c-danger-text); }
+
+.result-caption {
+    font-size: 14px;
+    color: var(--c-text-muted);
+}
+
+.result-answered {
+    color: var(--c-text-muted);
+}
+
+.result-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.chip {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--c-border-light);
+    color: var(--c-text-secondary);
+    white-space: nowrap;
+}
+
+.chip.ok { background: var(--c-success-bg); color: var(--c-success-text); }
+.chip.bad { background: var(--c-danger-bg); color: var(--c-danger-text); }
 
 .error-actions {
     display: flex;

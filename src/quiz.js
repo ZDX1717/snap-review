@@ -25,6 +25,7 @@ const totalQuestions = document.getElementById('total-questions');
 const correctAnswers = document.getElementById('correct-answers');
 const wrongAnswers = document.getElementById('wrong-answers');
 const accuracy = document.getElementById('accuracy');
+const answeredNote = document.getElementById('answered-note');
 const quizSettings = document.getElementById('quiz-settings');
 const prevQuestionBtn = document.getElementById('prev-question-btn');
 const unansweredCountEl = document.getElementById('unanswered-count');
@@ -461,11 +462,24 @@ export function showQuizResult(examUnanswered) {
     correctAnswers.textContent = state.correctCount;
     wrongAnswers.textContent = state.wrongCount;
     unansweredCountEl.textContent = unanswered;
+    // 正确率只显示数字(大字);"已答 N 题"移到旁侧小字,避免数字和说明挤在一格里
     accuracy.textContent = denominator > 0
-        ? (state.quizMode === 'exam'
-            ? `${((state.correctCount / denominator) * 100).toFixed(1)}%`
-            : `${((state.correctCount / denominator) * 100).toFixed(1)}%（已答 ${denominator} 题）`)
+        ? `${((state.correctCount / denominator) * 100).toFixed(1)}%`
         : '0%';
+    if (answeredNote) {
+        // 逐题模式提前结束时,分母是"已答数",须说明;套题模式分母即总题数,无需重复
+        answeredNote.textContent = (denominator > 0 && denominator < state.currentQuiz.length)
+            ? `· 已答 ${denominator} 题`
+            : '';
+    }
+    // 正确率着色:达标绿、偏低红,让"好不好"一眼可见(纯灰则无判断信息)
+    if (accuracy.classList) {
+        accuracy.classList.remove('ok', 'bad');
+        if (denominator > 0) {
+            const pct = (state.correctCount / denominator) * 100;
+            accuracy.classList.add(pct >= 60 ? 'ok' : 'bad');
+        }
+    }
 
     // 错题闭环提示：本轮因连对达标移出错题本的题
     if (state.masteryRemovedInSession > 0) {

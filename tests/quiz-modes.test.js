@@ -77,6 +77,8 @@ test('套题模式正确率按总题数,未答数展示', () => {
     run(setupQuiz + ` userAnswers = ['A', 'CA', '']; currentQuestionIndex = 2; finishExam();`);
     assert.strictEqual(elements['accuracy'].textContent, '66.7%');
     assert.strictEqual(String(elements['unanswered-count'].textContent), '1');
+    // 套题模式分母即总题数,不需要"已答 N 题"补充说明
+    assert.strictEqual(String(elements['answered-note'].textContent), '');
 });
 test('逐题模式提前结束:正确率按已答数,未答数补齐', () => {
     run(setupQuiz + `
@@ -85,8 +87,12 @@ test('逐题模式提前结束:正确率按已答数,未答数补齐', () => {
         currentQuestionIndex = 1; isAnswered = true;   // 答完2题(1对1错)就结束
         showQuizResult();
     `);
-    assert.strictEqual(elements['accuracy'].textContent, '50.0%（已答 2 题）');
+    // 重设计:正确率只留数字(大字),补充说明移到旁侧小字
+    assert.strictEqual(elements['accuracy'].textContent, '50.0%');
+    assert.ok(String(elements['answered-note'].textContent).includes('已答 2 题'));
     assert.strictEqual(String(elements['unanswered-count'].textContent), '1');
+    // 50% 偏低 → 红色;≥60% → 绿色(让"好不好"一眼可见)
+    assert.ok(elements['accuracy'].classList.contains('bad'), '50% 应标红');
 });
 test('逐题模式答题记录进入回顾列表(渲染不报错)', () => {
     const selEl = makeEl();
