@@ -150,6 +150,10 @@ const editorSaveBtn = document.getElementById('editor-save-btn');
 const editorPendingOnly = document.getElementById('editor-pending-only');
 const editorHistRow = document.getElementById('editor-hist-row');
 const editorCloseBtn = document.getElementById('editor-close-btn');
+const bankRenameBtn = document.getElementById('bank-rename-btn');
+const bankDedupBtn = document.getElementById('bank-dedup-btn');
+const bankExportBtn = document.getElementById('bank-export-btn');
+const bankDeleteBtn = document.getElementById('bank-delete-btn');
 const editorPosition = document.getElementById('editor-position');
 
 // 首页快捷入口
@@ -161,6 +165,14 @@ const heroImportBtn = document.getElementById('hero-import-btn');
 function init() {
     // 主题(暗色模式)先行,避免闪白
     initTheme();
+
+    // hash 路由:任何模块改 location.hash 即切换分区(替代跨模块 import showSection)
+    if (typeof window !== 'undefined' && window.addEventListener) {
+        window.addEventListener('hashchange', () => {
+            const hash = location.hash.slice(1);
+            if (['home', 'quiz', 'banks'].includes(hash)) showSection(hash);
+        });
+    }
 
     // 加载本地存储的数据
     loadFromLocalStorage();
@@ -258,6 +270,20 @@ function setupEventListeners() {
     editorAddBtn.addEventListener('click', editorAddQuestion);
     editorSaveBtn.addEventListener('click', () => editorSaveCurrent(false));
     editorCloseBtn.addEventListener('click', editorClose);
+    // 库级操作:作用于当前编辑中的题库(编辑器即该库的管理入口)
+    bankRenameBtn.addEventListener('click', () => showRenameModal(state.editBankName));
+    bankDedupBtn.addEventListener('click', () => {
+        if (state.editBankName && confirm(`对"${state.editBankName}"一键去重?`)) {
+            dedupBank(state.editBankName);
+            renderBankEditor();
+        }
+    });
+    bankExportBtn.addEventListener('click', () => exportBank(state.editBankName));
+    bankDeleteBtn.addEventListener('click', () => {
+        if (state.editBankName && confirm(`删除题库"${state.editBankName}"?(错题与收藏将移入回收站)`) && deleteBank(state.editBankName) !== false) {
+            editorClose();
+        }
+    });
     editorPendingOnly.addEventListener('change', (e) => editorTogglePendingOnly(e.target.checked));
     editorHistRow.addEventListener('click', editorHistClick);
     editorPrevBtn.addEventListener('click', () => editorNavigate(-1));

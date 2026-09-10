@@ -1624,7 +1624,13 @@ export function updateBanksList() {
             state.isAllBanksView = false;
             saveToLocalStorage();
             updateBankSelect();
-            showSection('quiz');
+            if (typeof location !== 'undefined') {
+                if (location.hash === '#quiz') {
+                    if (typeof showSection === 'function') showSection('quiz');
+                } else {
+                    location.hash = '#quiz';  // hashchange 路由触发 showSection
+                }
+            }
         });
         bankActions.appendChild(startBtn);
 
@@ -1642,7 +1648,9 @@ export function updateBanksList() {
         errToggle.className = 'foot-toggle' + (state.expandedBanks['err:' + bankName] ? ' open' : '');
         errToggle.innerHTML = `📕 错题 <b>${errCount}</b>`;
         errToggle.addEventListener('click', () => {
-            state.expandedBanks['err:' + bankName] = !state.expandedBanks['err:' + bankName];
+            const open = !state.expandedBanks['err:' + bankName];
+            state.expandedBanks['err:' + bankName] = open;
+            if (open) state.expandedBanks['fav:' + bankName] = false;  // 互斥:收起收藏
             saveCollapsedBanks();
             updateBanksList();
         });
@@ -1652,7 +1660,9 @@ export function updateBanksList() {
         favToggle.className = 'foot-toggle fav' + (state.expandedBanks['fav:' + bankName] ? ' open' : '');
         favToggle.innerHTML = `⭐ 收藏 <b>${favCount}</b>`;
         favToggle.addEventListener('click', () => {
-            state.expandedBanks['fav:' + bankName] = !state.expandedBanks['fav:' + bankName];
+            const open = !state.expandedBanks['fav:' + bankName];
+            state.expandedBanks['fav:' + bankName] = open;
+            if (open) state.expandedBanks['err:' + bankName] = false;  // 互斥:收起错题
             saveCollapsedBanks();
             updateBanksList();
         });
