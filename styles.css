@@ -531,7 +531,7 @@ h3 {
 /* 题库管理样式 */
 .manage-layout {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    grid-template-columns: 1fr 1fr;  /* 2:3 实测失调(👤 反馈),回归等宽 */
     gap: 24px;
     margin-top: 24px;
 }
