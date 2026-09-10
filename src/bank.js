@@ -1477,6 +1477,40 @@ export function updateBanksList() {
 
 
 // 渲染编辑器整体（题目列表 + 当前题表单）
+export // ==================== 历史标记(人工旗标:保存不消,仅 × 删除) ====================
+
+// 行内渲染:走事件委托,innerHTML 重建不丢监听
+function renderEditorHistRow(q) {
+    const row = document.getElementById('editor-hist-row');
+    if (!row) return;
+    if (q && q.histMark) {
+        const t = new Date(q.histMark);
+        const when = isNaN(t) ? '' : `（${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}）`;
+        row.innerHTML = `<span class="hist-chip">⚑ 历史标记${when}<button type="button" id="hist-remove-btn" title="删除历史标记">×</button></span>`;
+    } else {
+        row.innerHTML = `<button type="button" id="hist-add-btn" class="action-btn small secondary">⚑ 加历史标记</button>`;
+    }
+}
+
+// 委托处理:加/删历史标记(即时生效并落盘,不依赖「保存」)
+export function editorHistClick(e) {
+    const target = e && e.target;
+    if (!target) return;
+    const questions = currentEditBank();
+    const q = questions[state.editIndex];
+    if (!q) return;
+    if (target.id === 'hist-add-btn') {
+        q.histMark = new Date().toISOString();
+    } else if (target.id === 'hist-remove-btn') {
+        delete q.histMark;
+    } else {
+        return;
+    }
+    saveToLocalStorage();
+    renderEditorHistRow(q);
+    renderBankEditor();
+}
+
 export function renderBankEditor() {
     const questions = currentEditBank();
     const pendingOnly = !!state.editorPendingOnly;
@@ -1489,8 +1523,9 @@ export function renderBankEditor() {
         // 待修改高亮:缺答案(待补)或选项不足的题,橙底标记;AI 标记:紫条 🤖(与预览同色系)
         const needsFix = !q.answer || Object.keys(q.options || {}).length < 2;
         const aiTouched = q.aiSource === 'ai';
-        item.className = 'editor-list-item' + (idx === state.editIndex ? ' selected' : '') + (needsFix ? ' needs-fix' : '') + (aiTouched ? ' ai-gen' : '');
-        item.textContent = `${idx + 1}. ` + (aiTouched ? '🤖 ' : '') + `${(q.content || '（无题干）').slice(0, 22)}` + (!q.answer ? ' ⏳' : (needsFix ? ' ⚠' : ''));
+        const hasHist = !!q.histMark;
+        item.className = 'editor-list-item' + (idx === state.editIndex ? ' selected' : '') + (needsFix ? ' needs-fix' : '') + (aiTouched ? ' ai-gen' : '') + (hasHist ? ' has-hist' : '');
+        item.textContent = `${idx + 1}. ` + (aiTouched ? '🤖 ' : '') + `${(q.content || '（无题干）').slice(0, 22)}` + (!q.answer ? ' ⏳' : (needsFix ? ' ⚠' : '')) + (hasHist ? ' ⚑' : '');
         item.addEventListener('click', () => {
             if (!editorGuard()) return;
             state.editIndex = idx;
@@ -1507,9 +1542,10 @@ export function renderBankEditor() {
     }
     editorForm.classList.remove('hidden');
     editorEmpty.classList.add('hidden');
+    const cur = questions[state.editIndex];
+    renderEditorHistRow(cur);
     const aiNoteEl = document.getElementById('editor-ai-note');
     if (aiNoteEl) {
-        const cur = questions[state.editIndex];
         const aiTouched = cur && cur.aiSource === 'ai';
         const fixes = [];
         if (cur && !cur.answer) fixes.push('缺答案（待补）');

@@ -1638,3 +1638,37 @@ h3 {
 .editor-ai-note.fix-note {
     color: #b45309;
 }
+
+/* 编辑器:历史标记(人工旗标,保存不消,仅 × 删除) */
+.editor-hist-row { margin: 0 0 8px; }
+.hist-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #fdeef2;
+    color: #c2255c;
+    border: 1px solid #f1b8c6;
+    border-radius: 14px;
+    padding: 3px 6px 3px 12px;
+    font-size: 0.85em;
+    font-weight: 600;
+}
+.hist-chip button {
+    border: none;
+    background: #c2255c;
+    color: #fff;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    line-height: 1;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0;
+}
+.editor-list-item.has-hist {
+    box-shadow: inset 3px 0 0 #d6336c;
+}
+.editor-list-item.has-hist.needs-fix {
+    box-shadow: inset 3px 0 0 #e8899f;
+    background: #fff5f8;
+}
