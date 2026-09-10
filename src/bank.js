@@ -311,16 +311,12 @@ export function htmlToLines(html) {
 }
 
 
-// 显示导入状态(成功 4 秒后自动回中性;注意/错误常驻,直到下一个动作)
-let statusFadeTimer = null;
+// 显示导入状态:所有提示常驻显示,直到下一个动作覆盖它(绿色读不完的问题即此修)
+// 中性态只在明确"回到起点"时出现(清空/读取完成后的初始指引)
 export function showImportStatus(message, type) {
     if (!importStatus) return;
-    if (statusFadeTimer) { clearTimeout(statusFadeTimer); statusFadeTimer = null; }
     importStatus.textContent = message;
     importStatus.className = 'status-line' + (type ? ' ' + type : '');
-    if (type === 'success') {
-        statusFadeTimer = setTimeout(() => { setStatusNeutral(); statusFadeTimer = null; }, 4000);
-    }
 }
 
 
