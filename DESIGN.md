@@ -5,6 +5,7 @@
 > 修订规则:改规范 = 改本文件 + 同步 `:root`,一个 commit 完成,不允许只改 CSS 不改文档。
 
 ## 0. 修订记录
+- v3(2026-09-10):**令牌表全量重校准**——v2 之后配色经历"去紫换真宝蓝"(blue-600/暗 blue-500),但本文件未同步,导致主色记载为 `#4a6cf7`(紫系)而 `:root` 实为 `#2563eb`。本次按 `:root` 与 `html[data-theme="dark"]` 实测值**逐条对齐**,并补齐 v2 起新增的全部令牌。
 - v2(2026-09-10):采纳 slate/emerald/rose/amber 色阶与"卡片 12px+细边框+微阴影"体系(👤 提供的外部规范);按钮/输入保持 6px。v1 的 6px 唯一圆角规则废止。
 
 ## 1. 设计立场
@@ -15,22 +16,43 @@
 
 ## 2. 色彩令牌(唯一色彩来源 = `:root` 变量;v2 起中性色 = slate 阶,反馈色 = emerald/rose/amber)
 
-| 令牌 | 亮色 | 用途 | 暗色原则 |
+> ✅ **本表已于 v3 按实测值全量对齐 `styles.css`**,可直接照抄。若与本表不符,以 `:root` 为准,并**立即回来修本表**(见第 0 节 v3 事故)。
+
+| 令牌 | 亮色(`:root`) | 暗色(`html[data-theme="dark"]`) | 用途 |
 |---|---|---|---|
-| `--c-bg` | `#f5f7fa` | 页面底 | `#121417` |
-| `--c-surface` | `#fff` | 卡片/表面 | `#1c1f24` |
-| `--c-surface-alt` | `#f8f9fa` | 次级表面/嵌入区 | `#22262c` |
-| `--c-text` | `#343a40` | 主文字 | `#e9ecef` |
-| `--c-text-secondary` | `#495057` | 次级文字 | `#ced4da` |
-| `--c-text-muted` | `#6c757d` | 弱文字(**对比度下限,禁再浅**) | `#adb5bd` |
-| `--c-text-faint` | `#adb5bd` | 装饰性弱文字(时间戳等,不承载必读信息) | `#868e96` |
-| `--c-border` / `--c-border-light` | `#dee2e6` / `#e9ecef` | 边框 | 深灰系 |
-| `--c-primary` / `--c-primary-deep` | `#4a6cf7` / `#3a5bd9` | 唯一行动色:主按钮/链接/选中 | 提亮到 `#6b8afd` 系 |
+| `--c-bg` | `#f5f7fa` | `#121417` | 页面底 |
+| `--c-surface` | `#fff` | `#1c1f24` | 卡片/表面 |
+| `--c-surface-alt` | `#f8f9fa` | `#22262c` | 次级表面/嵌入区 |
+| `--c-text` | `#343a40` | `#e9ecef` | 主文字 |
+| `--c-text-secondary` | `#495057` | `#ced4da` | 次级文字 |
+| `--c-text-muted` | `#6c757d` | `#adb5bd` | 弱文字(**对比度下限,禁再浅**) |
+| `--c-text-faint` | `#adb5bd` | `#868e96` | 装饰性弱文字(时间戳等,不承载必读信息) |
+| `--c-border` | `#dee2e6` | `#3f444b` | 边框 |
+| `--c-border-light` | `#e9ecef` | `#2c3138` | 浅边框/分隔线 |
+| `--c-primary` | `#2563eb` | `#3b82f6` | **唯一行动色**:主按钮/链接/选中 |
+| `--c-primary-deep` | `#1d4ed8` | `#60a5fa` | 主色深阶(hover/按压) |
+| `--c-primary-alt` | `#2563eb` | `#3b82f6` | 行动色别名,语义 = primary(见下"待决") |
+| `--c-success` / `-deep` | `#28a745` / `#2e9e5b` | `#3fbf6a` / `#4cd07d` | 正确/成功 |
+| `--c-success-bg` / `-text` | `#d4edda` / `#155724` | `#1d3a26` / `#8fe3a8` | 成功底/文字 |
+| `--c-danger` / `-deep` | `#dc3545` / `#d9534f` | `#e05260` / `#e8737f` | 错误/危险/删除 |
+| `--c-danger-bg` / `-text` | `#f8d7da` / `#721c24` | `#43202a` / `#ff9a9a` | 错误底/文字 |
+| `--c-warn` / `-text` | `#ffc107` / `#7a5c00` | `#ffd666` / `#ffd666` | 警告 |
+| `--c-warn-bg` / `-accent` | `#fff3cd` / `#b8860b` | `#423a15` / `#e0b34c` | 警告底/强调 |
+| `--c-accent-purple` / `-bg` / `-text` | `#8e7cc3` / `#efeaff` / `#6a4fb6` | `#a08fd6` / `#2a2440` / `#c3b3ff` | 🤖 AI 动过(未核验) |
+| `--c-accent-orange` | `#f0a500` | `#f0a500` | ⏳/⚠ 待修 |
+| `--c-info-bg` / `-border` | `#eef3fb` / `#b9c6dd` | `#1e2632` / `#3a4a63` | 信息位/提示块 |
+| `--c-panel-bg` / `--c-chip-bg` | `#f1f3f5` / `#e9ecef` | `#262a30` / `#2c3138` | 面板底/🕘 历史 chip |
+| `--c-surface-warm` | `#fffdf5` | `#242320` | 暖底(救援区等) |
+| `--c-warn-bg-soft` | `#fff8e6` | `#3a3320` | 柔和警告底 |
+| `--c-success-soft` | `#ecfdf5` | `#0a2e1f` | 柔和成功底 |
+| `--c-danger-soft` | `#fff1f2` | `#3f0d18` | 柔和危险底 |
 
 **规则**:
 - 新样式**禁止出现裸 hex**,必须引用令牌(一次性 tint 色需先入令牌表)。
 - `--c-text-faint` 只允许用于非必读信息;必读文字最低 `--c-text-muted`(AA 4.5:1)。
 - 反白按钮文字用 `#fff`,不令牌化(亮暗通用)。
+
+> ⚠️ **待决(勿擅自改)**:`--c-primary-alt` / `--c-primary-alt-deep` 目前**与 `--c-primary` / `--c-primary-deep` 取值完全相同**(亮暗皆然),但全站有 17 处引用。历史上它是"紫→宝蓝"过渡期的别名,现已无独立语义。二选一需 👤 拍板:①合并为 `--c-primary`(删别名,改 17 处);②给它一个真正的次级色调。**在此之前新代码优先用 `--c-primary`**。
 
 ## 3. 语义标记色(AI/待修/历史,永久标注体系)
 
