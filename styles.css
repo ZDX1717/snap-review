@@ -1688,3 +1688,6 @@ h3 {
     border-color: #b8860b;
     background: #fffaf0;
 }
+
+/* 编辑器说明行:AI 与待修双状态并存时逐行显示 */
+.editor-ai-note.stacked > div { margin: 0 0 4px; }

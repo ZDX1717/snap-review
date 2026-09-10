@@ -1568,16 +1568,12 @@ export function renderBankEditor() {
         const fixes = [];
         if (cur && !cur.answer) fixes.push('缺答案（待补）');
         if (cur && Object.keys(cur.options || {}).length < 2) fixes.push('选项不足');
-        if (aiTouched) {
-            aiNoteEl.textContent = '🤖 此题经 AI 整理导入；保存修改后标记自动消除';
-            aiNoteEl.className = 'editor-ai-note';
-        } else if (fixes.length) {
-            aiNoteEl.textContent = '⚠ 此题' + fixes.join('、') + '；补全并保存后黄色高亮自动消失';
-            aiNoteEl.className = 'editor-ai-note fix-note';
-        } else {
-            aiNoteEl.textContent = '';
-            aiNoteEl.className = 'editor-ai-note';
-        }
+        const lines = [];
+        if (aiTouched) lines.push({ text: '🤖 此题经 AI 整理导入；保存修改后标记自动消除', cls: 'editor-ai-note' });
+        if (fixes.length) lines.push({ text: '⚠ 此题' + fixes.join('、') + '；补全并保存后黄色高亮自动消失', cls: 'editor-ai-note fix-note' });
+        // 双状态并存(AI 整理但仍缺答案)时,两行提示都显示
+        aiNoteEl.innerHTML = lines.map(l => `<div class="${l.cls}">${l.text}</div>`).join('');
+        aiNoteEl.className = lines.length ? 'editor-ai-note stacked' : 'editor-ai-note';
     }
     editorRenderForm();
 }

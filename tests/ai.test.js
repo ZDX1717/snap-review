@@ -404,14 +404,15 @@ test('编辑器:AI 题人工保存后消标;待修题说明行随状态切换', 
     run(`commitPreviewImport()`);
     run(`editBank('AI测试库')`);
     run(`state.editIndex = 2; renderBankEditor()`);
-    const note = String(elements['editor-ai-note'].textContent);
+    const note = String(elements['editor-ai-note'].innerHTML);
     assert.ok(note.includes('缺答案'), '待修题要有橙色说明');
 });
 
 test('历史标记日志:AI 题人工保存后转"曾AI整理";待补题补答后转"曾待补";仅 × 删除', async () => {
+    let noAns = false;  // 宿主侧开关:第二次 AI 调用返回无答案输出
     const h = await import('./helpers/vm-harness.mjs').then(m => m.loadApp({
         sandboxExtras: {
-            fetch: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: AI_TEXT } }] }) }),
+            fetch: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: noAns ? '题目：AI整理但仍无答案\nA：甲\nB：乙' : AI_TEXT } }] }) }),
             AbortController,
         },
     }));
@@ -439,6 +440,18 @@ test('历史标记日志:AI 题人工保存后转"曾AI整理";待补题补答�
     assert.ok(marks.includes('pending'), '消散的待补要进历史日志');
     assert.ok(String(elements['editor-hist-row'].innerHTML).includes('曾待补'), '出现"曾待补"chip');
     assert.ok(String(elements['editor-hist-row'].innerHTML).includes('data-hist-del'), 'chip 带 × 删除');
+    // 双状态并存:AI 整理但仍缺答案 → 紫橙两行同时显示(第二次 B 路线,输出故意无答案行)
+    noAns = true;
+    run(`pasteInput.value = '再来一坨乱原文'`);
+    await run(`(async () => { await rescueAiOrganize(); })()`);
+    run(`parsePastedText()`);
+    run(`previewData[0].include = true; renderPreview()`);
+    run(`previewTargetBankSelect.value = '史库'`);
+    run(`commitPreviewImport()`);
+    run(`editBank('史库')`);
+    run(`state.editIndex = 3; renderBankEditor()`);
+    const both = String(elements['editor-ai-note'].innerHTML);
+    assert.ok(both.includes('AI 整理导入') && both.includes('缺答案'), '双状态要两行提示都显示');
     // AI 题人工保存 → ai 标记消散转历史
     run(`state.editIndex = 0; renderBankEditor()`);
     run(`editorType.value = '判断'; editorAnswer.value = 'A'`);
