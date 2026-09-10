@@ -2141,3 +2141,78 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     color: var(--c-text-secondary);
 }
 .recycle-item span { flex: 1; }
+
+/* ==================== P0-1.9 库卡布局:标题徽章行 + 底部三键 + 展开面板 ==================== */
+.bank-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+.bank-badges .badge {
+    font-size: 12px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--c-panel-bg);
+    color: var(--c-text-secondary);
+}
+.bank-badges .err-badge { background: var(--c-danger-bg); color: var(--c-danger-text); }
+.bank-badges .fav-badge { background: var(--c-warn-bg); color: var(--c-warn-text); }
+.bank-card-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+}
+.bank-card-foot .foot-toggle {
+    background: var(--c-panel-bg);
+    border: none;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+    color: var(--c-text-secondary);
+    cursor: pointer;
+    font-family: inherit;
+}
+.bank-card-foot .foot-toggle b { color: var(--c-text); }
+.bank-card-foot .foot-toggle.fav { margin-left: auto; }
+.bank-card-foot .foot-toggle.open {
+    background: var(--c-primary);
+    color: #fff;
+}
+.bank-card-foot .foot-toggle.open b { color: #fff; }
+.bank-card-foot .action-btn.small {
+    padding: 7px 10px;
+    font-size: 13px;
+}
+.bank-panel-title {
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: var(--c-text-secondary);
+}
+.bank-errors-panel,
+.bank-favorites-panel,
+.bank-versions-panel {
+    background: var(--c-surface-alt);
+    border-radius: 6px;
+    padding: 12px;
+    margin: -6px 0 8px;
+}
+/* 编辑器内:题库设置与管理区 */
+.bank-admin {
+    border-top: 1px solid var(--c-border-light);
+    margin-top: 12px;
+    padding-top: 10px;
+}
+.bank-admin h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: var(--c-text-muted);
+    font-weight: 600;
+}
+.bank-admin-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}

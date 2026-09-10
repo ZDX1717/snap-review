@@ -1069,113 +1069,11 @@ export function deleteBank(bankName) {
 
 // ==================== 库级版本快照 UI(P0-1.11) ====================
 
-function renderVersionsForBank(bankName) {
-    const versions = (loadBankVersions()[bankName] || []).slice().reverse();  // 新的在上
-    if (versions.length === 0) return null;
-    const wrap = document.createElement('div');
-    wrap.className = 'bank-versions-panel';
-    const head = document.createElement('h4');
-    head.className = 'bank-panel-title';
-    head.textContent = `🕘 版本(${versions.length})`;
-    wrap.appendChild(head);
-    versions.forEach(v => {
-        const item = document.createElement('div');
-        item.className = 'version-item';
-        const when = new Date(v.time);
-        const info = document.createElement('span');
-        info.textContent = `${v.action} · ${when.getMonth() + 1}/${when.getDate()} ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')} · ${(v.questions || []).length} 题`;
-        item.appendChild(info);
-        const restoreBtn = document.createElement('button');
-        restoreBtn.className = 'action-btn small';
-        restoreBtn.textContent = '恢复此版';
-        restoreBtn.addEventListener('click', () => {
-            const current = state.questionBanks[bankName] || [];
-            if (confirm(`将"${bankName}"恢复到「${v.action}」版本?当前内容会先自动存为新版本。`)) {
-                pushBankVersion(bankName, '恢复前自动存', current);
-                state.questionBanks[bankName] = JSON.parse(JSON.stringify(v.questions));
-                saveToLocalStorage();
-                refreshQuestionBankView();
-                updateBanksList();
-            }
-        });
-        item.appendChild(restoreBtn);
-        wrap.appendChild(item);
-    });
-    return wrap;
-}
-
 // ==================== 回收站 UI(P0-1.10) ====================
 
-export function renderRecycleBin() {
-    const list = document.getElementById('recycle-list');
-    const binWrap = document.getElementById('recycle-bin');
-    if (!list || !binWrap) return;
-    const bin = loadRecycledBanks();
-    const entries = Object.entries(bin).sort((a, b) => (b[1].deletedAt || '').localeCompare(a[1].deletedAt || ''));
-    binWrap.querySelector('summary').textContent = `🗑 回收站 (${entries.length})`;
-    list.innerHTML = '';
-    if (entries.length === 0) {
-        list.innerHTML = '<p class="empty-message">回收站为空</p>';
-        return;
-    }
-    entries.forEach(([name, pkg]) => {
-        const item = document.createElement('div');
-        item.className = 'recycle-item';
-        const when = new Date(pkg.deletedAt);
-        const info = document.createElement('span');
-        info.textContent = `${name} · ${((pkg.bank) || []).length} 题 · ${when.getMonth() + 1}/${when.getDate()} 删除`;
-        item.appendChild(info);
-        const restoreBtn = document.createElement('button');
-        restoreBtn.className = 'action-btn small';
-        restoreBtn.textContent = '恢复';
-        restoreBtn.addEventListener('click', () => restoreRecycled(name));
-        const purgeBtn = document.createElement('button');
-        purgeBtn.className = 'action-btn small secondary';
-        purgeBtn.textContent = '彻底删除';
-        purgeBtn.addEventListener('click', () => {
-            if (confirm(`彻底删除"${name}"?此操作不可恢复!`)) {
-                purgeRecycledBank(name);
-                renderRecycleBin();
-            }
-        });
-        item.appendChild(restoreBtn);
-        item.appendChild(purgeBtn);
-        list.appendChild(item);
-    });
-}
 
-export function restoreBankVersion(name, index) {
-    const versions = loadBankVersions()[name] || [];
-    const v = versions[index];
-    if (!v) return false;
-    pushBankVersion(name, '恢复前自动存', state.questionBanks[name] || []);
-    state.questionBanks[name] = JSON.parse(JSON.stringify(v.questions));
-    // 先对齐当前视图引用,再落盘(否则旧引用会把恢复结果覆盖回去)
-    if (state.currentBankName === name) state.questionBank = state.questionBanks[name];
-    saveToLocalStorage();
-    refreshQuestionBankView();
-    updateBanksList();
-    return true;
-}
 
-export function recycleBankEntry(name, pkg) {
-    return recycleBank(name, pkg);
-}
 
-export function restoreRecycled(name) {
-    let target = name;
-    if (state.questionBanks[target]) target = `${name}·恢复`;
-    const pkg = restoreRecycledBank(name);
-    if (!pkg) return;
-    state.questionBanks[target] = pkg.bank || [];
-    (pkg.errors || []).forEach(e => { e.bankName = target; state.errorQuestions.push(e); });
-    (pkg.favorites || []).forEach(f => { f.bankName = target; state.favoriteQuestions.push(f); });
-    saveToLocalStorage();
-    updateBankSelect();
-    updateBanksList();
-    renderRecycleBin();
-    alert(`已恢复为"${target}"`);
-}
 
 
 // 导出单个题库
@@ -1682,87 +1580,107 @@ export function updateBanksList() {
     const bankNames = Object.keys(state.questionBanks);
 
     if (bankNames.length === 0) {
-        banksList.innerHTML = '<p class="empty-message">暂无题库</p>';
+        banksList.innerHTML = '<p class="empty-message">暂无题库:点右上角「＋ 创建题库」,或回首页导入</p>';
         return;
     }
 
     banksList.innerHTML = '';
 
     bankNames.forEach(bankName => {
+        const questions = state.questionBanks[bankName] || [];
+        const errCount = state.errorQuestions.filter(q => (q.bankName || '未知题库') === bankName).length;
+        const favCount = state.favoriteQuestions.filter(q => (q.bankName || '未知题库') === bankName).length;
+        const pendingCount = questions.filter(q => !q.answer).length;
+
         const bankItem = document.createElement('div');
         bankItem.className = 'bank-item';
 
+        // 标题行:库名 + 状态徽章
         const bankInfo = document.createElement('div');
         bankInfo.className = 'bank-info';
-
         const bankTitle = document.createElement('h3');
         bankTitle.textContent = bankName;
-
-        const bankCount = document.createElement('p');
-        const questions = state.questionBanks[bankName] || [];
-        const pendingCount = questions.filter(q => !q.answer).length;
-        bankCount.textContent = `题目数量：${questions.length}` + (pendingCount > 0 ? `（待补答案 ${pendingCount}）` : '');
-
-        const bankActions = document.createElement('div');
-        bankActions.className = 'bank-actions';
-
-        const editBtn = document.createElement('button');
-        editBtn.className = 'action-btn secondary';
-        editBtn.textContent = '编辑';
-        editBtn.addEventListener('click', () => editBank(bankName));
-
-        const renameBtn = document.createElement('button');
-        renameBtn.className = 'action-btn secondary';
-        renameBtn.textContent = '重命名';
-        renameBtn.addEventListener('click', () => showRenameModal(bankName));
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'action-btn secondary';
-        deleteBtn.style.backgroundColor = '#dc3545';
-        deleteBtn.textContent = '删除';
-        deleteBtn.addEventListener('click', () => deleteBank(bankName));
-
-        const exportBtn = document.createElement('button');
-        exportBtn.className = 'action-btn secondary';
-        exportBtn.textContent = '导出';
-        exportBtn.addEventListener('click', () => exportBank(bankName));
-
-        const dedupBtn = document.createElement('button');
-        dedupBtn.className = 'action-btn secondary';
-        dedupBtn.textContent = '去重';
-        dedupBtn.addEventListener('click', () => dedupBank(bankName));
-
-        bankActions.appendChild(editBtn);
-        bankActions.appendChild(renameBtn);
-        bankActions.appendChild(dedupBtn);
-        bankActions.appendChild(deleteBtn);
-        bankActions.appendChild(exportBtn);
-
         bankInfo.appendChild(bankTitle);
-        bankInfo.appendChild(bankCount);
+        const badges = document.createElement('div');
+        badges.className = 'bank-badges';
+        const mkBadge = (text, cls) => { const b = document.createElement('span'); b.className = 'badge ' + (cls || ''); b.textContent = text; badges.appendChild(b); };
+        mkBadge(`${questions.length} 题`);
+        if (pendingCount > 0) mkBadge(`待补 ${pendingCount}`, 'warn-badge');
+        if (errCount > 0) mkBadge(`错 ${errCount}`, 'err-badge');
+        if (favCount > 0) mkBadge(`藏 ${favCount}`, 'fav-badge');
+        bankInfo.appendChild(badges);
 
-        bankItem.appendChild(bankInfo);
-        bankItem.appendChild(bankActions);
+        // 页脚:左错题 · 中编辑/开始刷题 · 右收藏
+        const cardFoot = document.createElement('div');
+        cardFoot.className = 'bank-card-foot';
 
-        // 库卡点击体 = 展开本库错题/收藏手风琴(按钮区独立,不误触)
-        bankItem.addEventListener('click', (e) => {
-            if (e.target && e.target.closest && e.target.closest('button')) return;
-            state.expandedBanks[bankName] = !state.expandedBanks[bankName];
+        const errToggle = document.createElement('button');
+        errToggle.className = 'foot-toggle' + (state.expandedBanks['err:' + bankName] ? ' open' : '');
+        errToggle.innerHTML = `📕 错题 <b>${errCount}</b>`;
+        errToggle.addEventListener('click', () => {
+            state.expandedBanks['err:' + bankName] = !state.expandedBanks['err:' + bankName];
             saveCollapsedBanks();
             updateBanksList();
         });
+        cardFoot.appendChild(errToggle);
+
+        const startBtn = document.createElement('button');
+        startBtn.className = 'action-btn small';
+        startBtn.textContent = '▶ 开始刷题';
+        startBtn.addEventListener('click', () => {
+            state.currentBankName = bankName;
+            state.questionBank = state.questionBanks[bankName];
+            state.isAllBanksView = false;
+            saveToLocalStorage();
+            updateBankSelect();
+            showSection('quiz');
+        });
+        cardFoot.appendChild(startBtn);
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'action-btn small secondary';
+        editBtn.textContent = '✎ 编辑';
+        editBtn.addEventListener('click', () => editBank(bankName));
+        cardFoot.appendChild(editBtn);
+
+        const favToggle = document.createElement('button');
+        favToggle.className = 'foot-toggle fav' + (state.expandedBanks['fav:' + bankName] ? ' open' : '');
+        favToggle.innerHTML = `⭐ 收藏 <b>${favCount}</b>`;
+        favToggle.addEventListener('click', () => {
+            state.expandedBanks['fav:' + bankName] = !state.expandedBanks['fav:' + bankName];
+            saveCollapsedBanks();
+            updateBanksList();
+        });
+        cardFoot.appendChild(favToggle);
+
+        bankItem.appendChild(bankInfo);
+        bankItem.appendChild(cardFoot);
 
         banksList.appendChild(bankItem);
 
-        // 内嵌手风琴:错题(遮挡式)+ 收藏 + 版本
-        if (state.expandedBanks[bankName]) {
+        // 展开面板(默认折叠):错题在下、收藏在其下,仅点了对应按钮才出现
+        if (state.expandedBanks['err:' + bankName]) {
             const errPanel = renderErrorsForBank(bankName);
             if (errPanel) banksList.appendChild(errPanel);
+            else {
+                const empty = document.createElement('p');
+                empty.className = 'empty-message';
+                empty.textContent = '本库暂无错题 🎉';
+                banksList.appendChild(empty);
+            }
+        }
+        if (state.expandedBanks['fav:' + bankName]) {
             const favPanel = renderFavoritesForBank(bankName);
             if (favPanel) banksList.appendChild(favPanel);
-            const verPanel = renderVersionsForBank(bankName);
-            if (verPanel) banksList.appendChild(verPanel);
+            else {
+                const empty = document.createElement('p');
+                empty.className = 'empty-message';
+                empty.textContent = '本库暂无收藏';
+                banksList.appendChild(empty);
+            }
         }
+        const verPanel = renderVersionsForBank(bankName);
+        if (verPanel) banksList.appendChild(verPanel);
     });
 
     // 杂项兜底:错题/收藏的 bankName 已不在题库列表(库被删等)
@@ -1793,18 +1711,122 @@ export function updateBanksList() {
         }
     });
 
-    // 内嵌操作(收藏/删除)后刷新
     if (typeof window !== 'undefined' && !window.__embedsListener) {
         window.__embedsListener = true;  // 仅浏览器注册(vm 沙箱无 window)
         document.addEventListener('zquiz:embeds-dirty', () => updateBanksList());
     }
+}// ==================== 库级版本快照 UI(P0-1.11) ====================
+
+function renderVersionsForBank(bankName) {
+    const versions = (loadBankVersions()[bankName] || []).slice().reverse();  // 新的在上
+    if (versions.length === 0) return null;
+    const wrap = document.createElement('div');
+    wrap.className = 'bank-versions-panel';
+    const head = document.createElement('h4');
+    head.className = 'bank-panel-title';
+    head.textContent = `🕘 版本(${versions.length})`;
+    wrap.appendChild(head);
+    versions.forEach(v => {
+        const item = document.createElement('div');
+        item.className = 'version-item';
+        const when = new Date(v.time);
+        const info = document.createElement('span');
+        info.textContent = `${v.action} · ${when.getMonth() + 1}/${when.getDate()} ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')} · ${(v.questions || []).length} 题`;
+        item.appendChild(info);
+        const restoreBtn = document.createElement('button');
+        restoreBtn.className = 'action-btn small';
+        restoreBtn.textContent = '恢复此版';
+        restoreBtn.addEventListener('click', () => {
+            const current = state.questionBanks[bankName] || [];
+            if (confirm(`将"${bankName}"恢复到「${v.action}」版本?当前内容会先自动存为新版本。`)) {
+                pushBankVersion(bankName, '恢复前自动存', current);
+                state.questionBanks[bankName] = JSON.parse(JSON.stringify(v.questions));
+                saveToLocalStorage();
+                refreshQuestionBankView();
+                updateBanksList();
+            }
+        });
+        item.appendChild(restoreBtn);
+        wrap.appendChild(item);
+    });
+    return wrap;
+}
+
+// ==================== 回收站 UI(P0-1.10) ====================
+
+export function renderRecycleBin() {
+    const list = document.getElementById('recycle-list');
+    const binWrap = document.getElementById('recycle-bin');
+    if (!list || !binWrap) return;
+    const bin = loadRecycledBanks();
+    const entries = Object.entries(bin).sort((a, b) => (b[1].deletedAt || '').localeCompare(a[1].deletedAt || ''));
+    binWrap.querySelector('summary').textContent = `🗑 回收站 (${entries.length})`;
+    list.innerHTML = '';
+    if (entries.length === 0) {
+        list.innerHTML = '<p class="empty-message">回收站为空</p>';
+        return;
+    }
+    entries.forEach(([name, pkg]) => {
+        const item = document.createElement('div');
+        item.className = 'recycle-item';
+        const when = new Date(pkg.deletedAt);
+        const info = document.createElement('span');
+        info.textContent = `${name} · ${((pkg.bank) || []).length} 题 · ${when.getMonth() + 1}/${when.getDate()} 删除`;
+        item.appendChild(info);
+        const restoreBtn = document.createElement('button');
+        restoreBtn.className = 'action-btn small';
+        restoreBtn.textContent = '恢复';
+        restoreBtn.addEventListener('click', () => restoreRecycled(name));
+        const purgeBtn = document.createElement('button');
+        purgeBtn.className = 'action-btn small secondary';
+        purgeBtn.textContent = '彻底删除';
+        purgeBtn.addEventListener('click', () => {
+            if (confirm(`彻底删除"${name}"?此操作不可恢复!`)) {
+                purgeRecycledBank(name);
+                renderRecycleBin();
+            }
+        });
+        item.appendChild(restoreBtn);
+        item.appendChild(purgeBtn);
+        list.appendChild(item);
+    });
+}
+
+export function restoreBankVersion(name, index) {
+    const versions = loadBankVersions()[name] || [];
+    const v = versions[index];
+    if (!v) return false;
+    pushBankVersion(name, '恢复前自动存', state.questionBanks[name] || []);
+    state.questionBanks[name] = JSON.parse(JSON.stringify(v.questions));
+    // 先对齐当前视图引用,再落盘(否则旧引用会把恢复结果覆盖回去)
+    if (state.currentBankName === name) state.questionBank = state.questionBanks[name];
+    saveToLocalStorage();
+    refreshQuestionBankView();
+    updateBanksList();
+    return true;
+}
+
+export function recycleBankEntry(name, pkg) {
+    return recycleBank(name, pkg);
+}
+
+export function restoreRecycled(name) {
+    let target = name;
+    if (state.questionBanks[target]) target = `${name}·恢复`;
+    const pkg = restoreRecycledBank(name);
+    if (!pkg) return;
+    state.questionBanks[target] = pkg.bank || [];
+    (pkg.errors || []).forEach(e => { e.bankName = target; state.errorQuestions.push(e); });
+    (pkg.favorites || []).forEach(f => { f.bankName = target; state.favoriteQuestions.push(f); });
+    saveToLocalStorage();
+    updateBankSelect();
+    updateBanksList();
+    renderRecycleBin();
+    alert(`已恢复为"${target}"`);
 }
 
 
-// 渲染编辑器整体（题目列表 + 当前题表单）
-export // ==================== 历史标记(自动标记消散后的痕迹日志,仅 × 删除) ====================
-
-// 追加一条历史(去重:同类型已存在则不重复记)
+// 导出单个题库
 function pushHistMark(q, type) {
     if (!q) return;
     q.histMarks = Array.isArray(q.histMarks) ? q.histMarks : [];
