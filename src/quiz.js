@@ -326,8 +326,8 @@ export function submitAnswer() {
             if (!inp) return;
             inp.disabled = true;
             item.classList.remove('selected');
-            if (correctSet.has(inp.value)) item.classList.add('correct-card');
-            if (userSet.has(inp.value) && !isCorrect) item.classList.add('wrong-card');
+            if (correctSet.has(inp.value)) item.classList.add('correct-card', 'correct');
+            if (userSet.has(inp.value) && !isCorrect) item.classList.add('wrong-card', 'incorrect');
         });
     }
     

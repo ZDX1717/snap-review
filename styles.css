@@ -641,7 +641,7 @@ h3 {
 
 .modal-content {
     background-color: var(--c-surface);
-    border-radius: 6px;
+    border-radius: 12px;
     padding: 32px;
     max-width: 500px;
     width: 90%;
@@ -2066,3 +2066,32 @@ button, select, label, .option-item, .bank-toggle, .preview-item, .editor-list-i
     }
 }
 /* 状态不只靠颜色:错题本删除钮有文字,收藏有 ★/☆,标记有图标 —— 已符合,此处仅固化规则 */
+
+/* ==================== 0.10.0 视觉语言对齐(slate/emerald/rose) ==================== */
+.option-item.correct::after,
+.option-item.incorrect::after {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+}
+.option-item.correct::after { content: '✔'; color: var(--c-success); }
+.option-item.incorrect::after { content: '❌'; color: var(--c-danger); }
+
+@keyframes feedback-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+#answer-feedback:not(.hidden) {
+    animation: feedback-in 0.18s ease;
+}
+#answer-feedback {
+    background: var(--c-info-bg);
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+body, .container, .operation-card, .modal-content, .quiz-container, nav {
+    transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
