@@ -1666,3 +1666,25 @@ h3 {
     padding: 0;
 }
 .editor-list-item .hist-suffix { color: #adb5bd; }
+
+/* 错题本:收藏/删除操作行 */
+.error-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 6px;
+}
+.error-item .fav-toggle-btn {
+    background: none;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 0.85em;
+    color: #b8860b;
+    cursor: pointer;
+    font-family: inherit;
+}
+.error-item .fav-toggle-btn:hover {
+    border-color: #b8860b;
+    background: #fffaf0;
+}

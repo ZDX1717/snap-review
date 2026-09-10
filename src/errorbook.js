@@ -1,5 +1,6 @@
 import { state } from './state.js';
 import { saveCollapsedBanks, saveToLocalStorage } from './storage.js';
+import { toggleFavorite, updateFavoritesList } from './favorites.js';
 
 // ==================== errorbook.js ====================
 // 自动拆分自 main.js;依赖方向见各 import。
@@ -177,6 +178,22 @@ export function updateErrorsList() {
         deleteBtn.textContent = '删除';
         deleteBtn.addEventListener('click', () => deleteError(index));
 
+        // 收藏切换:与刷题页同一收藏夹(按题干匹配)
+        const isFav = state.favoriteQuestions.some(fq => fq.content === question.content);
+        const favBtn = document.createElement('button');
+        favBtn.className = 'fav-toggle-btn';
+        favBtn.textContent = isFav ? '★ 已收藏' : '☆ 收藏';
+        favBtn.addEventListener('click', () => {
+            toggleFavorite(question, question.bankName);
+            updateFavoritesList();
+            updateErrorsList();  // 重渲染刷新 ☆/★ 状态
+        });
+
+        const actionsRow = document.createElement('div');
+        actionsRow.className = 'error-actions';
+        actionsRow.appendChild(favBtn);
+        actionsRow.appendChild(deleteBtn);
+
         errorItem.appendChild(title);
         if (question.options && Object.keys(question.options).length > 0) {
             errorItem.appendChild(optionsDiv);
@@ -191,7 +208,7 @@ export function updateErrorsList() {
             errorItem.appendChild(mastery);
         }
         errorItem.appendChild(analysis);
-        errorItem.appendChild(deleteBtn);
+        errorItem.appendChild(actionsRow);
 
         bankContainer.appendChild(errorItem);
         });

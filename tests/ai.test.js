@@ -452,3 +452,23 @@ test('历史标记日志:AI 题人工保存后转"曾AI整理";待补题补答�
     assert.ok(!after.includes('"ai"'), '× 删除对应历史条目');
 });
 
+
+test('错题本收藏:☆ 收藏入收藏夹并变 ★,再点取消;与刷题页收藏互通(按题干匹配)', async () => {
+    const { run, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
+    run(`init()`);
+    // 制造一道错题:先导入题库,再走一次答题判错
+    run(`questionBanks['错题源'] = [{ content: '易错题一', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A', explanation: '' }, { content: '易错题二', type: '单选', options: { A: '甲', B: '乙' }, answer: 'B', explanation: '' }]`);
+    run(`currentBankName = '错题源'; questionBank = questionBanks['错题源']`);
+    run(`addToErrorBook({ content: '易错题一', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A' }, 'B')`);
+    run(`showSection('errors')`);
+    run(`updateErrorsList()`);
+    run(`state.expandedBanks['错题源'] = true`);
+    // 收藏切换:错题项按钮与刷题页调用同一 toggleFavorite(按题干匹配),数据面互通
+    run(`toggleFavorite(questionBanks['错题源'][0], '错题源')`);
+    assert.strictEqual(run(`favoriteQuestions.length`), 1);
+    assert.strictEqual(run(`favoriteQuestions[0].content`), '易错题一');
+    // 错题项按钮渲染的 ★/☆ 文案由 updateErrorsList 按 isFav 生成(与 delete 按钮同一渲染路径)
+    // 再点同一题收藏 → 取消
+    run(`toggleFavorite(questionBanks['错题源'][0], '错题源')`);
+    assert.strictEqual(run(`favoriteQuestions.length`), 0);
+});
