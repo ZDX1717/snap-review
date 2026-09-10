@@ -5,7 +5,7 @@
 > 修订规则:改规范 = 改本文件 + 同步 `:root`,一个 commit 完成,不允许只改 CSS 不改文档。
 
 ## 0. 修订记录
-- v3(2026-09-10):**令牌表全量重校准**——v2 之后配色经历"去紫换真宝蓝"(blue-600/暗 blue-500),但本文件未同步,导致主色记载为 `#4a6cf7`(紫系)而 `:root` 实为 `#2563eb`。本次按 `:root` 与 `html[data-theme="dark"]` 实测值**逐条对齐**,并补齐 v2 起新增的全部令牌。
+- v3(2026-09-10):**令牌表全量重校准**——v2 之后配色经历"去紫换真宝蓝"(blue-600/暗 blue-500),但本文件未同步,导致主色记载为 `#4a6cf7`(紫系)而 `:root` 实为 `#2563eb`。本次按 `:root` 与 `html[data-theme="dark"]` 实测值**逐条对齐**,并补齐 v2 起新增的全部令牌。同时**收口 30 处裸 hex**(§2.1),亮色零视觉变化、暗色首次可换肤。
 - v2(2026-09-10):采纳 slate/emerald/rose/amber 色阶与"卡片 12px+细边框+微阴影"体系(👤 提供的外部规范);按钮/输入保持 6px。v1 的 6px 唯一圆角规则废止。
 
 ## 1. 设计立场
@@ -52,7 +52,36 @@
 - `--c-text-faint` 只允许用于非必读信息;必读文字最低 `--c-text-muted`(AA 4.5:1)。
 - 反白按钮文字用 `#fff`,不令牌化(亮暗通用)。
 
+### 2.1 用途专用令牌(收口裸 hex 的产物,v3 新增 14 个)
+
+这些令牌**亮色值 = 收口前的硬编码原值**(逐条机械比对,零视觉变化),暗色值补齐后使这些用途首次可换肤。新代码遇到同类用途请复用下表,不要再引入新色。
+
+| 令牌 | 亮色 | 暗色 | 用途 |
+|---|---|---|---|
+| `--c-primary-hover` | `#5a6268` | `#4a5058` | secondary 按钮 hover(中灰) |
+| `--c-text-secondary-deep` | `#2c4a80` | `#a8c0e8` | info 提示文字(深蓝) |
+| `--c-warn-text-deep` | `#7a5800` | `#ffd666` | 告警提示文字 |
+| `--c-warn-border` | `#e0a800` | `#8a7333` | 告警提示边框 |
+| `--c-badge-warn-text` / `-border` | `#856404` / `#ffeeba` | `#ffd666` / `#5c4f1f` | ⚠ 徽章 |
+| `--c-warn-icon` | `#f0a020` | `#e0b34c` | ⏳ 待修左条(暖橙) |
+| `--c-warn-text-strong` / `-alt` | `#7a5200` / `#b45309` | `#ffd666` / `#e0b34c` | 待修文字 / 双标说明 |
+| `--c-star-border` / `-text` / `-bg` | `#fd7e14` / `#b4690e` / `#fff8e1` | `#f0a500` / `#ffd666` / `#3a3320` | ☆→★ 收藏三态 |
+| `--c-star-hover-bg` | `#fffaf0` | `#302a1c` | ☆ 收藏 hover 底 |
+| `--c-streak-bg` | `#fff4e0` | `#3a3320` | 连对徽章底(≠ `--c-star-bg`) |
+| `--c-option-exp-text` | `#fd7e14` | `#ffd666` | 选项解释文字(逐题模式) |
+| `--c-danger-hover` | `#c82333` | `#ff8a94` | 删除按钮 hover |
+| `--c-input-border` | `#ced4da` | `#3f444b` | 表单输入边框 |
+| `--c-review-unanswered-border` | `#c3e6cb` | `#2f5c3d` | 回顾·未作答行边框 |
+| `--c-selected-text` / `-strong` | `#2c5282` / `#1c3d7c` | `#b9ccec` | 选中行文字 / 待修+选中行文字 |
+| `--c-selected-bg-strong` | `#e7f0ff` | `#26313f` | 待修+选中行底 |
+| `--c-accent-purple-faint` / `-tint` / `-overlap` | `#fbfaff` / `#fbf7ff` / `#b08df0` | `#232030` / `#2a2440` / `#7d68b8` | 🤖 行底 / 紫+⏳ 行底 / 双标左条过渡 |
+| `--c-review-wrong-bg` | `#fff5f5` | `#3f0d18` | 回顾·答错行底 |
+| `--c-ai-connected-text` / `-bg` | `#1e7e46` / `#e9f7ef` | `#8fe3a8` / `#1d3a26` | AI 已连接徽章 |
+| `--c-border-hairline` | `#eef0f3` | `#2c3138` | 极浅分隔边框(救援区) |
+| `--c-progress-tip` | `#6c8fc7` | `#4a6a9e` | 进度条渐变尾色 |
+
 > ⚠️ **待决(勿擅自改)**:`--c-primary-alt` / `--c-primary-alt-deep` 目前**与 `--c-primary` / `--c-primary-deep` 取值完全相同**(亮暗皆然),但全站有 17 处引用。历史上它是"紫→宝蓝"过渡期的别名,现已无独立语义。二选一需 👤 拍板:①合并为 `--c-primary`(删别名,改 17 处);②给它一个真正的次级色调。**在此之前新代码优先用 `--c-primary`**。
+> 另有 2 个令牌**定义了但全站零引用**:`--c-chip-bg`、`--c-primary-alt-deep`。建议随上述决策一并删除。
 
 ## 3. 语义标记色(AI/待修/历史,永久标注体系)
 

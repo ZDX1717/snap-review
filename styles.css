@@ -38,6 +38,37 @@
     --c-warn-bg-soft: #fff8e6;
     --c-success-soft: #ecfdf5;
     --c-danger-soft: #fff1f2;
+    /* ===== 裸 hex 收口(取色 = 各用途原有硬编码值,亮色零视觉变化) ===== */
+    --c-primary-hover: #5a6268;      /* secondary 按钮 hover(中灰,深于 --c-text-muted) */
+    --c-text-secondary-deep: #2c4a80;/* info 提示文字(深蓝) */
+    --c-warn-text-deep: #7a5800;     /* 告警提示文字(深褐) */
+    --c-warn-border: #e0a800;        /* 告警提示边框 */
+    --c-badge-warn-text: #856404;    /* ⚠ 徽章文字 */
+    --c-badge-warn-border: #ffeeba;  /* ⚠ 徽章边框 */
+    --c-warn-icon: #f0a020;          /* ⏳ 待修左条(暖橙,区别于 --c-accent-orange) */
+    --c-warn-text-strong: #7a5200;   /* 待修文字/说明 */
+    --c-warn-text-alt: #b45309;      /* 🤖+⏳ 双标并存时的说明文字 */
+    --c-accent-purple-faint: #fbfaff;/* 🤖 标记行底(极淡) */
+    --c-accent-purple-overlap: #b08df0;/* 🤖+⏳ 左条过渡色(双标并存) */
+    --c-review-wrong-bg: #fff5f5;    /* 回顾·答错行底 */
+    --c-ai-connected-text: #1e7e46;  /* AI 已连接文字 */
+    --c-ai-connected-bg: #e9f7ef;    /* AI 已连接底 */
+    --c-border-hairline: #eef0f3;    /* 极浅分隔边框(救援区) */
+    --c-progress-tip: #6c8fc7;       /* 进度条渐变尾色(蓝灰) */
+    /* --- 以下为「无等价令牌」的独立颜色,亮色值 = 原硬编码值,保证零视觉变化 --- */
+    --c-star-border: #fd7e14;        /* ☆ 收藏 hover 边框(亮橙) */
+    --c-star-text: #b4690e;          /* ★ 收藏激活文字(深橙) */
+    --c-star-bg: #fff8e1;            /* ★ 收藏激活底 */
+    --c-streak-bg: #fff4e0;          /* 连对徽章底 */
+    --c-option-exp-text: #fd7e14;    /* 选项解释文字(橙色,逐题模式) */
+    --c-star-hover-bg: #fffaf0;      /* ☆ 收藏 hover 底 */
+    --c-danger-hover: #c82333;       /* 删除按钮 hover(深红) */
+    --c-input-border: #ced4da;       /* 表单输入边框 */
+    --c-review-unanswered-border: #c3e6cb; /* 回顾·未作答行边框 */
+    --c-selected-text: #2c5282;      /* 编辑器选中行文字(深蓝) */
+    --c-selected-bg-strong: #e7f0ff; /* 待修+选中行底 */
+    --c-selected-text-strong: #1c3d7c;/* 待修+选中行文字 */
+    --c-accent-purple-tint: #fbf7ff; /* 🤖+⏳ 双标并存行底(比 faint 更紫) */
 }
 
 /* Zquiz · 期末周刷题 样式 */
@@ -204,7 +235,7 @@ h3 {
 }
 
 .action-btn.secondary:hover {
-    background-color: #5a6268;
+    background-color: var(--c-primary-hover);
 }
 
 .status-message {
@@ -302,7 +333,7 @@ h3 {
 }
 
 .option-explanation {
-    color: #fd7e14;
+    color: var(--c-option-exp-text);
     font-style: italic;
     margin-top: 4px;
     padding-left: 25px;
@@ -503,7 +534,7 @@ h3 {
 }
 
 .error-item .delete-btn:hover {
-    background-color: #c82333;
+    background-color: var(--c-danger-hover);
 }
 
 @media (max-width: 768px) {
@@ -669,7 +700,7 @@ h3 {
 .form-input {
     width: 100%;
     padding: 8px;
-    border: 1px solid #ced4da;
+    border: 1px solid var(--c-input-border);
     border-radius: 6px;
     font-size: 16px;
     font-family: inherit;
@@ -815,8 +846,8 @@ h3 {
 
 .badge.warn-badge {
     background: var(--c-warn-bg);
-    color: #856404;
-    border: 1px solid #ffeeba;
+    color: var(--c-badge-warn-text);
+    border: 1px solid var(--c-badge-warn-border);
 }
 
 .preview-conf {
@@ -929,7 +960,7 @@ h3 {
 
 .review-item.review-wrong {
     border-color: var(--c-danger);
-    background: #fff5f5;
+    background: var(--c-review-wrong-bg);
 }
 
 .review-item.review-unanswered {
@@ -953,7 +984,7 @@ h3 {
 .badge.ok-badge {
     background: var(--c-success-bg);
     color: var(--c-success-text);
-    border: 1px solid #c3e6cb;
+    border: 1px solid var(--c-review-unanswered-border);
 }
 
 .review-stem {
@@ -1052,14 +1083,14 @@ h3 {
 }
 
 .favorite-btn:hover {
-    border-color: var(--c-accent-orange);
-    color: var(--c-accent-orange);
+    border-color: var(--c-star-border);
+    color: var(--c-star-border);
 }
 
 .favorite-btn.active {
-    background: #fff8e1;
-    border-color: var(--c-accent-orange);
-    color: var(--c-accent-orange);
+    background: var(--c-star-bg);
+    border-color: var(--c-star-border);
+    color: var(--c-star-text);
     font-weight: 600;
 }
 
@@ -1150,8 +1181,8 @@ h3 {
 }
 
 .editor-list-item.selected {
-    background: #e3ecf7;
-    color: #2c5282;
+    background: var(--c-selected-bg-strong);
+    color: var(--c-selected-text);
     font-weight: 600;
 }
 
@@ -1320,15 +1351,15 @@ h3 {
 #quiz-progress-fill {
     height: 100%;
     width: 0;
-    background: linear-gradient(90deg, var(--c-primary-alt), #6c8fc7);
+    background: linear-gradient(90deg, var(--c-primary-alt), var(--c-progress-tip));
     transition: width 0.2s;
 }
 
 .streak-badge {
     font-size: 14px;
     font-weight: 600;
-    color: #b4690e;
-    background: #fff4e0;
+    color: var(--c-accent-orange);
+    background: var(--c-streak-bg);
     border-radius: 12px;
     padding: 2px 8px;
 }
@@ -1483,13 +1514,13 @@ h3 {
 }
 .file-notice.warning {
     background: var(--c-warn-bg-soft);
-    border: 1.5px solid #e0a800;
-    color: #7a5800;
+    border: 1.5px solid var(--c-warn-border);
+    color: var(--c-warn-text-deep);
 }
 .file-notice.info {
     background: var(--c-info-bg);
     border: 1.5px solid var(--c-primary-alt);
-    color: #2c4a80;
+    color: var(--c-text-secondary-deep);
 }
 .file-notice.hidden {
     display: none;
@@ -1528,7 +1559,7 @@ h3 {
 }
 .preview-item.ai-touched {
     box-shadow: inset 3px 0 0 var(--c-accent-purple);
-    background: #fbfaff;
+    background: var(--c-accent-purple-tint);
 }
 
 .prompt-guide-head-actions {
@@ -1566,8 +1597,8 @@ h3 {
 }
 .card-link.ai-connected {
     border-color: var(--c-success-deep);
-    color: #1e7e46;
-    background: #e9f7ef;
+    color: var(--c-ai-connected-text);
+    background: var(--c-ai-connected-bg);
     font-weight: 600;
 }
 .status-line {
@@ -1604,7 +1635,7 @@ h3 {
     .rescue-grid { grid-template-columns: 1fr; }
 }
 .rescue-col {
-    border: 1px solid #eef0f3;
+    border: 1px solid var(--c-border-hairline);
     border-radius: 6px;
     padding: 8px;
 }
@@ -1673,13 +1704,13 @@ h3 {
 /* 编辑器待修改题高亮 */
 .editor-list-item.needs-fix {
     background: var(--c-warn-bg-soft);
-    box-shadow: inset 3px 0 0 #f0a020;
-    color: #7a5200;
+    box-shadow: inset 3px 0 0 var(--c-warn-icon);
+    color: var(--c-warn-text-strong);
 }
 .editor-list-item.needs-fix.selected {
-    background: #e7f0ff;
+    background: var(--c-selected-bg-strong);
     box-shadow: inset 3px 0 0 var(--c-primary);
-    color: #1c3d7c;
+    color: var(--c-selected-text-strong);
 }
 
 /* 编辑器:AI 标记题(紫条)与 AI 说明行 */
@@ -1687,13 +1718,13 @@ h3 {
     box-shadow: inset 3px 0 0 var(--c-accent-purple);
 }
 .editor-list-item.ai-gen.needs-fix {
-    box-shadow: inset 3px 0 0 #b08df0;  /* 双重标记时紫橙过渡色 */
-    background: #fbf7ff;
+    box-shadow: inset 3px 0 0 var(--c-accent-purple-overlap);  /* 双重标记时紫橙过渡色 */
+    background: var(--c-accent-purple-faint);
 }
 .editor-ai-note { font-weight: 600; }
 
 .editor-ai-note.fix-note {
-    color: #b45309;
+    color: var(--c-warn-text-alt);
 }
 
 /* 编辑器:历史标记(人工旗标,保存不消,仅 × 删除) */
@@ -1743,7 +1774,7 @@ h3 {
 }
 .error-item .fav-toggle-btn:hover {
     border-color: var(--c-warn-accent);
-    background: #fffaf0;
+    background: var(--c-star-hover-bg);
 }
 
 /* 编辑器说明行:AI 与待修双状态并存时逐行显示 */
@@ -1923,6 +1954,38 @@ html[data-theme="dark"] {
     --c-warn-bg-soft: #3a3320;
     --c-success-soft: #0a2e1f;
     --c-danger-soft: #3f0d18;
+    /* ===== 裸 hex 收口 · 暗色对应值 =====
+       这些在收口前是硬编码亮色 tint,暗色下无法换肤(过亮/刺眼)。
+       取值优先复用本表已有的、已验证的暗色语义色,避免引入新色感。 */
+    --c-primary-hover: #4a5058;       /* 中灰 hover(暗色下用深一档灰) */
+    --c-text-secondary-deep: #a8c0e8; /* info 文字提亮 */
+    --c-warn-text-deep: #ffd666;      /* 同暗色 --c-warn-text */
+    --c-warn-border: #8a7333;
+    --c-badge-warn-text: #ffd666;
+    --c-badge-warn-border: #5c4f1f;
+    --c-warn-icon: #e0b34c;           /* 同暗色 --c-warn-accent */
+    --c-warn-text-strong: #ffd666;
+    --c-warn-text-alt: #e0b34c;
+    --c-accent-purple-faint: #232030;
+    --c-accent-purple-overlap: #7d68b8;
+    --c-review-wrong-bg: #3f0d18;     /* 同暗色 --c-danger-soft */
+    --c-ai-connected-text: #8fe3a8;   /* 同暗色 --c-success-text */
+    --c-ai-connected-bg: #1d3a26;     /* 同暗色 --c-success-bg */
+    --c-border-hairline: #2c3138;     /* 同暗色 --c-border-light */
+    --c-progress-tip: #4a6a9e;         /* 暗色进度渐变尾色(压暗) */
+    --c-star-border: #f0a500;          /* 暗色下并入 --c-accent-orange */
+    --c-star-text: #ffd666;
+    --c-star-bg: #3a3320;
+    --c-streak-bg: #3a3320;
+    --c-star-hover-bg: #302a1c;
+    --c-option-exp-text: #ffd666;
+    --c-danger-hover: #ff8a94;
+    --c-input-border: #3f444b;
+    --c-review-unanswered-border: #2f5c3d;
+    --c-selected-text: #b9ccec;
+    --c-selected-text-strong: #b9ccec;
+    --c-selected-bg-strong: #26313f;
+    --c-accent-purple-tint: #2a2440;
 }
 html[data-theme="dark"] {
     color-scheme: dark;
