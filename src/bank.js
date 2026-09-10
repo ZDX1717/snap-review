@@ -1190,6 +1190,8 @@ export function editorSaveCurrent(silent) {
     q.answer = answer;
     q.explanation = editorExplanation.value.trim();
     q.analysis = editorAnalysis.value.trim();
+    // 人工保存 = 人工核验完成:撤销 AI 永久标记(人动过就以人为准)
+    if (q.aiSource === 'ai') delete q.aiSource;
 
     saveToLocalStorage();
     state.editorDirty = false;
@@ -1508,7 +1510,20 @@ export function renderBankEditor() {
     const aiNoteEl = document.getElementById('editor-ai-note');
     if (aiNoteEl) {
         const cur = questions[state.editIndex];
-        aiNoteEl.textContent = cur && cur.aiSource === 'ai' ? '🤖 此题经 AI 整理导入；你在此保存的修改为最终版本' : '';
+        const aiTouched = cur && cur.aiSource === 'ai';
+        const fixes = [];
+        if (cur && !cur.answer) fixes.push('缺答案（待补）');
+        if (cur && Object.keys(cur.options || {}).length < 2) fixes.push('选项不足');
+        if (aiTouched) {
+            aiNoteEl.textContent = '🤖 此题经 AI 整理导入；保存修改后标记自动消除';
+            aiNoteEl.className = 'editor-ai-note';
+        } else if (fixes.length) {
+            aiNoteEl.textContent = '⚠ 此题' + fixes.join('、') + '；补全并保存后黄色高亮自动消失';
+            aiNoteEl.className = 'editor-ai-note fix-note';
+        } else {
+            aiNoteEl.textContent = '';
+            aiNoteEl.className = 'editor-ai-note';
+        }
     }
     editorRenderForm();
 }

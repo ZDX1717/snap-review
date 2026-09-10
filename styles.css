@@ -1634,3 +1634,7 @@ h3 {
     background: #fbf7ff;
 }
 .editor-ai-note { font-weight: 600; }
+
+.editor-ai-note.fix-note {
+    color: #b45309;
+}

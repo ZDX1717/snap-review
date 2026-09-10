@@ -375,3 +375,34 @@ test('AI 标记持久化:确认导入后 aiSource=ai 写进题库数据(编辑�
     run(`commitPreviewImport()`);
     assert.strictEqual(run(`questionBanks['AI测试库'].some(q => q.content === '普通题' && q.aiSource)`), false);
 });
+
+test('编辑器:AI 题人工保存后消标;待修题说明行随状态切换', async () => {
+    const { run, store, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+        sandboxExtras: {
+            fetch: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: AI_TEXT } }] }) }),
+            AbortController,
+        },
+    }));
+    store.set('aiConfig', JSON.stringify(CFG));
+    run(`init()`);
+    run(`pasteInput.value = '一坨乱原文'`);
+    await run(`(async () => { await rescueAiOrganize(); })()`);
+    run(`parsePastedText()`);
+    run(`prompt = () => 'AI测试库'`);
+    run(`previewTargetBankSelect.value = '__new__'`);
+    run(`commitPreviewImport()`);
+    run(`editBank('AI测试库')`);
+    assert.strictEqual(run(`questionBanks['AI测试库'][0].aiSource`), 'ai');
+    // 人工保存 → aiSource 消除
+    run(`editorStem.value = '人工改过的题'; editorType.value = '判断'; editorAnswer.value = 'A'`);
+    run(`editorSaveCurrent(true)`);
+    assert.strictEqual(run(`questionBanks['AI测试库'][0].aiSource`), undefined);
+    // 待修题(导入一题缺答案) → 说明行走橙字分支
+    run(`openImportPreview(parseQuestionsText('1. 缺答案的题 A.甲 B.乙'))`);
+    run(`previewTargetBankSelect.value = 'AI测试库'`);
+    run(`commitPreviewImport()`);
+    run(`editBank('AI测试库')`);
+    run(`state.editIndex = 1; renderBankEditor()`);
+    const note = String(elements['editor-ai-note'].textContent);
+    assert.ok(note.includes('缺答案'), '待修题要有橙色说明');
+});
