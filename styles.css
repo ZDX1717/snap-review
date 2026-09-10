@@ -232,10 +232,16 @@ h3 {
 
 .question-header {
     display: flex;
-    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 15px;
     font-weight: 500;
     color: var(--c-text-secondary);
+}
+.quiz-progress {
+    flex: 1;
+    min-width: 40px;
+    margin: 0 4px;
 }
 
 .question-content {
@@ -1962,10 +1968,9 @@ html[data-theme="dark"] .container {
     }
     /* 题干紧跟进度条,只留一行的呼吸感(居中版留白过大,按 👤 反馈改顶对齐) */
     #quiz-section.active:has(#quiz-container:not(.hidden)) .question-header {
-        margin-bottom: 5px;
+        margin-bottom: 6px;
     }
     #quiz-section.active:has(#quiz-container:not(.hidden)) .quiz-progress {
-        margin-bottom: 6px;
         height: 5px;
     }
     #quiz-section.active:has(#quiz-container:not(.hidden)) .question-content {

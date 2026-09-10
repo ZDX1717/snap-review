@@ -208,8 +208,13 @@ export function displayQuestion() {
         }
     } else {
         prevQuestionBtn.classList.add('hidden');
-        submitAnswerBtn.textContent = question.type === '多选' ? '确认答案' : '提交答案';
-        submitAnswerBtn.classList.remove('hidden');
+        // 单选/判断点卡片即判分,提交按钮无意义;仅多选需要「确认答案」
+        submitAnswerBtn.textContent = '确认答案';
+        if (question.type === '多选') {
+            submitAnswerBtn.classList.remove('hidden');
+        } else {
+            submitAnswerBtn.classList.add('hidden');
+        }
         nextQuestionBtn.classList.add('hidden');
     }
 
