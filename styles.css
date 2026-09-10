@@ -198,7 +198,7 @@ h3 {
     color: var(--c-text-muted);
 }
 
-.import-options, .quiz-options {
+.quiz-options {
     background-color: var(--c-surface-alt);
     border-radius: 6px;
     padding: 24px;
@@ -561,31 +561,9 @@ h3 {
     }
 }
 
-/* 题库管理样式 */
-.manage-layout {
-    display: grid;
-    grid-template-columns: 1fr 1fr;  /* 2:3 实测失调(👤 反馈),回归等宽 */
-    gap: 24px;
-    margin-top: 24px;
-}
 
-.bank-list-panel {
-    background-color: var(--c-surface-alt);
-    border-radius: 6px;
-    padding: 24px;
-}
 
-.panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
-}
 
-.panel-header h3 {
-    margin: 0;
-    color: var(--c-text);
-}
 
 .action-btn.small {
     padding: 8px 16px;
@@ -631,11 +609,6 @@ h3 {
     font-size: 14px;
 }
 
-.bank-operations-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-}
 
 .operation-card {
     background-color: var(--c-surface-alt);
@@ -648,15 +621,7 @@ h3 {
     color: var(--c-text);
 }
 
-.export-options {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
 
-.export-options button {
-    width: 100%;
-}
 
 /* 模态框样式 */
 .modal {
@@ -719,9 +684,6 @@ h3 {
 }
 
 @media (max-width: 768px) {
-    .manage-layout {
-        grid-template-columns: 1fr;
-    }
 
     .bank-item {
         flex-direction: column;
@@ -739,14 +701,7 @@ h3 {
         min-width: calc(50% - 4px);
     }
 }
-/* ==================== 粘贴导入 + 导入预览向导（批次1） ==================== */
 
-.import-hint {
-    font-size: 14px;
-    color: var(--c-text-muted);
-    margin-bottom: 12px;
-    line-height: 1.6;
-}
 
 #paste-input {
     width: 100%;
@@ -1110,20 +1065,8 @@ h3 {
     margin: 8px 0 0;
 }
 
-/* ==================== 错题移出规则 + 复习范围 + 题库编辑器 ==================== */
 
-.mastery-config {
-    margin: 8px 0 16px;
-    font-size: 14px;
-    color: var(--c-text-secondary);
-}
 
-.mastery-config select {
-    padding: 4px 8px;
-    border: 1px solid var(--c-border);
-    border-radius: 6px;
-    font-size: 14px;
-}
 
 .scope-options {
     display: flex;
@@ -1296,10 +1239,6 @@ h3 {
     .operation-card {
         padding: 16px 16px;
     }
-    .panel-header {
-        flex-wrap: wrap;
-        gap: 8px;
-    }
     .modal-content {
         padding: 24px 16px;
     }
@@ -1429,45 +1368,6 @@ h3 {
     }
 }
 
-/* ==================== 官方提示词引导条 ==================== */
-.prompt-guide {
-    background: var(--c-info-bg);
-    border: 1px solid var(--c-info-border);
-    border-radius: 6px;
-    padding: 12px 16px;
-    margin-bottom: 24px;
-}
-.prompt-guide.hidden {
-    display: none;
-}
-.prompt-guide-text {
-    font-size: 14px;
-    line-height: 1.6;
-    margin-bottom: 8px;
-    color: var(--c-text);
-}
-
-/* ==================== 提示词引导(输入框上方,突出 + 可展开) ==================== */
-.prompt-guide {
-    background: var(--c-info-bg);
-    border: 2px solid var(--c-primary-alt);
-    border-radius: 10px;
-    padding: 12px 16px;
-    margin-bottom: 16px;
-}
-.prompt-guide-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 8px;
-}
-.prompt-guide-title {
-    font-weight: 700;
-    font-size: 14px;
-    color: var(--c-text);
-}
 .prompt-toggle {
     background: none;
     border: 1px solid var(--c-info-border);
@@ -1476,15 +1376,6 @@ h3 {
     font-size: 12px;
     color: var(--c-primary-alt);
     cursor: pointer;
-}
-.prompt-guide-text {
-    font-size: 14px;
-    line-height: 1.6;
-    margin-bottom: 8px;
-    color: var(--c-text-secondary);
-}
-.prompt-guide .action-btn {
-    width: 100%;
 }
 .prompt-content {
     margin-top: 8px;
@@ -1562,11 +1453,6 @@ h3 {
     background: var(--c-accent-purple-tint);
 }
 
-.prompt-guide-head-actions {
-    display: inline-flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
 
 .file-notice-actions {
     margin: 8px 0 4px;
@@ -1811,10 +1697,6 @@ h3 {
     .operation-card h3 {
         margin-top: 0;
         margin-bottom: 8px;
-    }
-    .bank-list-panel,
-    .bank-operations-panel {
-        gap: 0;
     }
     .banks-list,
     .editor-question-list,
@@ -2172,12 +2054,6 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     align-items: center;
     margin-bottom: 16px;
 }
-.collection-panel {
-    margin-top: 24px;
-}
-.collection-panel h3 {
-    margin: 0 0 12px;
-}
 /* 导入卡在首页:去双栏遗留,全宽 */
 #home-section .operation-card {
     margin-top: 24px;
@@ -2186,9 +2062,6 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     .banks-header .action-btn.small {
         padding: 7px 10px;
         font-size: 13px;
-    }
-    .collection-panel {
-        margin-top: 16px;
     }
 }
 
