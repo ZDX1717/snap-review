@@ -1,13 +1,11 @@
+import test from 'node:test';
 import assert from 'node:assert';
 import { loadApp, makeEl } from './helpers/vm-harness.mjs';
 
 const { run, elements, store, alerts, sandbox, domContentLoadedCount } = await loadApp();
 
-let passed = 0;
-const test = (name, fn) => { fn(); passed++; console.log('  ✓ ' + name); };
 const Q = (content, answer) => ({ content, type: '单选', options: {A:'甲',B:'乙'}, answer, analysis: '', explanation: '', confidence: 1, raw: '' });
 
-console.log('== 功能1:错题移出规则可配置 ==');
 test('阈值 0(关闭):答对不追踪不移出', () => {
     run(`masteryThreshold = 0;
         errorQuestions = [{ ...${JSON.stringify(Q('题1','A'))}, userAnswer: 'B', correctStreak: 0 }];`);
@@ -41,7 +39,6 @@ test('设置加载与持久化(含非法值回退)', () => {
     assert.strictEqual(run('masteryThreshold'), 0);
 });
 
-console.log('== 功能2:题源(题库/错题本/收藏夹) ==');
 test('题源解析:三种来源各自返回对应题目池', () => {
     run(`questionBank = [{ content: 'q1', type: '单选', answer: 'A' }];
         errorQuestions = [{ content: 'e1', type: '单选', bankName: '高数' }, { content: 'e2', type: '判断', bankName: '英语' }];
@@ -161,7 +158,6 @@ test('选择题库对错题/收藏题源同样生效(按 bankName 收窄)', () =
     assert.strictEqual(run('currentQuiz[0].content'), 'b');
 });
 
-console.log('== 功能3:题库编辑器 ==');
 test('判断题保存:选项强制 A正确/B错误,对错写法归一', () => {
     run(`questionBanks = { 'T': [${JSON.stringify(Q('原题', 'A'))}] };
         editBankName = 'T'; editIndex = 0;
@@ -211,4 +207,3 @@ test('编辑器导航越界保护', () => {
     assert.strictEqual(run('editIndex'), 0);
 });
 
-console.log(`\n全部通过:${passed} 项断言组 ✅`);

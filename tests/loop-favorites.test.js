@@ -1,13 +1,11 @@
+import test from 'node:test';
 import assert from 'node:assert';
 import { loadApp, makeEl } from './helpers/vm-harness.mjs';
 
 const { run, elements, store, alerts, sandbox, domContentLoadedCount } = await loadApp();
 
-let passed = 0;
-const test = (name, fn) => { fn(); passed++; console.log('  ✓ ' + name); };
 const Q = (content, answer) => ({ content, type: '单选', options: {A:'甲',B:'乙'}, answer, analysis: 'x', confidence: 1, raw: '' });
 
-console.log('== 去重指纹(题干+选项) ==');
 test('同题干同选项不同答案 → 同一题(重复)', () => {
     const k1 = run(`questionDedupKey(${JSON.stringify(Q('题A', 'A'))})`);
     const k2 = run(`questionDedupKey(${JSON.stringify(Q('题A', 'B'))})`);
@@ -20,7 +18,6 @@ test('同题干不同选项 → 不同题(不误判)', () => {
     assert.notStrictEqual(run(`questionDedupKey(${JSON.stringify(q1)})`), run(`questionDedupKey(${JSON.stringify(q2)})`));
 });
 
-console.log('== 错题闭环 ==');
 test('答对一次 → 连对1,不移出;答错 → 清零并更新作答', () => {
     run(`errorQuestions = [{ ...${JSON.stringify(Q('错题1','A'))}, userAnswer: 'B', bankName: 'T', correctStreak: 0 }];`);
     assert.strictEqual(run(`updateErrorStreak(${JSON.stringify(Q('错题1','A'))}, true, 'A')`), 0);
@@ -54,7 +51,6 @@ test('逐题模式答对错本题 → 反馈文案带移出提示', () => {
     sandbox.document.querySelector = () => makeEl();
 });
 
-console.log('== 收藏夹 ==');
 test('切换收藏:加入→列表+1并持久化,再切→移除', () => {
     run(`favoriteQuestions = [];`);
     assert.strictEqual(run(`toggleFavorite(${JSON.stringify(Q('好题','A'))}, '高数')`), true);
@@ -98,4 +94,3 @@ test('题库一键去重', () => {
     assert.ok(alerts.some(a => a.includes('已清理 1')));
 });
 
-console.log(`\n全部通过:${passed} 项断言组 ✅`);

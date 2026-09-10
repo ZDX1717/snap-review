@@ -1,13 +1,11 @@
+import test from 'node:test';
 import assert from 'node:assert';
 import { loadApp, makeEl } from './helpers/vm-harness.mjs';
 
 const { run, elements, store, alerts, sandbox, domContentLoadedCount } = await loadApp({ promptValue: 'AI题库' });
 
-let passed = 0;
-const test = (name, fn) => { fn(); passed++; console.log('  ✓ ' + name); };
 const P = (s) => run(`parseQuestionsText(${JSON.stringify(s)})`);
 
-console.log('== P0 回归 ==');
 test('DOMContentLoaded 只注册一次', () => assert.strictEqual(domContentLoadedCount.n, 1));
 test("normalizeAnswerString('CA')==='AC'", () => assert.strictEqual(run("normalizeAnswerString('CA')"), 'AC'));
 test('损坏 JSON 不崩溃', () => {
@@ -16,7 +14,6 @@ test('损坏 JSON 不崩溃', () => {
     assert.strictEqual(Object.keys(run('questionBanks')).length, 0);
 });
 
-console.log('== 家族A:原有字段式 ==');
 test('完整字段(解释/选项解释/解析/类型)全部保留', () => {
     const qs = P(`# 单选题1
 题目：福祸相依体现了（）
@@ -50,7 +47,6 @@ B：丁
     assert.strictEqual(qs[1].content, '第二题');
 });
 
-console.log('== 家族B:编号式逐行 ==');
 test('多题+选项+答案+解析', () => {
     const qs = P(`1. 下列哪个是编程语言？
 A. Python
@@ -85,7 +81,6 @@ B. 选项二
     assert.strictEqual(qs[0].content, '下列关于马克思主义的说法\n正确的是哪一个？');
 });
 
-console.log('== 家族C:单行混排 ==');
 test('题干+行内选项+行内答案', () => {
     const qs = P(`1. 一年有几个月？A.10 B.11 C.12 D.13 答案：C
 2. 光速约为每秒多少公里？A.3万 B.30万 C.300万 答案：B`);
@@ -107,7 +102,6 @@ test('题干含"A、B"文字不被误拆', () => {
     assert.deepStrictEqual(Object.keys(qs[0].options), []);
 });
 
-console.log('== 家族D:判断题 ==');
 test('答案"对"→ 判断题,A正确B错误', () => {
     const qs = P(`1. 中国的首都是北京。
 答案：对`);
@@ -128,7 +122,6 @@ test('"判断题："开头 + 答案A', () => {
     assert.strictEqual(qs[0].answer, 'A');
 });
 
-console.log('== 题型提示与置信度 ==');
 test('类型提示与答案矛盾时以答案推断为准(判分自洽)', () => {
     const qs = P(`题目：测试
 A：甲
@@ -151,14 +144,12 @@ test('finalizeQuestion 幂等', () => {
     assert.strictEqual(q2, before);
 });
 
-console.log('== htmlToLines 兜底(无 DOMParser 环境) ==');
 test('HTML 标签转行', () => {
     const lines = run(`htmlToLines('<p>1. 题目一</p><p>A. 甲</p>答案：A')`);
     assert.ok(lines.some(l => l.includes('题目一')));
     assert.ok(!lines.some(l => l.includes('<p>')));
 });
 
-console.log('== 预览导入提交流程 ==');
 test('批内去重 + 目标题库查重 + 正确入库', () => {
     run(`
         questionBanks = { '目标': [{ content: '已存在的题', options: {A:'甲',B:'乙'}, answer: 'A', type: '单选', confidence: 1, raw: '' }] };
@@ -207,4 +198,3 @@ test('覆盖模式(overwrite)清空目标后导入', () => {
     assert.strictEqual(bank[0].content, '覆盖后的题');
 });
 
-console.log(`\n全部通过:${passed} 项断言组 ✅`);

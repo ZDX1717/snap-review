@@ -1,10 +1,8 @@
+import test from 'node:test';
 import assert from 'node:assert';
 import { loadApp, makeEl } from './helpers/vm-harness.mjs';
 
 const { run, elements, store, alerts, sandbox, domContentLoadedCount } = await loadApp();
-
-let passed = 0;
-const test = (name, fn) => { fn(); passed++; console.log('  ✓ ' + name); };
 
 // 通用三题:q1 单选(A) / q2 多选(CA→判 AC) / q3 判断(A)
 const setupQuiz = `
@@ -21,7 +19,6 @@ const setupQuiz = `
     isAllBanksView = false;
 `;
 
-console.log('== 套题模式:翻页与作答保存 ==');
 test('下一题前进,上一题回退,作答不丢失', () => {
     // 真实浏览器中翻页时 displayQuestion 会把已保存答案恢复到界面上,
     // 这里用桩模拟"恢复后的选中状态"(q1 单选选中 A)
@@ -38,7 +35,6 @@ test('逐题模式没有上一题按钮逻辑', () => {
     assert.strictEqual(run('currentQuestionIndex'), 1); // 不应回退
 });
 
-console.log('== 套题模式:交卷判分 ==');
 test('判分正确:对2/错0/未答1,未作答入错题本', () => {
     run(setupQuiz + ` userAnswers = ['A', 'CA', '']; currentQuestionIndex = 2; finishExam();`);
     assert.strictEqual(run('correctCount'), 2);
@@ -72,7 +68,6 @@ test('错题入错题本', () => {
     sandbox.document.querySelector = () => makeEl();
 });
 
-console.log('== 结果页统计 ==');
 test('套题模式正确率按总题数,未答数展示', () => {
     run(setupQuiz + ` userAnswers = ['A', 'CA', '']; currentQuestionIndex = 2; finishExam();`);
     assert.strictEqual(elements['accuracy'].textContent, '66.7%');
@@ -112,7 +107,6 @@ test('逐题模式答题记录进入回顾列表(渲染不报错)', () => {
     sandbox.document.querySelector = () => makeEl();
 });
 
-console.log('== 错题本作为题源 ==');
 test('题源=错题本:startQuiz 从错题池出题且强制逐题模式', () => {
     run(setupQuiz + `
         errorQuestions = [{ content: 'E1', type: '单选', options: {A:'x',B:'y'}, answer: 'A', bankName: 'T' }];
@@ -142,4 +136,3 @@ test('题源池为空时给出各自指引(错题本/收藏夹)', () => {
     sandbox.document.querySelector = () => makeEl();
 });
 
-console.log(`\n全部通过:${passed} 项断言组 ✅`);
