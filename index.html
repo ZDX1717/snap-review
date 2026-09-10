@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+        <meta name="theme-color" content="#f5f7fa">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=0922">
+    <link rel="stylesheet" href="styles.css?v=0923">
 </head>
 <body>
     <div class="container">
@@ -24,7 +25,12 @@
             <section id="home-section" class="section active">
                 <div class="home-hero">
                     <h2>Zquiz · 期末周刷题</h2>
-                    <p class="hero-version">v0.9.0 · AI 导入上线</p>
+                    <p class="hero-version">v0.10.0-dev · UI 重构中</p>
+                    <div id="theme-switch" class="theme-switch">
+                        <button type="button" data-theme-opt="auto" class="theme-opt active">🌓 自动</button>
+                        <button type="button" data-theme-opt="light" class="theme-opt">☀️ 亮</button>
+                        <button type="button" data-theme-opt="dark" class="theme-opt">🌙 暗</button>
+                    </div>
                     <div class="hero-actions">
                         <button id="hero-start-btn" class="action-btn">开始刷题</button>
                         <button id="hero-import-btn" class="action-btn secondary">导入题库</button>
@@ -521,6 +527,6 @@ A：选项A  B：选项B
 
     </div>
 
-    <script type="module" src="src/main.js?v=0922"></script>
+    <script type="module" src="src/main.js?v=0923"></script>
 </body>
 </html>

@@ -325,6 +325,28 @@ test('预览全选三态:未全勾→点一次全勾;再点→全不选;部分�
     assert.strictEqual(all.indeterminate, true);
 });
 
+test('暗色模式:三档切换打 data-theme、持久化、auto 跟随系统', async () => {
+    const { run, store } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+        sandboxExtras: {
+            document: { documentElement: { dataset: {} } },  // 沙箱补 html 元素
+            matchMedia: () => ({ matches: true, addEventListener() {} }),  // 系统暗色
+        },
+    }));
+    run(`init()`);
+    // auto + 系统暗 → dark
+    assert.strictEqual(run(`document.documentElement.dataset.theme`), 'dark');
+    // 手动选亮 → light 且持久
+    run(`setThemeSetting('light')`);
+    assert.strictEqual(run(`document.documentElement.dataset.theme`), 'light');
+    assert.strictEqual(store.get('themeSetting'), 'light');
+    // 手动选暗
+    run(`setThemeSetting('dark')`);
+    assert.strictEqual(run(`document.documentElement.dataset.theme`), 'dark');
+    // 回 auto → 跟随系统(暗)
+    run(`setThemeSetting('auto')`);
+    assert.strictEqual(run(`document.documentElement.dataset.theme`), 'dark');
+});
+
 test('导入按钮职责分离回归:选文件即读进框;解析按钮单监听纯解析;清空复位一切', async () => {
     const { run, elements, alerts } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
         sandboxExtras: {

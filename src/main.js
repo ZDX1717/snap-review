@@ -1,5 +1,6 @@
 import { buildAiNotes } from './ai.js';
 import { state } from './state.js';
+import { applyTheme, initTheme, setThemeSetting } from './theme.js';
 import { finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey, shuffleArray, splitInlineOptions } from './parser.js';
 import { loadCollapsedBanks, loadFromLocalStorage, loadMasterySetting, saveCollapsedBanks, saveToLocalStorage, recordImportBatch } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
@@ -159,11 +160,15 @@ const editorCloseBtn = document.getElementById('editor-close-btn');
 const editorPosition = document.getElementById('editor-position');
 
 // 首页快捷入口
+const themeSwitch = document.getElementById('theme-switch');
 const heroStartBtn = document.getElementById('hero-start-btn');
 const heroImportBtn = document.getElementById('hero-import-btn');
 
 // 初始化
 function init() {
+    // 主题(暗色模式)先行,避免闪白
+    initTheme();
+
     // 加载本地存储的数据
     loadFromLocalStorage();
     loadCollapsedBanks();
@@ -317,6 +322,12 @@ function setupEventListeners() {
     prevQuestionBtn.addEventListener('click', prevQuestion);
     reviewOnlyWrong.addEventListener('change', renderAnswerReview);
 
+    // 主题三档开关(事件委托)
+    themeSwitch.addEventListener('click', (e) => {
+        const opt = e.target && e.target.closest ? e.target.closest('.theme-opt') : null;
+        if (opt) setThemeSetting(opt.dataset.themeOpt);
+    });
+
     // 首页快捷入口
     heroStartBtn.addEventListener('click', () => showSection('quiz'));
     heroImportBtn.addEventListener('click', () => showSection('manage'));
@@ -444,6 +455,8 @@ if (typeof window === 'undefined') {
         state,
         addToErrorBook,
         backToQuizOptions,
+        applyTheme,
+        setThemeSetting,
         clearErrors,
         clearPasteInput,
         collectUserAnswer,

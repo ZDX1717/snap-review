@@ -46,7 +46,7 @@
 body {
     font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
     line-height: 1.6;
-    color: #333;
+    color: var(--c-text);
     background-color: var(--c-bg);
     padding: 20px;
 }
@@ -1862,4 +1862,74 @@ h3 {
         /* 模态框也不被底栏遮挡 */
         margin-bottom: calc(60px + env(safe-area-inset-bottom));
     }
+}
+
+/* ==================== P0-1.4 暗色模式(变量层整体换肤) ==================== */
+html[data-theme="dark"] {
+    --c-bg: #121417;
+    --c-surface: #1c1f24;
+    --c-surface-alt: #22262c;
+    --c-text: #e9ecef;
+    --c-text-secondary: #ced4da;
+    --c-text-muted: #adb5bd;
+    --c-text-faint: #868e96;
+    --c-border: #3f444b;
+    --c-border-light: #2c3138;
+    --c-primary: #6b8afd;
+    --c-primary-deep: #89a2ff;
+    --c-primary-alt: #6b8afd;
+    --c-primary-alt-deep: #89a2ff;
+    --c-success: #3fbf6a;
+    --c-success-deep: #4cd07d;
+    --c-success-bg: #1d3a26;
+    --c-success-text: #8fe3a8;
+    --c-danger: #e05260;
+    --c-danger-deep: #e8737f;
+    --c-danger-bg: #43202a;
+    --c-danger-text: #ff9a9a;
+    --c-warn: #ffd666;
+    --c-warn-bg: #423a15;
+    --c-warn-text: #ffd666;
+    --c-warn-accent: #e0b34c;
+    --c-accent-purple: #a08fd6;
+    --c-accent-purple-bg: #2a2440;
+    --c-accent-purple-text: #c3b3ff;
+    --c-accent-orange: #f0a500;
+    --c-info-bg: #1e2632;
+    --c-info-border: #3a4a63;
+    --c-panel-bg: #262a30;
+    --c-chip-bg: #2c3138;
+    --c-surface-warm: #242320;
+    --c-warn-bg-soft: #3a3320;
+}
+html[data-theme="dark"] body {
+    color-scheme: dark;
+}
+/* 暗色下阴影收敛(硬编码阴影在暗底上过重) */
+html[data-theme="dark"] .container {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* 主题三档开关 */
+.theme-switch {
+    display: inline-flex;
+    gap: 0;
+    border: 1px solid var(--c-border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+.theme-opt {
+    border: none;
+    background: var(--c-surface);
+    color: var(--c-text-muted);
+    padding: 5px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+}
+.theme-opt + .theme-opt { border-left: 1px solid var(--c-border); }
+.theme-opt.active {
+    background: var(--c-primary);
+    color: #fff;
 }

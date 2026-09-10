@@ -61,6 +61,8 @@ export async function loadApp({ confirmResult = true, promptValue = 'x', sandbox
         setTimeout() { return 0; },
         console,
     };
+    // 文档级注入(如 documentElement),供主题等访问 document.documentElement 的模块测试
+    if (sandboxExtras.document) Object.assign(sandbox.document, sandboxExtras.document);
     const context = vm.createContext(sandbox);
 
     const loaded = new Map();

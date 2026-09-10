@@ -200,3 +200,16 @@ export function recordAiUsage(entry) {
         localStorage.setItem('aiUsage', JSON.stringify(arr));
     } catch (e) { /* 埋点失败不影响主流程 */ }
 }
+
+// ==================== 主题设置(暗色模式) ====================
+
+export function loadThemeSetting() {
+    const v = localStorage.getItem('themeSetting');
+    return ['auto', 'light', 'dark'].includes(v) ? v : 'auto';
+}
+
+export function saveThemeSetting(v) {
+    try {
+        localStorage.setItem('themeSetting', ['auto', 'light', 'dark'].includes(v) ? v : 'auto');
+    } catch (e) { /* 静默 */ }
+}
