@@ -90,7 +90,8 @@ body {
     background-color: var(--c-surface);
     border-radius: 6px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
+    /* 注意:不能设 overflow:hidden —— 祖先裁剪会让 header 的 position:sticky 失效。
+       圆角由子元素各自处理(手机端 container 无圆角)。 */
 }
 
 header {
@@ -102,6 +103,12 @@ header {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    /* 悬浮:吸顶常驻,长列表滚动时站名与主题开关始终可达(👤 反馈);
+       阴影用来与内容分层,否则同一块蓝底会看起来"粘"在内容上 */
+    position: sticky;
+    top: 24px;              /* 桌面 body 有 24px padding,偏移对齐才不露背景带 */
+    z-index: 20;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
 }
 
 header h1 {
@@ -1701,6 +1708,10 @@ h3 {
     /* 页面与容器:去四边空白/圆角/阴影,内容贴边 */
     body {
         padding: 0;
+    }
+    /* 手机全出血:标题栏吸到屏幕顶 */
+    header {
+        top: 0;
     }
     .container {
         max-width: 100%;
