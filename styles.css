@@ -1935,3 +1935,61 @@ html[data-theme="dark"] .container {
     background: var(--c-primary);
     color: #fff;
 }
+
+/* ==================== P0-1.5 刷题聚焦模式(手机:题目居中 + 底部固定操作条) ==================== */
+@media (max-width: 768px) {
+    /* 进入刷题后:隐藏配置区,让位给题目 */
+    #quiz-section.active:has(#quiz-container:not(.hidden)) > h2,
+    #quiz-section.active:has(#quiz-container:not(.hidden)) #quiz-settings,
+    #quiz-section.active:has(#quiz-container:not(.hidden)) #start-quiz-btn,
+    #quiz-section.active:has(#quiz-container:not(.hidden)) #quiz-status:empty {
+        display: none;
+    }
+
+    /* 聚焦布局:quiz 容器占满首屏,题干+选项垂直居中 */
+    #quiz-section.active:has(#quiz-container:not(.hidden)) {
+        display: flex;
+        flex-direction: column;
+        min-height: calc(100vh - 76px);  /* 顶栏 + 底部 tab */
+    }
+    #quiz-section.active:has(#quiz-container:not(.hidden)) #quiz-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        margin-top: 0;
+        padding: 10px 0 12px;
+        background: transparent;
+    }
+    /* 自动边距实现居中:头部贴顶,操作条贴底,题目块居中;内容超高时自然回退为顺排 */
+    #quiz-section.active:has(#quiz-container:not(.hidden)) .quiz-progress {
+        margin-bottom: auto;
+    }
+    #quiz-section.active:has(#quiz-container:not(.hidden)) #answer-feedback:not(.hidden) {
+        margin-top: 10px;
+    }
+    #quiz-section.active:has(#quiz-container:not(.hidden)) .quiz-controls {
+        margin-top: auto;
+    }
+
+    /* 操作条固定于底部 tab 栏上方,不随内容滚动 */
+    .quiz-controls {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: calc(54px + env(safe-area-inset-bottom));
+        z-index: 90;
+        display: flex;
+        gap: 8px;
+        padding: 8px 12px;
+        background: var(--c-surface);
+        border-top: 1px solid var(--c-border);
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+    }
+    .quiz-controls .action-btn {
+        flex: 1;
+        margin: 0;
+    }
+    #quiz-container {
+        padding-bottom: 4px;  /* 操作条已脱离文档流,无需大留白 */
+    }
+}
