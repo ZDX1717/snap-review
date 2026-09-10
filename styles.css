@@ -755,6 +755,11 @@ h3 {
     cursor: pointer;
 }
 
+/* 编辑器「只看待补答案」标签:与上一按钮留出间隔(原为内联 margin) */
+.editor-pending-label {
+    margin-left: 10px;
+}
+
 .preview-list {
     max-height: 46vh;
     overflow-y: auto;
@@ -762,6 +767,12 @@ h3 {
     border-radius: 6px;
     padding: 8px;
     background: var(--c-surface-alt);
+}
+
+/* 预览工具栏紧凑按钮(原内联 padding/字号) */
+.preview-tools-btn {
+    padding: 4px 10px;
+    font-size: 0.85em;
 }
 
 .preview-item {
@@ -1487,6 +1498,12 @@ h3 {
     background: var(--c-ai-connected-bg);
     font-weight: 600;
 }
+/* 卡片内背景说明小字(原为 index.html 内联 style,无暗色适配) */
+.meta-note {
+    font-size: 0.85em;
+    color: var(--c-text-faint);
+}
+
 .status-line {
     margin: 8px 0 4px;
     padding: 8px 12px;
@@ -1607,7 +1624,11 @@ h3 {
     box-shadow: inset 3px 0 0 var(--c-accent-purple-overlap);  /* 双重标记时紫橙过渡色 */
     background: var(--c-accent-purple-faint);
 }
-.editor-ai-note { font-weight: 600; }
+.editor-ai-note {
+    margin: 0 0 8px;
+    font-size: 0.85em;
+    font-weight: 600;
+}
 
 .editor-ai-note.fix-note {
     color: var(--c-warn-text-alt);
