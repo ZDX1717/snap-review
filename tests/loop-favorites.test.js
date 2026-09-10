@@ -71,16 +71,15 @@ test('收藏按钮状态刷新', () => {
     run(`favoriteQuestions = []; updateFavoriteButton();`);
     assert.strictEqual(elements['favorite-btn'].textContent, '☆ 收藏');
 });
-test('复习收藏进入逐题模式', () => {
-    run(`favoriteQuestions = [${JSON.stringify(Q('收藏1','A'))}, ${JSON.stringify(Q('收藏2','B'))}];
-        reviewFavorites();`);
-    assert.strictEqual(run('currentQuiz.length'), 2);
-    assert.strictEqual(run('quizMode'), 'immediate');
+test('收藏夹作为题源:返回收藏题目池(副本)', () => {
+    run(`favoriteQuestions = [${JSON.stringify(Q('收藏1','A'))}, ${JSON.stringify(Q('收藏2','B'))}];`);
+    assert.strictEqual(run(`getSourcePool('favorites').length`), 2);
+    run(`getSourcePool('favorites').push({ content: 'x' })`);
+    assert.strictEqual(run('favoriteQuestions.length'), 2, '题源池是副本,不得串改 state');
 });
-test('空收藏夹复习 → 提示', () => {
-    alerts.length = 0;
-    run(`favoriteQuestions = []; reviewFavorites();`);
-    assert.ok(alerts[0].includes('收藏夹是空的'));
+test('空收藏夹作为题源 → 池为空(startQuiz 负责提示)', () => {
+    run(`favoriteQuestions = [];`);
+    assert.strictEqual(run(`getSourcePool('favorites').length`), 0);
 });
 test('收藏数据损坏安全重置', () => {
     store.set('favoriteQuestions', '[bad');

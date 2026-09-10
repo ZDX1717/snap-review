@@ -9,17 +9,30 @@ const { SourceTextModule } = vm;
 const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'src');
 
 export function makeEl() {
-    return {
+    const el = {
         _listeners: {},
         addEventListener(type, fn) { this._listeners[type] = fn; },
         setAttribute() {},
-        classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+        // classList 记录状态而非空操作:让"类有没有真的加上/去掉"可断言。
+        // 这不追求视觉保真(那是真机验收的事),只防"状态没生效"这类逻辑 bug。
+        _classes: new Set(),
+        classList: {
+            add: (...c) => { c.forEach(x => el._classes.add(x)); },
+            remove: (...c) => { c.forEach(x => el._classes.delete(x)); },
+            toggle: (c, force) => {
+                const on = force === undefined ? !el._classes.has(c) : !!force;
+                if (on) el._classes.add(c); else el._classes.delete(c);
+                return on;
+            },
+            contains: (c) => el._classes.has(c),
+        },
         style: {}, appendChild() {}, textContent: '', value: '', innerHTML: '', files: [],
         checked: false, placeholder: '', rows: 0, dataset: {},
         querySelector: () => makeEl(), querySelectorAll: () => [],
         type: '', children: [], disabled: false,
         focus() {},
     };
+    return el;
 }
 
 // 扫描 src/*.js 收集所有 DOM 常量(名字 → 元素 id),供注入 __zquiz 供测试驱动

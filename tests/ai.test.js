@@ -587,12 +587,17 @@ test('导航一致性:hash 已相同时也能切换(navigate 不再依赖 hashch
     // hash 已是 #banks,再点「题库」→ 不产生 hashchange,但视图仍需切到题库
     run(`navigate('banks')`);
     assert.strictEqual(run(`location.hash`), '#banks');
-    // 库卡开始刷题:通过事件通道导航
+});
+
+test('题库页只负责管理:库卡不再有「开始刷题」,刷题入口统一在刷题页', async () => {
+    const { run } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
+    run(`init()`);
     run(`questionBanks['T'] = [{ content: '题', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A' }]`);
-    const before = String(sandbox.location.hash);
     run(`updateBanksList()`);
-    const startBtns = run(`__created`).filter(c => c.el._listeners?.click && String(c.el.textContent).includes('开始刷题'));
-    assert.ok(startBtns.length >= 1, '库卡有开始刷题按钮');
-    startBtns[startBtns.length - 1].el._listeners.click();
-    assert.strictEqual(run(`location.hash`), '#quiz', '开始刷题应切到 #quiz');
+    const created = run(`__created`);
+    const startBtns = created.filter(c => String(c.el.textContent).includes('开始刷题'));
+    assert.strictEqual(startBtns.length, 0, '库卡不应再有「开始刷题」(它属于刷题页)');
+    // 编辑入口仍在(题库页的职责)
+    const editBtns = created.filter(c => String(c.el.textContent).includes('编辑'));
+    assert.ok(editBtns.length >= 1, '库卡应保留「编辑」入口');
 });

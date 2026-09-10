@@ -1,6 +1,5 @@
 import { state } from './state.js';
 import { normalizeAnswerString, shuffleArray } from './parser.js';
-import { showModal } from './dom.js';
 import { addToErrorBook, updateErrorStreak, updateErrorsList } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
 import { updateBanksList, updateLastImportInfo, renderRecycleBin } from './bank.js';
@@ -33,31 +32,49 @@ const answerReview = document.getElementById('answer-review');
 const reviewOnlyWrong = document.getElementById('review-only-wrong');
 const masteryNote = document.getElementById('mastery-note');
 const favoriteBtn = document.getElementById('favorite-btn');
-const reviewScopeModal = document.getElementById('review-scope-modal');
-const scopeBanks = document.getElementById('scope-banks');
-const scopeSummary = document.getElementById('scope-summary');
 
 // 开始刷题
+// 题源 → 题目池。"复习错题/收藏"不再是独立入口,而是与题库并列的题源;
+// 范围(哪些库/哪些题型)由「题源 + 选择题库 + 题型」三组设置共同表达,
+// 因此原先的复习范围弹窗(#review-scope-modal)已退役。
+export function getSourcePool(source) {
+    if (source === 'errors') return [...state.errorQuestions];
+    if (source === 'favorites') return [...state.favoriteQuestions];
+    return [...state.questionBank];
+}
+
+// 题源为空时的提示文案(每种来源给出各自的下一步动作指引)
+const EMPTY_SOURCE_HINT = {
+    bank: '请先导入题库',
+    errors: '错题本还没有题目——刷题时答错或未作答的题会自动进来',
+    favorites: '收藏夹还没有题目——刷题时点 ☆ 收藏即可加入',
+};
+
 export function startQuiz() {
-    if (state.questionBank.length === 0) {
-        showQuizStatus('请先导入题库', 'error');
+    // 题源:题库 / 错题本 / 收藏夹(未渲染时按题库兜底,保证旧 DOM 与测试桩兼容)
+    const sourceEl = document.querySelector('input[name="question-source"]:checked');
+    const source = sourceEl ? sourceEl.value : 'bank';
+    const pool = getSourcePool(source);
+
+    if (pool.length === 0) {
+        showQuizStatus(EMPTY_SOURCE_HINT[source] || '没有可刷的题目', 'error');
         return;
     }
-    
+
     // 获取刷题设置
     state.quizMode = document.querySelector('input[name="quiz-mode"]:checked').value;
     const questionType = document.querySelector('input[name="question-type"]:checked').value;
     const randomize = document.getElementById('randomize').checked;
-    
-    // 筛选题目
-    let filteredQuestions = [...state.questionBank];
-    
+
+    // 筛选题目(题型过滤对三种题源一视同仁)
+    let filteredQuestions = pool;
+
     if (questionType === 'single') {
-        filteredQuestions = state.questionBank.filter(q => q.type === '单选');
+        filteredQuestions = pool.filter(q => q.type === '单选');
     } else if (questionType === 'multiple') {
-        filteredQuestions = state.questionBank.filter(q => q.type === '多选');
+        filteredQuestions = pool.filter(q => q.type === '多选');
     } else if (questionType === 'judge') {
-        filteredQuestions = state.questionBank.filter(q => q.type === '判断');
+        filteredQuestions = pool.filter(q => q.type === '判断');
     }
 
     // 待补答案的题自动排除(无法判分);全部被排除时给出明确指引
@@ -532,77 +549,6 @@ export function endQuiz() {
 export function backToQuizOptions() {
     quizResult.classList.add('hidden');
     quizSettings.classList.remove('hidden');
-}
-
-
-// 复习错题：先选择范围（按题库/题型），再进入复习
-export function reviewErrors() {
-    if (state.errorQuestions.length === 0) {
-        alert('错题本中没有题目');
-        return;
-    }
-
-    // 填充题库勾选（默认全选，带题数）
-    scopeBanks.innerHTML = '';
-    const bankNames = [...new Set(state.errorQuestions.map(q => q.bankName || '未知题库'))];
-    bankNames.forEach(name => {
-        const count = state.errorQuestions.filter(q => (q.bankName || '未知题库') === name).length;
-        const label = document.createElement('label');
-        label.className = 'inline-label';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.name = 'scope-bank';
-        cb.value = name;
-        cb.checked = true;
-        label.appendChild(cb);
-        label.appendChild(document.createTextNode(` ${name}（${count} 题）`));
-        scopeBanks.appendChild(label);
-    });
-
-    updateScopeSummary();
-    showModal(reviewScopeModal);
-}
-
-
-// 读取范围选择
-export function getScopeSelection() {
-    const banks = new Set(
-        Array.from(document.querySelectorAll('input[name="scope-bank"]:checked')).map(cb => cb.value)
-    );
-    const types = new Set(
-        Array.from(document.querySelectorAll('input[name="scope-type"]:checked')).map(cb => cb.value)
-    );
-    return { banks, types };
-}
-
-
-// 刷新范围选择摘要
-export function updateScopeSummary() {
-    const { banks, types } = getScopeSelection();
-    const count = state.errorQuestions.filter(
-        q => banks.has(q.bankName || '未知题库') && types.has(q.type)
-    ).length;
-    scopeSummary.textContent = `已选中 ${count} 题`;
-}
-
-
-// 开始一场复习会话
-export function startReviewSession(questions) {
-    state.currentQuiz = [...questions];
-    state.currentQuestionIndex = 0;
-    state.correctCount = 0;
-    state.wrongCount = 0;
-    state.userAnswers = new Array(state.currentQuiz.length).fill('');
-    state.masteryRemovedInSession = 0;
-    state.quizMode = 'immediate';
-    endQuizBtn.textContent = '结束刷题';
-
-    showSection('quiz'); // 切换到刷题页面
-    quizContainer.classList.remove('hidden');
-    quizResult.classList.add('hidden');
-    quizSettings.classList.add('hidden');
-
-    displayQuestion();
 }
 
 

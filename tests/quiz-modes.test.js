@@ -106,16 +106,34 @@ test('逐题模式答题记录进入回顾列表(渲染不报错)', () => {
     sandbox.document.querySelector = () => makeEl();
 });
 
-console.log('== 错题本复习回归 ==');
-test('复习流程:打开范围弹窗 → 会话固定逐题模式', () => {
+console.log('== 错题本作为题源 ==');
+test('题源=错题本:startQuiz 从错题池出题且强制逐题模式', () => {
     run(setupQuiz + `
-        errorQuestions = [{ content: 'E1', type: '单选', options: {A:'x'}, answer: 'A', bankName: 'T' }];
-        reviewErrors();                    // 现在先打开范围选择弹窗
-        startReviewSession(errorQuestions); // 确认范围后开始复习
+        errorQuestions = [{ content: 'E1', type: '单选', options: {A:'x',B:'y'}, answer: 'A', bankName: 'T' }];
+        __sourceChoice = 'errors';
     `);
-    assert.strictEqual(run('quizMode'), 'immediate');
+    // 让 startQuiz 读到我们指定的题源单选值
+    sandbox.document.querySelector = (sel) => {
+        if (sel.includes('question-source')) return { value: run('__sourceChoice') };
+        if (sel.includes('quiz-mode')) return { value: 'exam' };
+        if (sel.includes('question-type')) return { value: 'all' };
+        return makeEl();
+    };
+    run(`startQuiz()`);
     assert.strictEqual(run('currentQuiz.length'), 1);
-    assert.strictEqual(elements['end-quiz-btn'].textContent, '结束刷题');
+    assert.strictEqual(run('currentQuiz[0].content'), 'E1');
+    sandbox.document.querySelector = () => makeEl();
+});
+
+test('题源池为空时给出各自指引(错题本/收藏夹)', () => {
+    run(setupQuiz + `errorQuestions = []; favoriteQuestions = []; __sourceChoice = 'errors';`);
+    sandbox.document.querySelector = (sel) => {
+        if (sel.includes('question-source')) return { value: run('__sourceChoice') };
+        return makeEl();
+    };
+    run(`startQuiz()`);
+    assert.ok(String(elements['quiz-status'].textContent).includes('错题本'), '应提示错题本为空并给出下一步');
+    sandbox.document.querySelector = () => makeEl();
 });
 
 console.log(`\n全部通过:${passed} 项断言组 ✅`);

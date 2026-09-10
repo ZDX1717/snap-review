@@ -6,7 +6,7 @@ import { loadCollapsedBanks, loadFromLocalStorage, loadMasterySetting, saveColla
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, toggleAllBanks, updateErrorStreak, updateErrorsList, updateToggleAllBanksLabel } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
-import { backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getScopeSelection, nextQuestion, prevQuestion, renderAnswerReview, reviewErrors, showQuizResult, showQuizStatus, showSection, startQuiz, startReviewSession, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton, updateScopeSummary } from './quiz.js';
+import { backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
 import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback, cancelPreviewAi, rescueAiOrganize, updateAiSettingsBadge, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, clearPasteInput, editorHistClick, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, togglePromptContent, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks, renderErrorsForBank, renderRecycleBin, restoreRecycled, recycleBankEntry, restoreBankVersion } from './bank.js';
 
 // Zquiz · 期末周刷题 —— 应用装配入口
@@ -65,10 +65,10 @@ const wrongAnswers = document.getElementById('wrong-answers');
 const accuracy = document.getElementById('accuracy');
 const backToOptionsBtn = document.getElementById('back-to-options-btn');
 const clearErrorsBtn = document.getElementById('clear-errors-btn');
-const reviewErrorsBtn = document.getElementById('review-errors-btn');
 const errorsList = document.getElementById('errors-list');
 const questionBankSelect = document.getElementById('question-bank-select');
 const quizSettings = document.getElementById('quiz-settings');
+const bankSelectGroup = document.getElementById('bank-select-group');
 const btnBanks = document.getElementById('btn-banks');
 const createBankBtn = document.getElementById('create-bank-btn');
 const exportAllBtn = document.getElementById('export-all-btn');
@@ -120,14 +120,9 @@ const reviewOnlyWrong = document.getElementById('review-only-wrong');
 const masteryNote = document.getElementById('mastery-note');
 const favoriteBtn = document.getElementById('favorite-btn');
 const favoritesList = document.getElementById('favorites-list');
-const reviewFavoritesBtn = document.getElementById('review-favorites-btn');
 const masteryThresholdSelect = document.getElementById('mastery-threshold-select');
 // 复习范围选择
-const reviewScopeModal = document.getElementById('review-scope-modal');
 const scopeBanks = document.getElementById('scope-banks');
-const scopeSummary = document.getElementById('scope-summary');
-const confirmReviewScopeBtn = document.getElementById('confirm-review-scope-btn');
-const cancelReviewScopeBtn = document.getElementById('cancel-review-scope-btn');
 // 题库编辑器
 const editBankModal = document.getElementById('edit-bank-modal');
 const editBankTitle = document.getElementById('edit-bank-title');
@@ -156,10 +151,8 @@ const bankExportBtn = document.getElementById('bank-export-btn');
 const bankDeleteBtn = document.getElementById('bank-delete-btn');
 const editorPosition = document.getElementById('editor-position');
 
-// 首页快捷入口
+// 首页:主题开关(hero 的开始刷题/导入题库按钮已移除,导航职责归底部 3 tab)
 const themeSwitch = document.getElementById('theme-switch');
-const heroStartBtn = document.getElementById('hero-start-btn');
-const heroImportBtn = document.getElementById('hero-import-btn');
 
 const SECTIONS = ['home', 'quiz', 'banks'];
 
@@ -175,6 +168,26 @@ function navigate(section) {
     } else {
         showSection(section);
     }
+}
+
+// 题源 UI:选「题库」时显示"选择题库"下拉;选错题本/收藏夹时隐藏它并显示题数。
+// (错题/收藏是跨题库的集合,再让用户选库只会造成"选了却没生效"的困惑)
+function updateSourceUI() {
+    const el = document.querySelector('input[name="question-source"]:checked');
+    const source = el ? el.value : 'bank';
+    const hint = document.getElementById('source-hint');
+    if (bankSelectGroup) bankSelectGroup.classList.toggle('hidden', source !== 'bank');
+    updateBankSelect();
+    if (!hint) return;
+    if (source === 'bank') {
+        hint.classList.add('hidden');
+        hint.textContent = '';
+        return;
+    }
+    const n = getSourcePool(source).length;
+    const label = source === 'errors' ? '错题本' : '收藏夹';
+    hint.textContent = n > 0 ? `${label}共 ${n} 题` : `${label}还没有题目`;
+    hint.classList.remove('hidden');
 }
 
 // 初始化
@@ -256,13 +269,18 @@ function setupEventListeners() {
     nextQuestionBtn.addEventListener('click', nextQuestion);
     endQuizBtn.addEventListener('click', endQuiz);
     backToOptionsBtn.addEventListener('click', backToQuizOptions);
+
+    // 题源切换:选「错题本/收藏夹」时"选择题库"无意义 → 隐藏,并给出题数提示
+    quizSettings.addEventListener('change', (e) => {
+        if (e.target && e.target.name === 'question-source') updateSourceUI();
+    });
+    updateSourceUI();
+
     
     // 错题本
     clearErrorsBtn.addEventListener('click', clearErrors);
-    reviewErrorsBtn.addEventListener('click', reviewErrors);
 
-    // 收藏夹
-    reviewFavoritesBtn.addEventListener('click', reviewFavorites);
+    // 收藏
     favoriteBtn.addEventListener('click', toggleFavoriteCurrent);
 
     // 错题移出规则设置
@@ -270,22 +288,6 @@ function setupEventListeners() {
         saveMasterySetting(this.value);
         updateErrorsList();
     });
-
-    // 复习范围选择
-    confirmReviewScopeBtn.addEventListener('click', () => {
-        const { banks, types } = getScopeSelection();
-        const questions = state.errorQuestions.filter(
-            q => banks.has(q.bankName || '未知题库') && types.has(q.type)
-        );
-        if (questions.length === 0) {
-            alert('所选范围内没有错题，请调整范围');
-            return;
-        }
-        hideModal(reviewScopeModal);
-        startReviewSession(questions);
-    });
-    cancelReviewScopeBtn.addEventListener('click', () => hideModal(reviewScopeModal));
-    reviewScopeModal.addEventListener('change', updateScopeSummary);
 
     // 题库编辑器
     editorAddBtn.addEventListener('click', editorAddQuestion);
@@ -364,9 +366,7 @@ function setupEventListeners() {
         if (opt) setThemeSetting(opt.dataset.themeOpt);
     });
 
-    // 首页快捷入口
-    heroStartBtn.addEventListener('click', () => navigate('quiz'));
-    heroImportBtn.addEventListener('click', () => { pasteInput.focus(); });
+    // 主题三档开关的绑定在 initTheme/theme.js 内完成
 }
 
 
@@ -401,30 +401,6 @@ function setupEventListeners() {
 
 
 
-
-// 复习收藏：以逐题模式过一遍收藏题
-function reviewFavorites() {
-    if (state.favoriteQuestions.length === 0) {
-        alert('收藏夹是空的，刷题时点击"☆ 收藏"即可加入');
-        return;
-    }
-
-    state.currentQuiz = [...state.favoriteQuestions];
-    state.currentQuestionIndex = 0;
-    state.correctCount = 0;
-    state.wrongCount = 0;
-    state.userAnswers = new Array(state.currentQuiz.length).fill('');
-    state.masteryRemovedInSession = 0;
-    state.quizMode = 'immediate';
-    endQuizBtn.textContent = '结束刷题';
-
-    showSection('quiz');
-    quizContainer.classList.remove('hidden');
-    quizResult.classList.add('hidden');
-    quizSettings.classList.add('hidden');
-
-    displayQuestion();
-}
 
 // 更新错题列表
 
@@ -527,8 +503,9 @@ if (typeof window === 'undefined') {
         exportBank,
         finalizeQuestion,
         finishExam,
+        getSourcePool,
+        updateSourceUI,
         formatQuestionsForExport,
-        getScopeSelection,
         handleFileSelect,
         handlePasteEvent,
         hideModal,
@@ -550,8 +527,6 @@ if (typeof window === 'undefined') {
         renderAnswerReview,
         renderBankEditor,
         renderPreview,
-        reviewErrors,
-        reviewFavorites,
         saveCollapsedBanks,
         saveMasterySetting,
         saveToLocalStorage,
@@ -565,7 +540,6 @@ if (typeof window === 'undefined') {
         shuffleArray,
         splitInlineOptions,
         startQuiz,
-        startReviewSession,
         submitAnswer,
         toggleAllBanks,
         toggleFavorite,
@@ -593,7 +567,6 @@ if (typeof window === 'undefined') {
         updateFavoritesList,
         updatePreviewSummary,
         updatePreviewTargetBanks,
-        updateScopeSummary,
         updateToggleAllBanksLabel,
     };
 }

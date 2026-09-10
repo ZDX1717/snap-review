@@ -1611,24 +1611,9 @@ export function updateBanksList() {
         if (favCount > 0) mkBadge(`藏 ${favCount}`, 'fav-badge');
         bankInfo.appendChild(badges);
 
-        // 右上:开始刷题 + 编辑
+        // 右上:编辑(「开始刷题」已移出题库页;刷题入口统一在刷题页的"题源/选择题库")
         const bankActions = document.createElement('div');
         bankActions.className = 'bank-actions';
-
-        const startBtn = document.createElement('button');
-        startBtn.className = 'action-btn small';
-        startBtn.textContent = '▶ 开始刷题';
-        startBtn.addEventListener('click', () => {
-            state.currentBankName = bankName;
-            state.questionBank = state.questionBanks[bankName];
-            state.isAllBanksView = false;
-            saveToLocalStorage();
-            updateBankSelect();
-            if (typeof CustomEvent !== 'undefined' && document.dispatchEvent) {
-                document.dispatchEvent(new CustomEvent('zquiz:navigate', { detail: { section: 'quiz' } }));
-            }
-        });
-        bankActions.appendChild(startBtn);
 
         const editBtn = document.createElement('button');
         editBtn.className = 'action-btn small secondary';

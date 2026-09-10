@@ -984,51 +984,12 @@ h3 {
     padding: 26px 8px 8px;
 }
 
-.hero-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-}
 
-.feature-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-}
 
-.feature-card {
-    background-color: var(--c-surface);
-    border: 1px solid var(--c-border-light);
-    border-radius: 6px;
-    padding: 16px 16px;
-}
 
-.feature-card h3 {
-    font-size: 14px;
-    color: var(--c-text);
-    margin-bottom: 8px;
-}
 
-.feature-card p {
-    font-size: 14px;
-    color: var(--c-text-muted);
-    line-height: 1.75;
-}
 
-.quick-start ol {
-    padding-left: 24px;
-    margin-top: 8px;
-}
 
-.quick-start li {
-    margin-bottom: 8px;
-    color: var(--c-text-secondary);
-    font-size: 14px;
-    line-height: 1.7;
-}
 
 /* ==================== 收藏夹 + 错题闭环提示 ==================== */
 
@@ -1076,18 +1037,7 @@ h3 {
 
 
 
-.scope-options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 16px;
-    margin-top: 8px;
-}
 
-.scope-summary {
-    color: var(--c-primary);
-    font-size: 14px;
-    margin: 12px 0;
-}
 
 /* 编辑器布局 */
 .editor-layout {
@@ -1215,11 +1165,6 @@ h3 {
     }
 }
 
-.hero-version {
-    color: var(--c-text-faint);
-    font-size: 14px;
-    margin: -4px 0 16px;
-}
 
 /* ==================== 手机适配补丁(题库管理 + 模态框) ==================== */
 

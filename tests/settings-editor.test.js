@@ -41,28 +41,77 @@ test('设置加载与持久化(含非法值回退)', () => {
     assert.strictEqual(run('masteryThreshold'), 0);
 });
 
-console.log('== 功能2:复习范围选择 ==');
-test('范围过滤:题库×题型组合', () => {
-    sandbox.document.querySelectorAll = (sel) => {
-        if (sel.includes('scope-bank')) return [{ value: '高数' }, { value: '英语' }];
-        if (sel.includes('scope-type')) return [{ value: '单选' }, { value: '判断' }];
-        return [];
-    };
-    run(`errorQuestions = [
-        { content: 'a', type: '单选', bankName: '高数' },
-        { content: 'b', type: '多选', bankName: '高数' },
-        { content: 'c', type: '判断', bankName: '英语' },
-        { content: 'd', type: '单选', bankName: '数学' },
-    ];`);
-    run(`const { banks, types } = getScopeSelection();
-        globalThis.__filtered = errorQuestions.filter(q => banks.has(q.bankName || '未知题库') && types.has(q.type));`);
-    assert.strictEqual(run('globalThis.__filtered.length'), 2);
+console.log('== 功能2:题源(题库/错题本/收藏夹) ==');
+test('题源解析:三种来源各自返回对应题目池', () => {
+    run(`questionBank = [{ content: 'q1', type: '单选', answer: 'A' }];
+        errorQuestions = [{ content: 'e1', type: '单选', bankName: '高数' }, { content: 'e2', type: '判断', bankName: '英语' }];
+        favoriteQuestions = [{ content: 'f1', type: '多选' }];`);
+    assert.strictEqual(run(`getSourcePool('bank').length`), 1);
+    assert.strictEqual(run(`getSourcePool('errors').length`), 2);
+    assert.strictEqual(run(`getSourcePool('favorites').length`), 1);
+    // 返回的是副本,改动题源池不得影响 state(防串改)
+    run(`getSourcePool('errors').push({ content: 'x' })`);
+    assert.strictEqual(run('errorQuestions.length'), 2);
 });
-test('开始复习会话:逐题模式+计数归零', () => {
-    run(`startReviewSession([{ content: 'r1', type: '单选' }, { content: 'r2', type: '判断' }]);`);
+
+test('题源池 + 题型筛选:错题本按题型过滤', () => {
+    run(`errorQuestions = [
+        { content: 'a', type: '单选', bankName: '高数', answer: 'A' },
+        { content: 'b', type: '多选', bankName: '高数', answer: 'AB' },
+        { content: 'c', type: '判断', bankName: '英语', answer: 'A' },
+    ];`);
+    run(`globalThis.__onlySingle = getSourcePool('errors').filter(q => q.type === '单选');`);
+    assert.strictEqual(run('globalThis.__onlySingle.length'), 1);
+    assert.strictEqual(run('globalThis.__onlySingle[0].content'), 'a');
+});
+test('题源 UI:题库显示"选择题库",错题本/收藏夹隐藏它并显示题数', () => {
+    run(`errorQuestions = [{ content: 'e1', type: '单选', bankName: 'T' }];
+         favoriteQuestions = [{ content: 'f1', type: '多选' }];`);
+    const pick = (v) => { sandbox.document.querySelector = (sel) =>
+        sel.includes('question-source') ? { value: v } : makeEl(); };
+    // 通过 DOM 接口取,保证与 main.js 内 getElementById 拿到同一实例
+    const group = sandbox.document.getElementById('bank-select-group');
+    const hint = sandbox.document.getElementById('source-hint');
+
+    pick('bank');
+    run(`updateSourceUI()`);
+    assert.ok(group.classList.contains('hidden') === false, '题库题源应显示"选择题库"');
+    assert.ok(hint.classList.contains('hidden') === true, '题库题源不应有额外提示');
+
+    pick('errors');
+    run(`updateSourceUI()`);
+    assert.ok(group.classList.contains('hidden') === true, '错题本题源应隐藏"选择题库"');
+    assert.ok(String(hint.textContent).includes('错题本共 1 题'), '应显示错题数');
+
+    pick('favorites');
+    run(`updateSourceUI()`);
+    assert.ok(String(hint.textContent).includes('收藏夹共 1 题'), '应显示收藏数');
+
+    // 空集合:给出"还没有题目"而不是数字 0
+    run(`favoriteQuestions = []`);
+    run(`updateSourceUI()`);
+    assert.ok(String(hint.textContent).includes('还没有题目'), '空收藏夹应提示还没有题目');
+
+    sandbox.document.querySelector = () => makeEl();
+});
+test('题源=错题本:startQuiz 出题并归零计数(题源即复习入口)', () => {
+    run(`
+        errorQuestions = [{ content: 'r1', type: '单选', options: {A:'x',B:'y'}, answer: 'A', bankName: 'T' },
+                          { content: 'r2', type: '判断', options: {A:'正确',B:'错误'}, answer: 'A', bankName: 'T' }];
+        correctCount = 9; wrongCount = 9;
+    `);
+    sandbox.document.querySelector = (sel) => {
+        if (sel.includes('question-source')) return { value: 'errors' };
+        if (sel.includes('quiz-mode')) return { value: 'immediate' };
+        if (sel.includes('question-type')) return { value: 'all' };
+        return makeEl();
+    };
+    run(`startQuiz()`);
+    sandbox.document.querySelector = () => makeEl();
     assert.strictEqual(run('currentQuiz.length'), 2);
     assert.strictEqual(run('quizMode'), 'immediate');
     assert.strictEqual(run('correctCount'), 0);
+    assert.strictEqual(run('wrongCount'), 0);
 });
 
 console.log('== 功能3:题库编辑器 ==');
