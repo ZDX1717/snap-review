@@ -651,6 +651,13 @@ export function renderPreview() {
 
         const box = document.createElement('div');
         box.className = 'preview-item' + (warnings.length ? ' warn' : '') + (item.aiNote ? ' ai-touched' : '');
+        const clearAiMark = () => {
+            if (!item.aiNote) return;
+            item.aiNote = '';
+            box.classList.remove('ai-touched');
+            const badge = box.querySelector('.ai-badge');
+            if (badge && badge.remove) badge.remove();
+        };
 
         const head = document.createElement('div');
         head.className = 'preview-item-head';
@@ -696,7 +703,7 @@ export function renderPreview() {
         stem.className = 'preview-stem';
         stem.rows = 2;
         stem.value = q.content;
-        stem.addEventListener('input', () => { q.content = stem.value; });
+        stem.addEventListener('input', () => { q.content = stem.value; clearAiMark(); });
         box.appendChild(stem);
 
         const optsDiv = document.createElement('div');
@@ -719,7 +726,7 @@ export function renderPreview() {
         ansInput.className = 'preview-answer';
         ansInput.value = q.answer;
         ansInput.placeholder = '如 A / ABC / 对';
-        ansInput.addEventListener('input', () => { q.answer = ansInput.value; });
+        ansInput.addEventListener('input', () => { q.answer = ansInput.value; clearAiMark(); });
         editRow.appendChild(ansInput);
 
         if (q.analysis) {
@@ -1476,8 +1483,10 @@ export function renderBankEditor() {
         if (pendingOnly && q.answer) return; // 只看待补
         const item = document.createElement('button');
         item.type = 'button';
-        item.className = 'editor-list-item' + (idx === state.editIndex ? ' selected' : '');
-        item.textContent = `${idx + 1}. ${(q.content || '（无题干）').slice(0, 22)}` + (!q.answer ? ' ⏳' : '');
+        // 待修改高亮:缺答案(待补)或选项不足的题,橙底标记
+        const needsFix = !q.answer || Object.keys(q.options || {}).length < 2;
+        item.className = 'editor-list-item' + (idx === state.editIndex ? ' selected' : '') + (needsFix ? ' needs-fix' : '');
+        item.textContent = `${idx + 1}. ${(q.content || '（无题干）').slice(0, 22)}` + (!q.answer ? ' ⏳' : (needsFix ? ' ⚠' : ''));
         item.addEventListener('click', () => {
             if (!editorGuard()) return;
             state.editIndex = idx;
