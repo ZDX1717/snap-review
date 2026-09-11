@@ -4,8 +4,8 @@ import { applyTheme, initTheme, setThemeSetting } from './theme.js';
 import { buildCardCells, finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey, shuffleArray, splitInlineOptions } from './parser.js';
 import { loadAutoNextSetting, loadCollapsedBanks, loadFromLocalStorage, loadMasterySetting, saveAutoNextSetting, saveCollapsedBanks, saveMasterySetting, saveToLocalStorage, recordImportBatch } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
-import { addToErrorBook, clearErrors, deleteError, toggleAllBanks, updateErrorStreak, updateErrorsList, updateToggleAllBanksLabel } from './errorbook.js';
-import { toggleFavorite, updateFavoritesList } from './favorites.js';
+import { addToErrorBook, clearErrors, deleteError, updateErrorStreak } from './errorbook.js';
+import { toggleFavorite } from './favorites.js';
 import { advanceNext, backToQuizOptions, closeAnswerCard, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, isAnswerCardOpen, jumpToQuestion, openAnswerCard, readQuizSource, renderAnswerCard, resetGradingState, shouldAutoNext, shouldConfirmAnswer, syncNextButtonLabel, markEndButtonReady, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleAnswerCard, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
 import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback, cancelPreviewAi, rescueAiOrganize, updateAiSettingsBadge, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, clearPasteInput, editorHistClick, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, togglePromptContent, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks, renderErrorsForBank, renderFavoritesForBank, renderRecycleBin, restoreRecycled, recycleBankEntry, restoreBankVersion } from './bank.js';
 
@@ -64,7 +64,6 @@ const wrongAnswers = document.getElementById('wrong-answers');
 const accuracy = document.getElementById('accuracy');
 const backToOptionsBtn = document.getElementById('back-to-options-btn');
 const clearErrorsBtn = document.getElementById('clear-errors-btn');
-const errorsList = document.getElementById('errors-list');
 const questionBankSelect = document.getElementById('question-bank-select');
 const quizSettings = document.getElementById('quiz-settings');
 const btnBanks = document.getElementById('btn-banks');
@@ -118,10 +117,7 @@ const reviewOnlyWrong = document.getElementById('review-only-wrong');
 const masteryNote = document.getElementById('mastery-note');
 const favoriteBtn = document.getElementById('favorite-btn');
 const autoNextToggle = document.getElementById('auto-next-toggle');
-const favoritesList = document.getElementById('favorites-list');
 const masteryThresholdSelect = document.getElementById('mastery-threshold-select');
-// 复习范围选择
-const scopeBanks = document.getElementById('scope-banks');
 // 题库编辑器
 const editBankModal = document.getElementById('edit-bank-modal');
 const editBankTitle = document.getElementById('edit-bank-title');
@@ -293,7 +289,6 @@ function setupEventListeners() {
 
     
     // 错题本
-    clearErrorsBtn.addEventListener('click', clearErrors);
 
     // 收藏
     favoriteBtn.addEventListener('click', toggleFavoriteCurrent);
@@ -309,8 +304,10 @@ function setupEventListeners() {
     // 错题移出规则设置
     masteryThresholdSelect.addEventListener('change', function() {
         saveMasterySetting(this.value);
-        updateErrorsList();
     });
+
+    // 清空错题本(在题库编辑面板里,是错题本的管理入口)
+    if (clearErrorsBtn) clearErrorsBtn.addEventListener('click', clearErrors);
 
     // 题库编辑器
     editorAddBtn.addEventListener('click', editorAddQuestion);
@@ -500,7 +497,6 @@ if (typeof window === 'undefined') {
         jumpToQuestion,
         isAnswerCardOpen,
         resetGradingState,
-        clearErrors,
         clearPasteInput,
         collectUserAnswer,
         commitPreviewImport,
@@ -510,6 +506,7 @@ if (typeof window === 'undefined') {
         dedupBank,
         deleteBank,
         restoreBankVersion,
+        clearErrors,
         deleteError,
         displayQuestion,
         undoLastImport,
@@ -580,7 +577,6 @@ if (typeof window === 'undefined') {
         splitInlineOptions,
         startQuiz,
         submitAnswer,
-        toggleAllBanks,
         toggleFavorite,
         toggleFavoriteCurrent,
         togglePreviewSelectAll,
@@ -597,16 +593,13 @@ if (typeof window === 'undefined') {
         updateBankSelect,
         updateBanksList,
         updateErrorStreak,
-        updateErrorsList,
         renderErrorsForBank,
         renderFavoritesForBank,
         restoreRecycled,
         recycleBankEntry,
         restoreBankVersion,
         updateFavoriteButton,
-        updateFavoritesList,
         updatePreviewSummary,
         updatePreviewTargetBanks,
-        updateToggleAllBanksLabel,
     };
 }

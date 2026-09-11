@@ -4,7 +4,7 @@
 // 但这条守卫对**现存**模态框继续有效——新增模态框请一并加进下面的清单。
 import test from 'node:test';
 import assert from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -442,6 +442,40 @@ test('标签行三件(答题卡/题型/收藏)必须等高(👤 要求"统一高
     const fonts = Object.values(sels).map(sel => decl(mergedRule(index, sel), 'font-size'));
     assert.ok(fonts.every(f => f && parseFloat(f) >= 12), '三件字号都应 >= 12px:' + JSON.stringify(fonts));
     assert.strictEqual(new Set(fonts).size, 1, '三件字号应一致(等高之外还要等视觉重量):' + JSON.stringify(fonts));
+});
+
+test('模块引用的 DOM id 必须真实存在于 index.html(防"死渲染路径"复活)', () => {
+    // 🚨 这条守卫来自一次真实事故(2026-09-11):
+    // errorbook.js / favorites.js 里各留着一段"独立列表渲染",它们靠 `if (!el) return` 自我屏蔽
+    // (#errors-list / #favorites-list 早已不在 index.html)。**但它们仍在被测试覆盖** ——
+    // 因为 vm 测试桩的 getElementById 会自动建出任何被请求的元素,守卫形同虚设。
+    // 结果是"测试绿着、代码死了",而且那两段还是与新规范相反的旧卡片设计。
+    // 判据:src 里以 getElementById 取的常量 id,必须都能在 index.html 里找到。
+    const srcDir = path.join(root, 'src');
+    const htmlIds = new Set([...html.matchAll(/id="([\w-]+)"/g)].map(m => m[1]));
+    const missing = [];
+    for (const f of readdirSync(srcDir).filter(n => n.endsWith('.js'))) {
+        const text = readFileSync(path.join(srcDir, f), 'utf8');
+        for (const m of text.matchAll(/document\.getElementById\('([\w-]+)'\)/g)) {
+            if (!htmlIds.has(m[1])) missing.push(`${f}: #${m[1]}`);
+        }
+    }
+    assert.deepStrictEqual(missing, [],
+        '这些 id 在 index.html 里不存在,对应的渲染代码永远不会执行(要么补回 HTML,要么删掉代码):\n  '
+        + missing.join('\n  '));
+});
+
+test('错题/收藏的渲染只有一处(库卡内嵌面板),不得再有独立列表渲染', () => {
+    // 同上:同一份 UI 只留一条渲染路径,避免"两条路径各自漂移"或被死代码掩盖
+    const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
+    assert.ok(/export function renderErrorsForBank/.test(bank), '库卡错题面板渲染应在 bank.js');
+    assert.ok(/export function renderFavoritesForBank/.test(bank), '库卡收藏面板渲染应在 bank.js');
+    for (const f of ['errorbook.js', 'favorites.js']) {
+        const text = readFileSync(path.join(root, 'src', f), 'utf8');
+        assert.ok(!/createElement\(/.test(text),
+            `${f} 不应再有 DOM 渲染代码(渲染已并入库卡内嵌面板)`);
+        assert.ok(!/innerHTML/.test(text), `${f} 不应再写 innerHTML`);
+    }
 });
 
 test('答题卡抽屉在 <main> 之外(公理:浮层不受 section 显隐牵连)', () => {

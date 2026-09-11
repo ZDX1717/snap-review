@@ -4,7 +4,7 @@ import { saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportB
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
 import { OFFICIAL_PROMPT, buildCopyText, copyText } from './prompt.js';
-import { toggleFavorite, updateFavoritesList } from './favorites.js';
+import { toggleFavorite } from './favorites.js';
 import { aiConfigReady, aiFixQuestions, aiFormatMaterial, aiMatchKey, aiDiffParts, buildAiNotes, getProvider, normalizeAiConfig, testConnection } from './ai.js';
 import { isAiTested, loadAiConfig, loadRecycledBanks, markAiTested, purgeRecycledBank, recycleBank, restoreRecycledBank, saveAiConfig, saveRecycledBanks, recordAiUsage } from './storage.js';
 

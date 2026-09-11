@@ -488,23 +488,32 @@ test('历史标记日志:AI 题人工保存后转"曾AI整理";待补题补答�
 });
 
 
-test('错题本收藏:☆ 收藏入收藏夹并变 ★,再点取消;与刷题页收藏互通(按题干匹配)', async () => {
-    const { run, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
+test('错题卡上的收藏按钮:★/☆ 文案与数据互通(走库卡内嵌面板的真实渲染路径)', async () => {
+    const { run, sandbox } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
     run(`init()`);
-    // 制造一道错题:先导入题库,再走一次答题判错
-    run(`questionBanks['错题源'] = [{ content: '易错题一', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A', explanation: '' }, { content: '易错题二', type: '单选', options: { A: '甲', B: '乙' }, answer: 'B', explanation: '' }]`);
-    run(`currentBankName = '错题源'; questionBank = questionBanks['错题源']`);
-    run(`addToErrorBook({ content: '易错题一', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A' }, 'B')`);
-    run(`showSection('errors')`);
-    run(`updateErrorsList()`);
-    run(`state.expandedBanks['错题源'] = true`);
-    // 收藏切换:错题项按钮与刷题页调用同一 toggleFavorite(按题干匹配),数据面互通
-    run(`toggleFavorite(questionBanks['错题源'][0], '错题源')`);
+    run(`errorQuestions = [{ content: '易错题一', type: '单选', options: {A:'甲',B:'乙'}, answer: 'A', userAnswer: 'B', bankName: '错题源' }]`);
+    // ⚠️ 断言必须走**生产里真正在跑的**渲染路径。
+    // 历史教训:这条用例原先调 updateErrorsList() —— 那是独立列表页的渲染,
+    // 该页面早已下线(#errors-list 不在 index.html),测试桩会自动建出容器,
+    // 于是"测试一直绿着,代码却永不执行"(2026-09-11 已清掉那段死代码)。
+    const mark = sandbox.__created.length;
+    run(`renderErrorsForBank('错题源')`);
+    const btn = () => sandbox.__created.slice(mark)
+        .filter(c => c.tag === 'BUTTON' && String(c.el.className).includes('question-card-fav'))
+        .pop();
+    assert.strictEqual(String(btn().el.textContent), '☆ 收藏', '未收藏时应显示 ☆ 收藏');
+    // 点它 → 入收藏夹(与刷题页共用同一 toggleFavorite,按题干匹配)
+    btn().el._listeners.click();
     assert.strictEqual(run(`favoriteQuestions.length`), 1);
     assert.strictEqual(run(`favoriteQuestions[0].content`), '易错题一');
-    // 错题项按钮渲染的 ★/☆ 文案由 updateErrorsList 按 isFav 生成(与 delete 按钮同一渲染路径)
-    // 再点同一题收藏 → 取消
-    run(`toggleFavorite(questionBanks['错题源'][0], '错题源')`);
+    // 重绘后文案应变 ★(按钮文案由渲染时按 isFav 生成)
+    const mark2 = sandbox.__created.length;
+    run(`renderErrorsForBank('错题源')`);
+    const btn2 = sandbox.__created.slice(mark2)
+        .filter(c => c.tag === 'BUTTON' && String(c.el.className).includes('question-card-fav')).pop();
+    assert.strictEqual(String(btn2.el.textContent), '★ 已收藏', '收藏后应显示 ★ 已收藏');
+    // 再点 → 取消收藏
+    btn2.el._listeners.click();
     assert.strictEqual(run(`favoriteQuestions.length`), 0);
 });
 

@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import { buildCardCells, formatAnswerForDisplay, normalizeAnswerString, shuffleArray } from './parser.js';
-import { addToErrorBook, updateErrorStreak, updateErrorsList } from './errorbook.js';
-import { toggleFavorite, updateFavoritesList } from './favorites.js';
+import { addToErrorBook, updateErrorStreak } from './errorbook.js';
+import { toggleFavorite } from './favorites.js';
 import { updateBanksList, updateLastImportInfo, renderRecycleBin } from './bank.js';
 
 // ==================== quiz.js ====================
@@ -972,8 +972,6 @@ export function showSection(sectionName) {
     // 题库页:库列表 + 错题 + 收藏 + 最近导入一并刷新
     if (sectionName === 'banks') {
         updateBanksList();
-        updateErrorsList();
-        updateFavoritesList();
         updateLastImportInfo();
         renderRecycleBin();
     }
