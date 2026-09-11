@@ -464,13 +464,32 @@ h3 {
     margin-top: 12px;
 }
 
+/* 刷题状态栏左区:题目状态指示(两行:序号 / 题型)在左,收藏按钮在其右 */
 .quiz-meta {
     display: flex;
-    align-items: center;      /* 元信息内部居中,徽标与按钮同一中线 */
+    align-items: center;
     gap: 8px;
     min-width: 0;
     font-size: 14px;
     color: var(--c-text-muted);
+}
+
+/* 状态指示:序号与题型**上下两行**(👤 要求) */
+.quiz-status {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+    min-width: 0;
+}
+
+.quiz-status #question-number {
+    font-weight: 600;
+    color: var(--c-text-secondary);
+}
+
+.quiz-status #question-type {
+    font-size: 12px;
+    color: var(--c-text-faint);
 }
 
 /* 收藏按钮原先在题目头部靠右(.favorite-btn 自带 margin-left:auto),
@@ -483,6 +502,14 @@ h3 {
     display: flex;
     gap: 8px;
     margin-left: auto;   /* 按钮组靠右 */
+}
+
+/* 翻页按钮的禁用态:仍占位(位置稳定),仅弱化。
+   用原生 :disabled —— 它能真正阻止程序化 click,并给无障碍正确语义;
+   外观在此显式接管,不依赖浏览器默认禁用样式。 */
+.quiz-actions .action-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
 }
 
 .quiz-actions button {

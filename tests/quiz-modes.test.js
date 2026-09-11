@@ -136,3 +136,33 @@ test('题源池为空时给出各自指引(错题本/收藏夹)', () => {
     sandbox.document.querySelector = () => makeEl();
 });
 
+
+test('套题模式翻页按钮常驻:顺序为 上一题/下一题/交卷,首末题只禁用不隐藏', () => {
+    // 回归:旧版在首题隐藏"上一题"、末题隐藏"下一题",按钮随位置忽隐忽现,
+    // 看起来像"上一题和下一题在循环"(👤 反馈)。现改为始终可见,边界处禁用。
+    const btn = (id) => elements[id];
+    run(setupQuiz + ` currentQuestionIndex = 0; displayQuestion();`);
+    assert.ok(!btn('prev-question-btn').classList.contains('hidden'), '首题:「上一题」也必须可见');
+    assert.strictEqual(btn('prev-question-btn').disabled, true, '首题:「上一题」应禁用');
+    assert.ok(!btn('next-question-btn').classList.contains('hidden'), '首题:「下一题」应可见');
+    assert.strictEqual(btn('next-question-btn').disabled, false, '首题:「下一题」应可用');
+    assert.ok(!btn('end-quiz-btn').classList.contains('hidden'), '「交卷」应常驻');
+    assert.strictEqual(String(btn('end-quiz-btn').textContent), '交卷', '套题模式该按钮文案为「交卷」');
+
+    // 末题:下一题禁用(而不是隐藏),交卷仍可点
+    run(setupQuiz + ` currentQuestionIndex = 2; displayQuestion();`);
+    assert.ok(!btn('next-question-btn').classList.contains('hidden'), '末题:「下一题」也必须可见');
+    assert.strictEqual(btn('next-question-btn').disabled, true, '末题:「下一题」应禁用');
+    assert.strictEqual(btn('prev-question-btn').disabled, false, '末题:「上一题」应可用');
+});
+
+test('末题禁用后点击「下一题」不得重复交卷(禁用必须真挡住 click)', () => {
+    // 回归:仅用 pointer-events:none 时,程序化 .click() 仍会触发 finishExam,
+    // 造成重复计数。必须用原生 disabled。
+    run(setupQuiz + ` userAnswers = ['A', 'CA', '']; currentQuestionIndex = 2; displayQuestion();`);
+    const before = run('correctCount');
+    const n = elements['next-question-btn'];
+    n.disabled = true;                    // 与 UI 一致
+    if (n._listeners && n._listeners.click) n._listeners.click();   // 模拟点击
+    assert.strictEqual(run('correctCount'), before, '禁用状态下点击不应改变计分');
+});

@@ -232,18 +232,16 @@ export function displayQuestion() {
     state.isAnswered = false;
     answerFeedback.classList.add('hidden');
     if (state.quizMode === 'exam') {
-        // 套题模式：作答中不出反馈，可前后翻页
+        // 套题模式:上一题 / 下一题 / 交卷 **从左到右常驻**。
+        // 旧版在首题隐藏"上一题"、末题隐藏"下一题",于是按钮会随位置忽隐忽现,
+        // 看起来像"上一题和下一题在循环"(👤 反馈的 bug)。
+        // 现在改为**始终可见**,只在边界置灰禁用 —— 位置稳定,不会造成误解。
         submitAnswerBtn.classList.add('hidden');
         nextQuestionBtn.classList.remove('hidden');
-        if (state.currentQuestionIndex >= state.currentQuiz.length - 1) {
-            nextQuestionBtn.classList.add('hidden'); // 最后一题用"交卷"
-        }
-        if (state.currentQuestionIndex > 0) {
-            prevQuestionBtn.classList.remove('hidden');
-        } else {
-            prevQuestionBtn.classList.add('hidden');
-        }
+        setNavEnabled(prevQuestionBtn, state.currentQuestionIndex > 0);
+        setNavEnabled(nextQuestionBtn, state.currentQuestionIndex < state.currentQuiz.length - 1);
     } else {
+        // 逐题模式:下一题 | 结束刷题(结束刷题常驻;上一题与逐题模式无关)
         prevQuestionBtn.classList.add('hidden');
         // 单选/判断点卡片即判分,提交按钮无意义;仅多选需要「确认答案」
         submitAnswerBtn.textContent = '确认答案';
@@ -252,10 +250,20 @@ export function displayQuestion() {
         } else {
             submitAnswerBtn.classList.add('hidden');
         }
-        nextQuestionBtn.classList.add('hidden');
+        nextQuestionBtn.classList.remove('hidden');
+        setNavEnabled(nextQuestionBtn, state.currentQuestionIndex < state.currentQuiz.length - 1);
     }
 
     bindQuizGestures();
+}
+
+// 翻页按钮的"可见但不可用"状态:保持位置稳定,仅置灰并屏蔽点击。
+// 必须用**原生 disabled 属性** —— 仅 pointer-events:none 挡不住程序化 .click(),
+// 末题误点"下一题"会重复交卷、重复计数(测试已复现)。
+// 禁用态外观由 CSS 显式接管(.action-btn:disabled),不依赖浏览器默认样式。
+function setNavEnabled(btn, enabled) {
+    if (!btn) return;
+    btn.disabled = !enabled;
 }
 
 // 方案 A:左右滑切题 + 长按收藏(仅绑定一次)
