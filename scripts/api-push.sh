@@ -32,7 +32,9 @@ echo "[1/4] POST blobs(${#FILES[@]} 个)"
 ENTRIES=""
 first=1
 for f in "${FILES[@]}"; do
-    b=$(gh api "repos/$REPO/git/blobs" -f content="$(base64 -w0 "$f")" -f encoding=base64 --jq '.sha')
+    # 大文件必须走 --input:见 api-push-multi.sh 里的同款说明(Linux 单参数上限 128KB)
+    b=$(base64 -w0 "$f" | jq -Rs '{content: ., encoding: "base64"}' \
+        | gh api "repos/$REPO/git/blobs" --input - --jq '.sha')
     l=$(git hash-object "$f")
     echo "  $f $b"
     [ "$b" = "$l" ] || { echo "FAIL blob $f"; exit 1; }

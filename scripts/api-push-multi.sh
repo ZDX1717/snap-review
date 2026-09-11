@@ -46,7 +46,13 @@ for C in "${COMMITS[@]}"; do
     for f in "${PATHS[@]}"; do
         if git cat-file -e "$C:$f" 2>/dev/null; then
             # 新增/修改:上传 blob 并校验哈希与本地一致
-            b=$(gh api "repos/$REPO/git/blobs" -f content="$(git show "$C:$f" | base64 -w0)" -f encoding=base64 --jq '.sha')
+            # ⚠️ 大文件必须走 --input(stdin):Linux 的**单参数上限是 128KB**,
+            #    而 `gh api -f content="$(base64 ...)"` 会把 base64 塞进 argv ——
+            #    src/bank.js 的 base64 约 135KB,必炸 `Argument list too long`
+            #    (实测 2026-09-11:推送直接失败,且报错信息完全指不到"文件太大"这个真因)。
+            b=$(git show "$C:$f" | base64 -w0 \
+                | jq -Rs '{content: ., encoding: "base64"}' \
+                | gh api "repos/$REPO/git/blobs" --input - --jq '.sha')
             l=$(git rev-parse "$C:$f")
             [ "$b" = "$l" ] || { echo "FAIL blob $f api=$b local=$l"; exit 1; }
             ENTRIES+=$(jq -n --arg p "$f" --arg s "$b" '{path:$p, mode:"100644", type:"blob", sha:$s}')$'\n'
