@@ -161,3 +161,29 @@ test('三页内容同宽:首页与题库页的模块走阅读档', () => {
         assert.ok(/max-width\s*:\s*var\(--reading-width\)/.test(m[1]), `${sel} 应走阅读档宽度`);
     }
 });
+
+test('三个页面内容同宽:首页/题库页模块与刷题配置区都走阅读档', () => {
+    // 实测教训:首页卡片与 .quiz-settings 都没有 max-width,桌面上撑满 952px(页面档),
+    // 而刷题容器/结果页走 640px 阅读档 → "首页明显比后俩页宽"(👤 反馈)。
+    // 同宽靠档位令牌保证,不靠逐页调。
+    const cssText = String(cssNoComments);
+    const want = [
+        '#home-section > .operation-card',
+        '#banks-section > .banks-list',
+        '.quiz-settings',
+    ];
+    for (const sel of want) {
+        const re = new RegExp(sel.replace(/[.#>]/g, (c) => '\\' + c) + '[^{]*\\{([^}]*)\\}');
+        const m = cssText.match(re);
+        assert.ok(m, `应有 ${sel} 的规则`);
+        assert.ok(
+            /max-width\s*:\s*var\(--reading-width\)/.test(m[1]),
+            `${sel} 应走阅读档宽度(否则与其它页不同宽)`,
+        );
+    }
+    // 刷题容器与结果页原本就走阅读档,一并对齐验证
+    for (const sel of ['.quiz-container', '.quiz-result']) {
+        const re = new RegExp(sel.replace(/[.#]/g, (c) => '\\' + c) + '[^{]*\\{([^}]*)\\}');
+        assert.ok(/max-width\s*:\s*var\(--reading-width\)/.test(cssText.match(re)[1]), `${sel} 应走阅读档`);
+    }
+});
