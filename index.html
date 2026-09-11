@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=1037">
+    <link rel="stylesheet" href="styles.css?v=1038">
 </head>
 <body>
     <div class="container">
@@ -351,56 +351,94 @@ A：选项A  B：选项B
 
         <!-- 复习范围选择模态框 -->
 
-        <!-- 题库编辑模态框 -->
+        <!-- 题库编辑模态框(👤 2026-09-11 重构:手机优先) -->
+        <!-- 结构 = 头部(库名+进度) / 可滚动主体(题号列表 / 题目内容 / 题库设置) / 底部固定操作栏。
+             ⚠️ 「删除本题」不再放在底部动作条里 —— 它与「保存」是同一排,手机上极易误触;
+             删除属于题目级操作,跟着题号导航走。 -->
         <div id="edit-bank-modal" class="modal hidden">
             <div class="modal-content modal-lg">
-                <h3 id="edit-bank-title">编辑题库</h3>
-                <div class="editor-layout">
-                    <div class="editor-list-panel">
+                <div class="editor-head">
+                    <div class="editor-head-info">
+                        <h3 id="edit-bank-title">编辑题库</h3>
+                        <span id="editor-head-position" class="editor-head-position"></span>
+                    </div>
+                    <div class="editor-head-actions">
+                        <button type="button" id="editor-list-toggle" class="action-btn small secondary" aria-expanded="false" aria-controls="editor-list-panel">题目列表</button>
+                        <button type="button" id="editor-head-add-btn" class="action-btn small secondary">＋ 新增</button>
+                        <button type="button" id="editor-head-close-btn" class="editor-close-x" title="关闭">✕</button>
+                    </div>
+                </div>
+
+                <div class="editor-body">
+                    <!-- ① 题号列表(手机默认收起;桌面常显) -->
+                    <section id="editor-list-panel" class="editor-panel editor-list-panel">
+                        <h4 class="editor-panel-title">题目列表 <span id="editor-list-count" class="editor-panel-count"></span></h4>
                         <div id="editor-question-list" class="editor-question-list"></div>
                         <button id="editor-add-btn" class="action-btn small">＋ 新增题目</button>
-                    </div>
-                    <div class="editor-form-panel">
+                    </section>
+
+                    <!-- ② 当前题目的编辑区(手机优先:题干在上,答案紧邻,选项随后) -->
+                    <section class="editor-panel editor-question-panel">
+                        <h4 class="editor-panel-title">正在编辑</h4>
                         <div id="editor-form">
                             <div id="editor-hist-row" class="editor-hist-row"></div>
                             <p id="editor-ai-note" class="editor-ai-note"></p>
                             <div class="form-group">
-                                <label for="editor-stem">题干：</label>
-                                <textarea id="editor-stem" rows="3"></textarea>
-                            </div>
-                            <div class="form-group editor-inline-row">
-                                <label for="editor-type">题型：</label>
-                                <select id="editor-type">
-                                    <option value="单选">单选</option>
-                                    <option value="多选">多选</option>
-                                    <option value="判断">判断</option>
-                                </select>
-                                <label for="editor-answer">答案：</label>
-                                <input id="editor-answer" class="preview-answer" placeholder="如 A / ABC / 对">
+                                <label for="editor-stem">题干</label>
+                                <textarea id="editor-stem" rows="3" placeholder="粘贴或输入题干"></textarea>
                             </div>
                             <div class="form-group">
-                                <label>选项：</label>
+                                <span class="form-label">题型与答案</span>
+                                <div class="editor-answer-row">
+                                    <select id="editor-type" aria-label="题型">
+                                        <option value="单选">单选</option>
+                                        <option value="多选">多选</option>
+                                        <option value="判断">判断</option>
+                                    </select>
+                                    <input id="editor-answer" class="preview-answer" placeholder="答案，如 A / ABC / 对" aria-label="答案">
+                                </div>
+                                <p class="meta-note">多选连写字母（如 ABD）；判断题填「对」或「错」</p>
+                            </div>
+                            <div class="form-group">
+                                <span class="form-label">选项</span>
                                 <div id="editor-options"></div>
                                 <div class="editor-option-actions">
                                     <button id="editor-add-option" class="action-btn small secondary">＋ 添加选项</button>
                                     <button id="editor-remove-option" class="action-btn small secondary">－ 删除末尾选项</button>
                                 </div>
                             </div>
-                            <div class="form-group">
-                                <label for="editor-explanation">题目解释（可选）：</label>
-                                <textarea id="editor-explanation" rows="2"></textarea>
-                            </div>
-                            <div class="form-group">
-                                <label for="editor-analysis">解析（可选）：</label>
-                                <textarea id="editor-analysis" rows="2"></textarea>
-                                <div class="editor-ai-answer-row">
-                                    <button type="button" id="editor-ai-answer-btn" class="action-btn small secondary">✍️ AI 补答案/解析</button>
-                                    <span id="editor-ai-answer-note" class="meta-note"></span>
+                            <details class="editor-more">
+                                <summary>题目解释 / 解析（可选）</summary>
+                                <div class="form-group">
+                                    <label for="editor-explanation">题目解释</label>
+                                    <textarea id="editor-explanation" rows="2" placeholder="解释题干在问什么"></textarea>
                                 </div>
-                            </div>
+                                <div class="form-group">
+                                    <label for="editor-analysis">解析</label>
+                                    <textarea id="editor-analysis" rows="2" placeholder="解释为什么是这个答案"></textarea>
+                                    <div class="editor-ai-answer-row">
+                                        <button type="button" id="editor-ai-answer-btn" class="action-btn small secondary">✍️ AI 补答案/解析</button>
+                                        <span id="editor-ai-answer-note" class="meta-note"></span>
+                                    </div>
+                                </div>
+                            </details>
+
+                            <!-- 题目级操作:导航 + 删除(删除离保存远一点) -->
                             <div class="editor-nav-row">
+                                <button id="editor-prev-btn" class="action-btn secondary">上一题</button>
+                                <span id="editor-position" class="editor-position"></span>
+                                <button id="editor-next-btn" class="action-btn secondary">下一题</button>
+                                <button id="editor-delete-btn" class="action-btn small secondary editor-delete-current">删除本题</button>
+                            </div>
+                        </div>
+                        <p id="editor-empty" class="empty-message hidden">该题库暂无题目，点右上角「＋ 新增」添加</p>
+                    </section>
+
+                    <!-- ③ 题库级设置(默认收起:它和"改这一道题"不是一回事,混在一起最容易误操作) -->
+                    <section class="editor-panel editor-bank-panel">
+                        <details class="editor-bank-details">
+                            <summary>题库设置 <span class="editor-panel-hint">配色 · 重命名 · 去重 · 导出 · 删除题库 · 错题规则</span></summary>
                             <div class="bank-admin">
-                                <h4>题库设置与管理</h4>
                                 <div class="bank-admin-row bank-color-row">
                                     <span class="bank-color-label">卡片配色</span>
                                     <div id="bank-color-picker" class="bank-color-picker" role="group" aria-label="题库卡配色"></div>
@@ -425,18 +463,16 @@ A：选项A  B：选项B
                                     </label>
                                 </div>
                             </div>
-                                <button id="editor-prev-btn" class="action-btn small secondary">上一题</button>
-                                <span id="editor-position" class="editor-position"></span>
-                                <label class="inline-label editor-pending-label"><input type="checkbox" id="editor-pending-only"> 只看待补答案</label>
-                                <button id="editor-next-btn" class="action-btn small secondary">下一题</button>
-                                <button id="editor-delete-btn" class="action-btn small secondary">删除本题</button>
-                            </div>
-                            <div class="modal-actions">
-                                <button id="editor-save-btn" class="action-btn">保存本题</button>
-                                <button id="editor-close-btn" class="action-btn secondary">关闭</button>
-                            </div>
-                        </div>
-                        <p id="editor-empty" class="empty-message hidden">该题库暂无题目，点击"＋ 新增题目"添加</p>
+                        </details>
+                    </section>
+                </div>
+
+                <!-- 底部固定操作栏:窄屏永远够得着"保存"(原先埋在滚动区最下方) -->
+                <div id="editor-foot" class="editor-foot">
+                    <label class="inline-label editor-pending-label"><input type="checkbox" id="editor-pending-only"> 只看待补答案</label>
+                    <div class="editor-foot-actions">
+                        <button id="editor-close-btn" class="action-btn secondary">关闭</button>
+                        <button id="editor-save-btn" class="action-btn">保存本题</button>
                     </div>
                 </div>
             </div>
@@ -463,6 +499,6 @@ A：选项A  B：选项B
         </p>
     </div>
 
-    <script type="module" src="src/main.js?v=1037"></script>
+    <script type="module" src="src/main.js?v=1038"></script>
 </body>
 </html>

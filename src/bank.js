@@ -52,6 +52,12 @@ const editorExplanation = document.getElementById('editor-explanation');
 const editorAnalysis = document.getElementById('editor-analysis');
 const editorAiAnswerBtn = document.getElementById('editor-ai-answer-btn');
 const bankColorPicker = document.getElementById('bank-color-picker');
+// 编辑器重构后新增的元素(👤 2026-09-11)
+const editorListPanel = document.getElementById('editor-list-panel');
+const editorListToggle = document.getElementById('editor-list-toggle');
+const editorHeadPosition = document.getElementById('editor-head-position');
+const editorListCount = document.getElementById('editor-list-count');
+const editorFoot = document.getElementById('editor-foot');
 const bankColorNote = document.getElementById('bank-color-note');
 const editorAiAnswerNote = document.getElementById('editor-ai-answer-note');
 const editorPosition = document.getElementById('editor-position');
@@ -1278,7 +1284,7 @@ export function editorAddQuestion() {
         explanation: '', analysis: '', optionExplanations: {}, confidence: 1, raw: ''
     });
     state.editIndex = questions.length - 1;
-    renderBankEditor();
+    renderBankEditor(true);   // 保持题号列表展开:用户要看到"新题加进去了"
     state.editorDirty = true;
     editorStem.focus();
 }
@@ -1581,6 +1587,9 @@ export function editorRenderForm() {
     if (editorAiAnswerNote) editorAiAnswerNote.textContent = '';
     if (bankColorNote) bankColorNote.textContent = '';
     renderBankColorPicker();
+    // 换题时收起「题库设置」:它和"改这一道题"不是一回事,展开着最容易误点删除题库
+    const bankDetails = document.querySelector('.editor-bank-details');
+    if (bankDetails) bankDetails.open = false;
     const q = currentEditBank()[state.editIndex];
     if (!q) return;
 
@@ -1672,6 +1681,24 @@ export function setBankColor(bankName, color) {
     else state.bankColors[bankName] = color;
     saveToLocalStorage();
     return true;
+}
+
+// 题号列表开合(手机:默认收起,头部按钮拉出;桌面 CSS 里该按钮不显示)
+export function toggleEditorList() {
+    if (!editorListPanel) return;
+    const open = !editorListPanel.classList.contains('open');
+    editorListPanel.classList.toggle('open', open);
+    if (editorListToggle) editorListToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+// 选完某题就自动收起列表 —— 手机上点题号的目的就是"去看那道题",
+// 收起来才能立刻看到题干(否则列表还占着 34vh)。
+function collapseEditorListOnNarrow() {
+    if (!editorListPanel) return;
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+        && !window.matchMedia('(max-width: 768px)').matches) return;
+    editorListPanel.classList.remove('open');
+    if (editorListToggle) editorListToggle.setAttribute('aria-expanded', 'false');
 }
 
 // 渲染配色色板(编辑器内)。每个色块 = 一个按钮,点一下即改并立即落盘 ——
@@ -2196,8 +2223,12 @@ export function editorHistClick(e) {
     renderEditorHistRow(q);
 }
 
-export function renderBankEditor() {
+export function renderBankEditor(keepList = false) {
     renderBankColorPicker();
+    if (!keepList && editorListPanel) {
+        editorListPanel.classList.remove('open');
+        if (editorListToggle) editorListToggle.setAttribute('aria-expanded', 'false');
+    }
     const questions = currentEditBank();
     const pendingOnly = !!state.editorPendingOnly;
 
@@ -2216,15 +2247,36 @@ export function renderBankEditor() {
             if (!editorGuard()) return;
             state.editIndex = idx;
             renderBankEditor();
+            collapseEditorListOnNarrow();
         });
         editorQuestionList.appendChild(item);
     });
+
+    // 头部进度与列表计数(手机上列表是收起的,进度必须常显 —— 它是"我在第几题"的唯一线索)
+    const shown = questions.filter(q => !pendingOnly || !q.answer).length;
+    if (editorListCount) editorListCount.textContent = pendingOnly ? `待补 ${shown}` : `共 ${questions.length} 题`;
 
     if (questions.length === 0 || !questions[state.editIndex]) {
         editorForm.classList.add('hidden');
         editorEmpty.classList.remove('hidden');
         editorPosition.textContent = pendingOnly ? '没有待补答案的题目 🎉' : '';
+        if (editorHeadPosition) editorHeadPosition.textContent = editorPosition.textContent;
+        // 没题可编辑时,底部「保存本题」不该还在(点了只会报错)
+        if (editorFoot) editorFoot.classList.add('hidden');
         return;
+    }
+    if (editorFoot) editorFoot.classList.remove('hidden');
+    // ⚠️ 进度必须按**筛选后**的位置算:只看待补时 editIndex 仍是全库下标,
+    //    直接显示 index+1 会出现"共 3 题、只有 1 条待补,却显示 3/3"这种自相矛盾(实测踩到)。
+    const shownIndex = questions.filter(q => !pendingOnly || !q.answer)
+        .findIndex(q => q === questions[state.editIndex]);
+    if (editorHeadPosition) {
+        editorHeadPosition.textContent = `${shownIndex + 1}/${shown}` + (pendingOnly ? '（只看待补）' : '');
+    }
+    if (editorPosition) {
+        editorPosition.textContent = pendingOnly
+            ? `第 ${shownIndex + 1} / ${shown} 题（只看待补）`
+            : `第 ${state.editIndex + 1} / ${questions.length} 题`;
     }
     editorForm.classList.remove('hidden');
     editorEmpty.classList.add('hidden');

@@ -492,6 +492,69 @@ test('题库卡不得再出现左侧主色装饰条(👤 2026-09-11 改成配色
     }
 });
 
+// ==================== 题库编辑器重构(👤 2026-09-11:手机优先)====================
+test('编辑器:题目级操作与题库级操作彻底分开', () => {
+    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
+    // 底部动作栏只放"保存 / 关闭"—— 删除本题绝不与保存同排(手机上极易误触)
+    const foot = modal.slice(modal.indexOf('id="editor-foot"'));
+    assert.ok(foot.includes('editor-save-btn'), '底部栏应有保存');
+    assert.ok(foot.includes('editor-close-btn'), '底部栏应有关闭');
+    assert.ok(!foot.includes('editor-delete-btn'), '「删除本题」不得放在底部动作栏');
+    // 删除本题跟着题号导航走
+    const nav = modal.slice(modal.indexOf('editor-nav-row'), modal.indexOf('editor-delete-btn') + 200);
+    assert.ok(nav.includes('editor-delete-btn'), '「删除本题」应在题号导航行里');
+    // 题库级动作(改库名/删库/配色)必须在「题库设置」里,不与单题编辑混排
+    assert.ok(/editor-bank-details/.test(modal), '题库设置应整块收进 details');
+    const bankDetailsStart = modal.indexOf('editor-bank-details');
+    const after = modal.slice(bankDetailsStart);
+    for (const id of ['bank-rename-btn', 'bank-delete-btn', 'bank-color-picker']) {
+        assert.ok(after.includes(id), `${id} 应在「题库设置」区块内`);
+    }
+});
+
+test('编辑器:头部/滚动主体/底部固定操作栏三段结构齐备', () => {
+    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
+    for (const cls of ['editor-head', 'editor-body', 'editor-foot']) {
+        assert.ok(modal.includes(cls), `缺 ${cls} 分区`);
+    }
+    // 头部要有进度,否则手机上列表一收起就不知道在第几题
+    assert.ok(modal.includes('id="editor-head-position"'), '头部应有位置指示');
+    // 进度"按筛选后算"是修过的真 bug(只看待补时曾显示 3/3 而实际只有 1 条)
+    const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
+    assert.ok(/shownIndex/.test(bank), '进度应按筛选后的序号计算');
+    // 新增题目时要保持列表展开(否则用户看不到"新题加进去了")
+    assert.ok(/renderBankEditor\(true\)/.test(bank), 'editorAddQuestion 应保持列表展开');
+});
+
+test('编辑器:滚动只发生在主体,头部与底部不被滚走', () => {
+    // 手机上的编辑器是"整屏 + 底部常驻动作栏";若 .modal 自己滚(overflow-y:auto),
+    // sticky/flex 定位都靠不住 —— 故编辑器弹窗必须 overflow:hidden,由 .editor-body 滚。
+    const modalRule = cssNoComments.match(/\.modal#edit-bank-modal\s*\{([^}]*)\}/);
+    assert.ok(modalRule, '应有 .modal#edit-bank-modal 规则');
+    assert.ok(/overflow\s*:\s*hidden/.test(modalRule[1]), '编辑器弹窗自身不得滚动(否则底部栏会被滚走)');
+    const contentRule = cssNoComments.match(/\.modal#edit-bank-modal \.modal-content\s*\{([^}]*)\}/);
+    assert.ok(contentRule && /flex-direction\s*:\s*column/.test(contentRule[1]), '弹窗内容应为纵向 flex 三段布局');
+    const bodyRule = cssNoComments.match(/\.editor-body\s*\{([^}]*)\}/);
+    assert.ok(bodyRule && /overflow-y\s*:\s*auto/.test(bodyRule[1]), '滚动应发生在 .editor-body');
+    const footRule = cssNoComments.match(/\.editor-foot\s*\{([^}]*)\}/);
+    assert.ok(footRule && /flex\s*:\s*0 0 auto/.test(footRule[1]), '底部栏不得被压缩');
+});
+
+test('编辑器:手机上可点元素达标(≥44px 触达)', () => {
+    const media = cssNoComments.slice(cssNoComments.indexOf('max-width: 768px'));
+    const block = media.slice(media.indexOf('.editor-body'));
+    for (const sel of ['.editor-option-actions .action-btn', '.editor-nav-row .action-btn',
+        '.editor-foot .action-btn', '.editor-head-actions .action-btn', '.bank-admin-row .action-btn',
+        '.bank-color-swatch', '.editor-close-x']) {
+        assert.ok(block.includes(sel), `手机档缺 ${sel} 的触达规则`);
+    }
+    assert.ok(/min-height\s*:\s*44px/.test(block), '手机档应把触达下限设为 44px');
+    // iOS 聚焦自动放大页面的经典原因:输入框字号 <16px
+    assert.ok(/font-size\s*:\s*16px/.test(block), '手机档输入框字号应 ≥16px');
+    // 复选框单点太苛刻 → label 整行可点
+    assert.ok(/#edit-bank-modal \.inline-label/.test(block), '复选框应让 label 整行可点');
+});
+
 test('答题卡抽屉在 <main> 之外(公理:浮层不受 section 显隐牵连)', () => {
     const mainEnd = html.indexOf('</main>');
     const pos = html.indexOf('id="answer-card-drawer"');

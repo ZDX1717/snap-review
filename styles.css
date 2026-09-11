@@ -2804,3 +2804,239 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
 .answer-card-swatch.wrong { background: var(--c-danger-bg); border-color: var(--c-danger); }
 .answer-card-swatch.picked { background: var(--c-panel-bg); border-color: var(--c-text-faint); }
 .answer-card-swatch.blank { border-style: dashed; }
+
+/* ==================== 题库编辑器重构(👤 2026-09-11:手机优先)====================
+   结构:.editor-head(库名+进度) / .editor-body(可滚动) / .editor-foot(固定操作栏)
+   设计要点:
+   ① **窄屏优先**:手机不靠"两栏 + 横向挤",而是纵向分区、按重要性排序;
+   ② **触摸友好**:手机上所有可点元素 ≥44px(苹果 HIG / 安卓 Material 的通行下限);
+   ③ **逻辑合理**:题目级操作(改/删这一题)与题库级操作(整库设置)彻底分开 ——
+      原先「删除本题」和「保存本题」同排、题库设置夹在题号导航里,手机上极易误操作;
+   ④ **不丢东西**:窄屏隐藏的题号列表由头部按钮拉出;次要字段(解释/解析)折叠但不搬走。 */
+
+.modal#edit-bank-modal {
+    /* 编辑器独占整屏滚动:自身不滚,滚 .editor-body —— 否则头部与底部操作栏会被滚走 */
+    overflow: hidden;
+    align-items: stretch;
+}
+.modal#edit-bank-modal .modal-content {
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+    min-height: 0;
+    padding: 0;                /* 内边距交给各分区,头部/底部才能贴边 */
+    overflow: hidden;
+}
+
+/* ---------- 头部:库名 + 进度 + 快捷动作 ---------- */
+.editor-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--c-border-light);
+    background: var(--c-surface);
+    flex: 0 0 auto;
+}
+.editor-head-info {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+.editor-head h3 {
+    margin: 0;
+    font-size: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.editor-head-position {
+    font-size: 12px;
+    color: var(--c-text-faint);
+    white-space: nowrap;
+}
+.editor-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+.editor-close-x {
+    border: none;              /* 按钮必须显式声明 border,否则露出默认黑边 */
+    background: none;
+    padding: 6px 8px;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--c-text-muted);
+    cursor: pointer;
+    border-radius: 6px;
+}
+.editor-close-x:hover { background: var(--c-border-light); color: var(--c-text); }
+
+/* ---------- 主体:唯一滚动区 ---------- */
+.editor-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 12px 16px 16px;
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 16px;
+    align-items: start;
+}
+.editor-panel { min-width: 0; }
+.editor-panel-title {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--c-text-muted);
+}
+.editor-panel-count,
+.editor-panel-hint {
+    font-weight: 400;
+    color: var(--c-text-faint);
+}
+/* 题库设置整块跨两列,不与"当前题目"抢宽度 */
+.editor-bank-panel { grid-column: 1 / -1; }
+
+/* ---------- 底部固定操作栏 ---------- */
+.editor-foot {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--c-border-light);
+    background: var(--c-surface);
+}
+.editor-foot-actions { display: flex; gap: 8px; }
+
+/* ---------- 题目内容区:答案紧邻题干,次要字段折叠 ---------- */
+.form-label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--c-text-secondary);
+    font-size: 14px;
+}
+.editor-answer-row {
+    display: flex;
+    gap: 8px;
+}
+.editor-answer-row select { flex: 0 0 auto; }
+.editor-answer-row input { flex: 1 1 auto; min-width: 0; }
+.editor-more {
+    margin: 4px 0 12px;
+    border: 1px solid var(--c-border-light);
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+.editor-more > summary {
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--c-text-muted);
+}
+.editor-more[open] > summary { margin-bottom: 10px; }
+.editor-bank-details > summary {
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--c-text-secondary);
+}
+.editor-bank-details[open] > summary { margin-bottom: 8px; }
+/* 「删除本题」自带危险色,且与「下一题」拉开距离 —— 防误触 */
+.editor-delete-current {
+    margin-left: auto;
+    color: var(--c-danger);
+    border-color: var(--c-danger);
+}
+
+/* ---------- 手机档:单列 + 大触达 ---------- */
+@media (max-width: 768px) {
+    .modal#edit-bank-modal .modal-content {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        margin: 0;
+        border-radius: 0;
+    }
+    .editor-body {
+        grid-template-columns: 1fr;
+        gap: 14px;
+        padding: 12px 12px 16px;
+    }
+    /* 题号列表默认收起(它只用来跳题,占的是最宝贵的第一屏);
+       头部按钮拉出后最多占 34vh,滚到底不会挤掉正在编辑的内容 */
+    .editor-list-panel { display: none; }
+    .editor-list-panel.open { display: block; }
+    .editor-list-panel .editor-question-list {
+        max-height: 34vh;
+        flex: none;
+    }
+    /* 触摸目标:手机上输入框/按钮不低于 44px */
+    #editor-form textarea,
+    #editor-form input[type="text"],
+    .editor-option-input,
+    .editor-answer-row select,
+    .editor-answer-row input {
+        min-height: 44px;
+        font-size: 16px;       /* ≥16px 可避免 iOS 聚焦时自动放大页面 */
+    }
+    .editor-option-actions .action-btn,
+    .editor-nav-row .action-btn,
+    .editor-foot .action-btn,
+    .editor-head-actions .action-btn,
+    .bank-admin-row .action-btn {
+        min-height: 44px;
+        padding: 0 14px;
+    }
+    .editor-list-item {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+    }
+    /* 零散控件也要够得着:色块、AI 补答案、关闭 ✕、移出规则下拉、复选框 */
+    .bank-color-swatch { min-height: 44px; padding: 0 12px; }
+    .editor-ai-answer-row .action-btn,
+    .editor-option-actions .action-btn { min-height: 44px; }
+    .editor-close-x {
+        min-width: 44px;
+        min-height: 44px;
+        font-size: 18px;
+    }
+    .bank-admin-row select {
+        min-height: 44px;
+        font-size: 16px;
+    }
+    /* 复选框:label 整行可点(单点 13px 的方框太苛刻),方框本身也放大到 20px */
+    #edit-bank-modal .inline-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 44px;
+        font-size: 14px;
+    }
+    #edit-bank-modal .inline-label input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        flex: 0 0 auto;
+    }
+    #edit-bank-modal .editor-more > summary,
+    #edit-bank-modal .editor-bank-details > summary {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+    }
+    /* 底部栏最右侧永远是「保存本题」——拇指落点固定 */
+    .editor-foot { gap: 6px; }
+    .editor-foot-actions { flex: 1 1 auto; justify-content: flex-end; }
+    .editor-foot .action-btn { padding: 0 16px; }
+    .editor-nav-row .editor-position { flex: 1 1 auto; text-align: center; }
+}
+/* 桌面:题号列表常显,头部的「题目列表」按钮没有意义 */
+@media (min-width: 769px) {
+    #editor-list-toggle { display: none; }
+}
