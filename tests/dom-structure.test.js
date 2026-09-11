@@ -522,8 +522,8 @@ test('编辑器:头部/滚动主体/底部固定操作栏三段结构齐备', ()
     // 进度"按筛选后算"是修过的真 bug(只看待补时曾显示 3/3 而实际只有 1 条)
     const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
     assert.ok(/shownIndex/.test(bank), '进度应按筛选后的序号计算');
-    // 新增题目时要保持列表展开(否则用户看不到"新题加进去了")
-    assert.ok(/renderBankEditor\(true\)/.test(bank), 'editorAddQuestion 应保持列表展开');
+    // 保存/新增不该把用户拉开的列表又合上 → 这些路径要传 keepList
+    assert.ok(/renderBankEditor\(true\)/.test(bank), '保存与新增应保持题号列表的开合状态');
 });
 
 test('编辑器:滚动只发生在主体,头部与底部不被滚走', () => {

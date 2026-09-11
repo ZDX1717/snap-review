@@ -1284,8 +1284,11 @@ export function editorAddQuestion() {
         explanation: '', analysis: '', optionExplanations: {}, confidence: 1, raw: ''
     });
     state.editIndex = questions.length - 1;
-    renderBankEditor(true);   // 保持题号列表展开:用户要看到"新题加进去了"
+    // keepList = true:保持用户当前的列表开合状态(他刚拉开就接着加,不该被合上;
+    // 收起着也不该突然弹开 —— 新题的去向由头部进度 + 提示行说明)
+    renderBankEditor(true);
     state.editorDirty = true;
+    if (editorAiAnswerNote) editorAiAnswerNote.textContent = `已新增第 ${questions.length} 题,填写后点「保存本题」`;
     editorStem.focus();
 }
 
@@ -1422,7 +1425,8 @@ export function editorSaveCurrent(silent) {
 
     saveToLocalStorage();
     state.editorDirty = false;
-    renderBankEditor();
+    // keepList = true:保存不该把用户拉开的题号列表又合上(他可能正靠着列表连续核对)
+    renderBankEditor(true);
     // 让下拉框反映真正落库的类型(被自动纠正时给出可见反馈)
     editorType.value = finalType;
     if (!silent) {
