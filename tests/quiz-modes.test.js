@@ -419,3 +419,87 @@ test('确认答案按钮状态机:未选=下一题,已选=确认答案(橘),判�
     assert.strictEqual(String(btn.textContent), '下一题', '单选不应变为「确认答案」');
     sandbox.document.querySelectorAll = () => [];
 });
+
+test('多选未点「确认答案」就切到上一题:不得判分,回来后仍是未作答', () => {
+    // 回归:prevQuestion 曾把"勾了但没确认"的选择也存进 userAnswers,
+    // 回看时被当成已判分并复现结果 → 等于没确认就判了分(👤 反馈)。
+    const q = (c, t, o, a) => ({ content:c, type:t, options:o, answer:a, analysis:'', explanation:'', confidence:1, raw:'' });
+    const pick = (v) => { sandbox.document.querySelectorAll = (sel) =>
+        sel.includes('input[name="answer"]:checked') ? v.map((x) => ({ value: x })) : []; };
+    const sel = makeEl(); sel.value = 'A';
+    sandbox.document.querySelector = () => sel;
+
+    run(`quizMode='immediate';
+        currentQuiz=[${JSON.stringify(q('S1','单选',{A:'1',B:'2'},'A'))},${JSON.stringify(q('M2','多选',{A:'1',B:'2',C:'3'},'AC'))}];
+        questionBank=currentQuiz; currentQuestionIndex=1; isAnswered=false; correctCount=0; wrongCount=0; userAnswers=['A',''];`);
+
+    // 勾了 A、C 但**不点确认**,直接回上一题
+    pick(['A','C']);
+    run(`displayQuestion(); syncNextButtonLabel(); prevQuestion();`);
+    assert.strictEqual(run('currentQuestionIndex'), 0, '应回到第 1 题');
+    assert.strictEqual(run(`userAnswers[1]`), '', '未确认的勾选不得被记为答案');
+    assert.strictEqual(run('correctCount'), 0, '不得因此判分');
+
+    // 再回到第 2 题:应为"未作答",按钮回到普通「下一题」
+    pick([]);   // 用户回到该题时还没勾选(清的必须是与现实一致的桩)
+    run('nextQuestion()');
+    assert.strictEqual(run('isAnswered'), false, '回来时不应是已判分');
+    assert.ok(!elements['next-question-btn'].classList.contains('confirming'), '不应带确认态');
+    assert.ok(!elements['answer-feedback'].classList.contains('hidden') === false, '反馈区应隐藏');
+    sandbox.document.querySelector = () => makeEl();
+    sandbox.document.querySelectorAll = () => [];
+});
+
+test('末题多选:勾选后出现「确认答案」,确认后「结束刷题」变蓝', () => {
+    const q = (c, t, o, a) => ({ content:c, type:t, options:o, answer:a, analysis:'', explanation:'', confidence:1, raw:'' });
+    const pick = (v) => { sandbox.document.querySelectorAll = (sel) =>
+        sel.includes('input[name="answer"]:checked') ? v.map((x) => ({ value: x })) : []; };
+    const next = elements['next-question-btn'], end = elements['end-quiz-btn'];
+    pick([]);   // 前一个用例的桩会串到本用例,先清空
+    run(`quizMode='immediate';
+        currentQuiz=[${JSON.stringify(q('S1','单选',{A:'1',B:'2'},'A'))},${JSON.stringify(q('M2','多选',{A:'1',B:'2',C:'3'},'AC'))}];
+        questionBank=currentQuiz; currentQuestionIndex=1; isAnswered=false; userAnswers=['A',''];`);
+    run('displayQuestion()');
+    assert.strictEqual(String(next.textContent), '下一题', '未勾选应为「下一题」');
+    pick(['A','C']);
+    run('syncNextButtonLabel()');
+    assert.strictEqual(String(next.textContent), '确认答案', '末题多选勾选后也应出现「确认答案」');
+    assert.ok(next.classList.contains('confirming'), '应有 confirming 态');
+    assert.ok(!end.classList.contains('ready'), '未确认前「结束刷题」不应变色');
+    run('advanceNext()');
+    assert.strictEqual(run('isAnswered'), true, '确认后应已判分');
+    assert.ok(end.classList.contains('ready'), '确认后「结束刷题」应变色');
+    sandbox.document.querySelectorAll = () => [];
+});
+
+test('套题模式末题:选完即变色,取消选择恢复颜色', () => {
+    const q = (c, t, o, a) => ({ content:c, type:t, options:o, answer:a, analysis:'', explanation:'', confidence:1, raw:'' });
+    // 本文件共用一个 app 实例,前序用例的桩会串下来 —— 因此两个桩都在此重建:
+    //  单选/判断走 querySelector('input[name="answer"]:checked')
+    //  多选走 querySelectorAll(同上),两者都要覆盖
+    let single = null;
+    // displayQuestion 会对 .options-container 设 innerHTML 并 appendChild —— 桩要具备这两项
+    const containerStub = { innerHTML: '', appendChild() {}, querySelectorAll: () => [] };
+    const pick = (v) => {
+        single = v.length ? Object.assign(makeEl(), { value: v[0] }) : null;
+        sandbox.document.querySelector = (sel) =>
+            sel.includes('.options-container') ? containerStub : single;
+        sandbox.document.querySelectorAll = (sel) =>
+            sel.includes('input[name="answer"]:checked') ? v.map((x) => ({ value: x })) : [];
+    };
+    const end = elements['end-quiz-btn'];
+    pick([]);   // 未选:两个桩都返回空
+    run(`quizMode='exam';
+        currentQuiz=[${JSON.stringify(q('S1','单选',{A:'1',B:'2'},'A'))},${JSON.stringify(q('S2','单选',{A:'1',B:'2'},'A'))}];
+        questionBank=currentQuiz; currentQuestionIndex=1; isAnswered=false; userAnswers=['',''];`);
+    run('displayQuestion()');
+    assert.ok(!end.classList.contains('ready'), '未选时不变色');
+    pick(['A']);
+    run('markEndButtonReady()');
+    assert.ok(end.classList.contains('ready'), '套题末题选完即变色');
+    pick([]);
+    run('markEndButtonReady()');
+    assert.ok(!end.classList.contains('ready'), '取消选择后应恢复颜色');
+    sandbox.document.querySelector = () => makeEl();
+    sandbox.document.querySelectorAll = () => [];
+});

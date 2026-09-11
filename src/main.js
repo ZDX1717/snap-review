@@ -6,7 +6,7 @@ import { loadAutoNextSetting, loadCollapsedBanks, loadFromLocalStorage, loadMast
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, toggleAllBanks, updateErrorStreak, updateErrorsList, updateToggleAllBanksLabel } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
-import { advanceNext, backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, readQuizSource, shouldAutoNext, shouldConfirmAnswer, syncNextButtonLabel, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
+import { advanceNext, backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, readQuizSource, shouldAutoNext, shouldConfirmAnswer, syncNextButtonLabel, markEndButtonReady, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
 import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback, cancelPreviewAi, rescueAiOrganize, updateAiSettingsBadge, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, clearPasteInput, editorHistClick, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, togglePromptContent, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks, renderErrorsForBank, renderRecycleBin, restoreRecycled, recycleBankEntry, restoreBankVersion } from './bank.js';
 
 // Zquiz · 期末周刷题 —— 应用装配入口
@@ -529,6 +529,7 @@ if (typeof window === 'undefined') {
         getSourcePool,
         shouldAutoNext,
         shouldConfirmAnswer,
+        markEndButtonReady,
         syncNextButtonLabel,
         advanceNext,
         updateSourceUI,

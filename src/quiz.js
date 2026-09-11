@@ -127,6 +127,7 @@ export function startQuiz() {
     reviewOnlyWrong.checked = false;
     state.masteryRemovedInSession = 0;
     Object.keys(q_feedback).forEach(k => delete q_feedback[k]);
+    Object.keys(q_graded).forEach(k => delete q_graded[k]);
     
     // 显示刷题容器
     quizContainer.classList.remove('hidden');
@@ -204,6 +205,8 @@ export function displayQuestion() {
             clearQuizHint();   // 已动手选择 → 提示自然失效
             // 多选勾选状态变化 → 按钮在「下一题 / 确认答案」之间切换
             if (question.type === '多选') syncNextButtonLabel();
+            // 套题模式下"选完即变色、取消即恢复",故每次变动都重算末题提示
+            if (state.quizMode === 'exam') markEndButtonReady();
             if (inputElement.checked && question.type !== '多选') {
                 optionsContainer.querySelectorAll('.option-item').forEach(o => o.classList.remove('selected'));
                 optionItem.classList.add('selected');
@@ -268,8 +271,9 @@ export function displayQuestion() {
         nextQuestionBtn.classList.remove('hidden');
         setNavEnabled(nextQuestionBtn, state.currentQuestionIndex < state.currentQuiz.length - 1);
 
-        // 逐题模式:回到已判分的题时复现当时的结果(着色/反馈/解析)——👤 要求"保留判分结果和解析"
-        if (state.userAnswers[state.currentQuestionIndex]) {
+        // 逐题模式:回到**已判分**的题时复现当时结果(着色/反馈/解析),👤 要求"保留判分结果和解析"。
+        // 条件用 userAnswers 记录 + 该题确已判分(未判分的勾选不会被落记录,见 prevQuestion)。
+        if (state.userAnswers[state.currentQuestionIndex] && q_graded[state.currentQuestionIndex]) {
             state.isAnswered = true;
             restoreGradedAnswer(question, state.userAnswers[state.currentQuestionIndex]);
         }
@@ -292,6 +296,8 @@ function setNavEnabled(btn, enabled) {
 // 每题的"判分反馈"留档(index → {text, cls, explanation}),回看时原样复现。
 // 不重新推导文案:当次可能有"已连对 N 次,移出错题本"等上下文信息,重建会丢。
 const q_feedback = {};
+// 记录"哪几题真的判过分":仅凭 userAnswers 有值无法区分"已判分"与"勾了没确认"
+const q_graded = {};
 
 // 选项卡片判分标色(对绿/错红/正确项高亮)并禁改。
 // 抽成函数是为了让"回看已判分的题"能复用同一套着色,而不是各写一份。
@@ -328,10 +334,19 @@ export function syncNextButtonLabel() {
     nextQuestionBtn.textContent = hasPick ? '确认答案' : '下一题';
 }
 
-// 最后一题的「结束刷题 / 交卷」在判分完成后变色,提示"可以收尾了"(👤 要求)
-function markEndButtonReady() {
+// 最后一题的「结束刷题 / 交卷」变色提示收尾(👤 规则):
+//  · 逐题模式:末题**判完分**才变色;
+//  · 套题模式:末题**用户选完**就变色(套题不即时判分,没有"判完分"这个时刻);
+//    且**取消选择后颜色要恢复** —— 所以每次选项变动都必须重算,而不能只在判分时算一次。
+export function markEndButtonReady() {
     const isLast = state.currentQuestionIndex >= state.currentQuiz.length - 1;
-    endQuizBtn.classList.toggle('ready', isLast && state.isAnswered);
+    if (!isLast) {
+        endQuizBtn.classList.remove('ready');
+        return;
+    }
+    const picked = !!collectUserAnswer();
+    const ready = state.quizMode === 'exam' ? picked : state.isAnswered;
+    endQuizBtn.classList.toggle('ready', ready);
 }
 
 // 回看已判分的题:把判分着色、反馈文案与解析一并恢复(👤 要求)
@@ -523,6 +538,7 @@ export function submitAnswer() {
 
     // 更新按钮状态
     state.isAnswered = true;   // ⚠️ 必须在 markEndButtonReady 之前:它读的正是这个状态
+    q_graded[state.currentQuestionIndex] = true;
     nextQuestionBtn.classList.remove('hidden');
     // 最后一题判分完成后,让「结束刷题 / 交卷」变色提示收尾(👤 要求)
     markEndButtonReady();
@@ -591,9 +607,14 @@ export function nextQuestion() {
 export function prevQuestion() {
     cancelAutoNext();   // 手动翻页优先,取消待执行的自动翻页
     if (state.currentQuestionIndex === 0) return;
-    // 逐题模式也可回看(👤 要求)。已作答的题已锁定并记分,回看不改分;
-    // 仅当该题尚未作答时才把当前勾选保存下来,避免覆盖已判定的记录。
-    if (state.quizMode === 'exam' || !state.userAnswers[state.currentQuestionIndex]) {
+    // 逐题模式也可回看(👤 要求)。落记录的条件:
+    //  · 套题模式:作答随时可改,必须存下来;
+    //  · 逐题模式:仅当本题**已判分**(state.isAnswered)时记录才有效。
+    //    ⚠️ 不能用"userAnswers 是否为空"判断 —— 那会把"勾了但没点确认答案"的选择
+    //    也当成答案存下来,回看时 displayQuestion 会把它当已判分并复现结果,
+    //    等于"没确认就判了分"(👤 反馈的 bug)。
+    const graded = state.quizMode === 'exam' || state.isAnswered;
+    if (graded) {
         state.userAnswers[state.currentQuestionIndex] = collectUserAnswer();
     }
     state.currentQuestionIndex--;
