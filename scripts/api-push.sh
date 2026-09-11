@@ -39,7 +39,9 @@ for f in "${FILES[@]}"; do
     echo "  $f $b"
     [ "$b" = "$l" ] || { echo "FAIL blob $f"; exit 1; }
     [ $first -eq 1 ] && first=0 || ENTRIES+=","
-    ENTRIES+=$(jq -n --arg path "$f" --arg sha "$b" '{path:$path, mode:"100644", type:"blob", sha:$sha}')
+    # mode 取真实值(可执行脚本是 100755,硬写 644 会让 tree 对不上) —— 见 api-push-multi.sh 里的同款说明
+    m=$(git ls-tree HEAD -- "$f" | awk '{print $1}')
+    ENTRIES+=$(jq -n --arg path "$f" --arg sha "$b" --arg mode "$m" '{path:$path, mode:$mode, type:"blob", sha:$sha}')
 done
 
 echo "[2/4] POST tree"

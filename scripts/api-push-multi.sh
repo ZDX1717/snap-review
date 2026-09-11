@@ -55,7 +55,12 @@ for C in "${COMMITS[@]}"; do
                 | gh api "repos/$REPO/git/blobs" --input - --jq '.sha')
             l=$(git rev-parse "$C:$f")
             [ "$b" = "$l" ] || { echo "FAIL blob $f api=$b local=$l"; exit 1; }
-            ENTRIES+=$(jq -n --arg p "$f" --arg s "$b" '{path:$p, mode:"100644", type:"blob", sha:$s}')$'\n'
+            # ⚠️ mode 必须取**真实值**(`git ls-tree`),不能硬编码 100644:
+            #    可执行脚本是 100755,硬写 644 会让 API 造的 tree 与本地对不上 ——
+            #    报错是 "FAIL tree api=… local=…",完全看不出是 mode 的锅(踩过 2026-09-11:
+            #    api-push.sh 有执行位,而脚本把它当普通文件)。
+            m=$(git ls-tree "$C" -- "$f" | awk '{print $1}')
+            ENTRIES+=$(jq -n --arg p "$f" --arg s "$b" --arg m "$m" '{path:$p, mode:$m, type:"blob", sha:$s}')$'\n'
         else
             # 删除:tree 条目 sha 置 null
             ENTRIES+=$(jq -n --arg p "$f" '{path:$p, mode:"100644", type:"blob", sha:null}')$'\n'
