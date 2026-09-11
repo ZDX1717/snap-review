@@ -1452,17 +1452,81 @@ export function refreshQuestionBankView() {
 
 // ==================== 按库内嵌渲染(P0-1.9:错题归题库卡手风琴) ====================
 
+// ==================== 题目卡片(错题 / 收藏 共用一套结构)====================
+// 👤 定调 2026-09-11:错题卡与收藏卡**统一设计**,且题型/收藏/删除一律放在**题干上方一行**。
+// 结构:`.q-card > .q-card-tags(题型 + 状态徽章 + 收藏 + 删除) + 题干 + 选项 + details(答案/解析)`。
+// 与刷题页的 `.question-tags` 同一条规矩:标签行在题干之上、自成一行,不影响题干宽度。
+
+// 题干上方那一行。返回元素,调用方自行 append 到卡片最前。
+function buildCardTagRow(question, opts = {}) {
+    const row = document.createElement('div');
+    row.className = 'question-card-tags';
+
+    // 题型:仍用 ［单选］ 全角括号文案(沿用原有约定,用户与测试都已熟悉)
+    const type = document.createElement('span');
+    type.className = 'error-type-line';
+    type.textContent = `［${question.type || '未知'}］`;
+    row.appendChild(type);
+
+    // 状态徽章(收藏卡标"在错题本";错题卡标"已收藏"由按钮本身表达)
+    if (opts.statusBadge) {
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = opts.statusBadge;
+        row.appendChild(badge);
+    }
+
+    row.appendChild(buildFavoriteButton(question, opts.favoriteText));
+    row.appendChild(buildDeleteButton(opts.onDelete));
+    return row;
+}
+
+// 收藏按钮:两处卡片共用。onClick 缺省即"切换收藏",传入时用调用方的(收藏卡里就是取消收藏)
+function buildFavoriteButton(question, text) {
+    const isFav = state.favoriteQuestions.some(fq => fq.content === question.content);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'question-card-btn question-card-fav';
+    btn.textContent = text !== undefined ? text : (isFav ? '★ 已收藏' : '☆ 收藏');
+    btn.addEventListener('click', () => {
+        toggleFavorite(question, question.bankName);
+        // 跨模块通知:库卡内嵌面板需要整块重绘,但不允许互相 import(见架构铁律 4)
+        if (typeof CustomEvent !== 'undefined' && document.dispatchEvent) {
+            document.dispatchEvent(new CustomEvent('zquiz:embeds-dirty'));
+        }
+    });
+    return btn;
+}
+
+// 删除按钮:onDelete 由调用方给(错题本=移出错题本;收藏=取消收藏)
+function buildDeleteButton(onDelete) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'question-card-btn question-card-del';
+    btn.textContent = '删除';
+    if (onDelete) btn.addEventListener('click', onDelete);
+    return btn;
+}
+
+// 判断题按对错展示、选择题给「A. 选项原文」(唯一展示入口)
+function answerText(answer, question) {
+    return answer ? formatAnswerForDisplay(answer, question) : '(未答)';
+}
+
 // 生成单个遮挡式错题条目:默认只显示题干;「查看答案」展开后红绿对比 + 解析
-// index = 该错题在 state.errorQuestions 中的真实下标(删除/掌握用);bankName = 归属库
+// index = 该错题在 state.errorQuestions 中的真实下标(删除用);bankName = 归属库
 function buildErrorItem(question, index) {
     const item = document.createElement('div');
-    item.className = 'error-item';
+    item.className = 'question-card error-card';
 
-    // 题型标在题干之前(👤 反馈):先知道是什么题型再读题,比读完备注更顺
-    const type = document.createElement('p');
-    type.className = 'error-type-line';
-    type.textContent = `［${question.type}］`;
-    item.appendChild(type);
+    // 题型 + 收藏 + 删除:题干上方一行(👤 定调)
+    item.appendChild(buildCardTagRow(question, {
+        onDelete: () => {
+            state.errorQuestions.splice(index, 1);
+            saveToLocalStorage();
+            updateBanksList();
+        },
+    }));
 
     const title = document.createElement('h4');
     title.textContent = question.content;
@@ -1488,8 +1552,7 @@ function buildErrorItem(question, index) {
 
     const yourAnswer = document.createElement('p');
     yourAnswer.className = 'your-answer';
-    // 判断题按对错展示,不显示 A/B(👤 反馈)
-    yourAnswer.textContent = `你的答案:${question.userAnswer ? formatAnswerForDisplay(question.userAnswer, question) : '(未答)'}`;
+    yourAnswer.textContent = `你的答案:${answerText(question.userAnswer, question)}`;
     reveal.appendChild(yourAnswer);
 
     const correctAnswer = document.createElement('p');
@@ -1509,33 +1572,9 @@ function buildErrorItem(question, index) {
         item.appendChild(mastery);
     }
 
-    const isFav = state.favoriteQuestions.some(fq => fq.content === question.content);
-    const favBtn = document.createElement('button');
-    favBtn.className = 'fav-toggle-btn';
-    favBtn.textContent = isFav ? '★ 已收藏' : '☆ 收藏';
-    favBtn.addEventListener('click', () => {
-        toggleFavorite(question, question.bankName);
-        if (typeof CustomEvent !== 'undefined' && document.dispatchEvent) {
-            document.dispatchEvent(new CustomEvent('zquiz:embeds-dirty'));
-        }
-    });
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'delete-btn';
-    deleteBtn.textContent = '删除';
-    deleteBtn.addEventListener('click', () => {
-        state.errorQuestions.splice(index, 1);
-        saveToLocalStorage();
-        updateBanksList();
-    });
-
-    const actionsRow = document.createElement('div');
-    actionsRow.className = 'error-actions';
-    actionsRow.appendChild(favBtn);
-    actionsRow.appendChild(deleteBtn);
-    item.appendChild(actionsRow);
     return item;
 }
+
 
 // 某题库的错题手风琴面板(空库返回 null)
 export function renderErrorsForBank(bankName) {
@@ -1555,7 +1594,7 @@ export function renderErrorsForBank(bankName) {
 }
 
 // 某题库的收藏面板(空返回 null)
-function renderFavoritesForBank(bankName) {
+export function renderFavoritesForBank(bankName) {
     const favs = state.favoriteQuestions.filter(fq => (fq.bankName || '未知题库') === bankName);
     if (favs.length === 0) return null;
     const wrap = document.createElement('div');
@@ -1564,42 +1603,57 @@ function renderFavoritesForBank(bankName) {
     head.className = 'bank-panel-title';
     head.textContent = `收藏(${favs.length})`;
     wrap.appendChild(head);
-    favs.forEach(fq => {
-        const item = document.createElement('div');
-        item.className = 'error-item';
-        const title = document.createElement('h4');
-        title.textContent = fq.content;
-        item.appendChild(title);
-        const inErrors = state.errorQuestions.some(eq => eq.content === fq.content);
-        if (inErrors) {
-            const tag = document.createElement('span');
-            tag.className = 'badge';
-            tag.textContent = '📕 在错题本';
-            item.appendChild(tag);
-        }
-        const answer = document.createElement('p');
-        answer.className = 'correct-answer';
-        answer.textContent = `答案:${fq.answer || '(待补)'}`;
-        item.appendChild(answer);
-        const analysis = document.createElement('p');
-        analysis.textContent = `解析:${fq.analysis || fq.explanation || '暂无解析'}`;
-        item.appendChild(analysis);
-        const actionsRow = document.createElement('div');
-        actionsRow.className = 'error-actions';
-        const unfavBtn = document.createElement('button');
-        unfavBtn.className = 'delete-btn';
-        unfavBtn.textContent = '取消收藏';
-        unfavBtn.addEventListener('click', () => {
+    favs.forEach(fq => wrap.appendChild(buildFavoriteItem(fq)));
+    return wrap;
+}
+
+// 单个收藏条目。**与错题卡同一套结构与样式**(👤 定调:两卡统一),
+// 差别只有:左条用收藏色、展开区多一行"正确答案"、下方多一个「取消收藏」。
+function buildFavoriteItem(fq) {
+    const item = document.createElement('div');
+    item.className = 'question-card fav-item';
+
+    const inErrors = state.errorQuestions.some(eq => eq.content === fq.content);
+    item.appendChild(buildCardTagRow(fq, {
+        statusBadge: inErrors ? '📕 在错题本' : '',
+        onDelete: () => {
             toggleFavorite(fq, fq.bankName);
             if (typeof CustomEvent !== 'undefined' && document.dispatchEvent) {
                 document.dispatchEvent(new CustomEvent('zquiz:embeds-dirty'));
             }
-        });
-        actionsRow.appendChild(unfavBtn);
-        item.appendChild(actionsRow);
-        wrap.appendChild(item);
-    });
-    return wrap;
+        },
+    }));
+
+    const title = document.createElement('h4');
+    title.textContent = fq.content;
+    item.appendChild(title);
+
+    const optKeys = Object.keys(fq.options || {}).sort();
+    if (optKeys.length) {
+        const opts = document.createElement('p');
+        opts.className = 'error-options';
+        opts.textContent = optKeys.map(k => `${k}. ${fq.options[k]}`).join('　');
+        item.appendChild(opts);
+    }
+
+    // 与错题卡一样走主动回忆遮挡:先自己回忆,再展开对答案
+    const reveal = document.createElement('details');
+    reveal.className = 'answer-reveal';
+    const summary = document.createElement('summary');
+    summary.textContent = '查看答案';
+    reveal.appendChild(summary);
+
+    const correctAnswer = document.createElement('p');
+    correctAnswer.className = 'correct-answer';
+    correctAnswer.textContent = `正确答案:${answerText(fq.answer, fq)}`;
+    reveal.appendChild(correctAnswer);
+
+    const analysis = document.createElement('p');
+    analysis.textContent = `解析:${fq.analysis || fq.explanation || '暂无解析'}`;
+    reveal.appendChild(analysis);
+    item.appendChild(reveal);
+
+    return item;
 }
 
 export function updateBanksList() {

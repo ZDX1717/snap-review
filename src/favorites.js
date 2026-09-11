@@ -28,7 +28,10 @@ export function toggleFavorite(question, bankName) {
 }
 
 
-// 刷新收藏夹列表
+// ⚠️ 本函数目前是**死路径**:收藏列表已并入题库页的库卡内嵌面板
+//    (见 bank.js 的 renderFavoritesForBank/buildFavoriteItem),index.html 里已没有 #favorites-list。
+//    它内部是"答案直接摊开、不遮挡"的旧版卡片,与现行卡片设计相反(现行见 DESIGN.md 卡片规范)。
+//    要复活独立列表页,请直接复用 buildFavoriteItem,不要打开这段。
 export function updateFavoritesList() {
     if (!favoritesList) return;  // 收藏改库卡内嵌
     if (state.favoriteQuestions.length === 0) {

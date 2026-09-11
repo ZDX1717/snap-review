@@ -40,7 +40,11 @@ export function makeEl() {
             el._classes.clear();
             String(v).split(/\s+/).filter(Boolean).forEach(x => el._classes.add(x));
         },
-        style: {}, appendChild() {}, textContent: '', value: '', innerHTML: '', files: [],
+        // appendChild 记录子元素:DOM 结构类断言(如"标签行是不是卡片的第一个子元素")需要它。
+        // 原先要求"测试只断数据层",但卡片结构本身就是产品要求,不记子节点就无法断言。
+        style: {},
+        appendChild(child) { this.children.push(child); return child; },
+        textContent: '', value: '', innerHTML: '', files: [],
         checked: false, placeholder: '', rows: 0, dataset: {},
         querySelector: () => makeEl(), querySelectorAll: () => [],
         type: '', children: [], disabled: false,

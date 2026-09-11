@@ -57,8 +57,12 @@ export function updateErrorStreak(question, isCorrect, userAnswer) {
 }
 
 
+// ⚠️ 本函数目前是**死路径**:独立的「错题本」页面已并入题库页的库卡内嵌面板
+//    (见 bank.js 的 renderErrorsForBank/buildErrorItem),index.html 里已没有 #errors-list。
+//    保留原因:它内部是"答案直接摊开、不遮挡"的旧版卡片,与现行卡片设计相反,
+//    万一将来要复活独立列表页,记得先按 DESIGN.md 的卡片规范重写,不要直接打开这段。
 export function updateErrorsList() {
-    if (!errorsList) return;  // 堆叠面板已移除,错题改库卡内嵌(兼容旧测试:沙箱自动建元素)
+    if (!errorsList) return;  // 堆叠面板已移除,错题改库卡内嵌(沙箱里会自动建出该元素,故测试仍会走到下面)
     if (state.errorQuestions.length === 0) {
         errorsList.innerHTML = '<p class="empty-message">暂无错题记录</p>';
         toggleAllBanksBtn.classList.add('hidden');

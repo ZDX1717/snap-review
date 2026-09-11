@@ -65,7 +65,6 @@
     --c-star-bg: #fff8e1;            /* ★ 收藏激活底 */
     --c-option-exp-text: #fd7e14;    /* 选项解释文字(橙色,逐题模式) */
     --c-star-hover-bg: #fffaf0;      /* ☆ 收藏 hover 底 */
-    --c-danger-hover: #c82333;       /* 删除按钮 hover(深红) */
     --c-input-border: #ced4da;       /* 表单输入边框 */
     --c-review-unanswered-border: #c3e6cb; /* 回顾·未作答行边框 */
     --c-selected-text: #2c5282;      /* 编辑器选中行文字(深蓝) */
@@ -783,20 +782,95 @@ h3 {
     display: none;
 }
 
-.error-item {
+
+/* ==================== 题目卡片(错题 / 收藏 共用一套设计)====================
+   👤 定调 2026-09-11:两卡统一。差别只在左条颜色(错题=红、收藏=星橙),
+   以及收藏卡展开区多一行"正确答案"。
+   结构:.q-card > .q-card-tags(题型 + 徽章 + 收藏 + 删除) + h4 题干 + 选项 + details 答案。
+
+   ⚠️ 标签行在**题干之上、自成一行**,且按钮不得反过来影响题干宽度 ——
+   与刷题页 `.question-tags` 同一条规矩(见 DESIGN.md 8.1 附近的宽度陷阱)。 */
+/* ⚠️ 两张卡**共用同一个基础类** `.question-card`(不再是"错题卡叫 error-item、收藏卡叫别的"),
+   否则任何按类选卡的代码(或未来的样式)都会漏掉其中一种。
+   修饰类只表达差异:`.error-card` = 左条红,`.fav-item` = 左条星橙。 */
+.question-card {
     background-color: var(--c-surface);
     border-radius: 6px;
     padding: 16px;
     margin-bottom: 16px;
     border-left: 4px solid var(--c-danger);
 }
+.question-card.fav-item {
+    border-left-color: var(--c-star-border);
+}
 
-.error-item h4 {
+/* 题干上方那一行:题型/徽章在左,收藏与删除靠右(动作归动作,标签归标签) */
+.question-card-tags {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;            /* 禁止折行:折行会把这行变高、把题干往下推 */
+    margin-bottom: 6px;
+}
+.question-card-tags .question-card-fav {
+    margin-left: auto;            /* 把两个动作按钮推到右侧 */
+}
+
+/* 卡片里的小按钮:统一高度/字号(与刷题页标签行同一套尺寸),
+   ⚠️ 必须显式写 border,否则会露出浏览器默认黑边 */
+.question-card-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 26px;
+    padding: 0 10px;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: var(--c-surface);
+    color: var(--c-text-muted);
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.2;
+    cursor: pointer;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+/* 标签行里的状态徽章(如「📕 在错题本」)也要与按钮等高 —— 它是唯一非按钮成员,
+   不拉齐就会出现 19 vs 26 的落差(实测过)。只作用于卡片标签行内的 .badge,
+   不去动别处的徽章(库卡徽章、回顾页徽章各有一套尺寸)。 */
+.question-card-tags .badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tag-row-h);
+    padding: 0 8px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.question-card-fav {
+    color: var(--c-star-text);
+    border-color: var(--c-star-border);
+}
+.question-card-fav:hover {
+    background: var(--c-star-hover-bg);
+}
+/* 删除:危险动作做成"描边红"而不是实心红 —— 它紧挨着收藏按钮,
+   实心红会把这一行的视觉重心全吸走(收藏才是这里的常用动作) */
+.question-card-del {
+    color: var(--c-danger);
+    border-color: var(--c-danger);
+}
+.question-card-del:hover {
+    background: var(--c-danger-bg);
+    color: var(--c-danger-text);
+}
+
+.question-card h4 {
     margin-bottom: 8px;
     color: var(--c-text);
 }
 
-.error-item p {
+.question-card p {
     margin-bottom: 4px;
 }
 
@@ -807,36 +881,25 @@ h3 {
 }
 
 /* 题型标:置于题干之前,小字弱化,只做定位不抢视线 */
+/* 题型标:行内元素参与标签行(原先是块级 p,单独占一行) */
 .error-type-line {
     font-size: 12px;
     font-weight: 600;
     color: var(--c-text-muted);
-    margin-bottom: 2px;
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
-.error-item .correct-answer {
+.question-card .correct-answer {
     color: var(--c-success);
     font-weight: 500;
 }
 
-.error-item .your-answer {
+.question-card .your-answer {
     color: var(--c-danger);
     font-weight: 500;
 }
 
-.error-item .delete-btn {
-    background-color: var(--c-danger);
-    color: white;
-    border: none;
-    padding: 4px 8px;
-    border-radius: 6px;
-    cursor: pointer;
-    margin-top: 8px;
-}
-
-.error-item .delete-btn:hover {
-    background-color: var(--c-danger-hover);
-}
 
 @media (max-width: 768px) {
     .container {
@@ -1324,7 +1387,7 @@ h3 {
     font-size: 14px;
 }
 
-.error-item .mastery-note {
+.question-card .mastery-note {
     font-size: 12px;
     margin: 8px 0 0;
 }
@@ -1869,26 +1932,6 @@ h3 {
 .editor-list-item .hist-suffix { color: var(--c-text-faint); }
 
 /* 错题本:收藏/删除操作行 */
-.error-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-    margin-top: 8px;
-}
-.error-item .fav-toggle-btn {
-    background: none;
-    border: 1px solid var(--c-border);
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 0.85em;
-    color: var(--c-warn-accent);
-    cursor: pointer;
-    font-family: inherit;
-}
-.error-item .fav-toggle-btn:hover {
-    border-color: var(--c-warn-accent);
-    background: var(--c-star-hover-bg);
-}
 
 /* 编辑器说明行:AI 与待修双状态并存时逐行显示 */
 .editor-ai-note.stacked > div { margin: 0 0 4px; }
@@ -2095,7 +2138,6 @@ html[data-theme="dark"] {
     --c-star-bg: #3a3320;
     --c-star-hover-bg: #302a1c;
     --c-option-exp-text: #ffd666;
-    --c-danger-hover: #ff8a94;
     --c-input-border: #3f444b;
     --c-review-unanswered-border: #2f5c3d;
     --c-selected-text: #b9ccec;
