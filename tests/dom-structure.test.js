@@ -198,7 +198,7 @@ test('按钮类必须显式声明 border(否则露出浏览器默认黑边)', ()
     const missing = [];
     for (const cls of buttonClasses) {
         // 取该类的**基础**规则:选择器的第一项必须正好是该类(不含伪类/祖先选择器),
-        // 否则会误命中 `.quiz-meta .favorite-btn` 这类复合规则(其 body 里自然没有 border)
+        // 否则会误命中 `.question-tags .favorite-btn` 这类复合规则(其 body 里自然没有 border)
         const re = new RegExp('(?:^|\\})[^{}]*?(?:^|[\\n,])\\s*' + cls + '\\s*\\{([^}]*)\\}', 'm');
         const m = cssText.match(re);
         if (!m) continue;                       // 该类可能只在复合选择器里出现
@@ -222,9 +222,11 @@ test('刷题元信息并入下方操作区:进度条已移除,手机单行且按
     const controls = html.slice(html.indexOf('class="quiz-controls"'), html.indexOf('</div>', html.indexOf('class="quiz-actions"')));
     assert.ok(controls.includes('class="quiz-meta"'), '操作区内应有 .quiz-meta');
     assert.ok(controls.indexOf('quiz-meta') < controls.indexOf('quiz-actions'), '元信息应在按钮组之前(左侧)');
-    for (const id of ['question-number', 'favorite-btn']) {
-        assert.ok(controls.includes(`id="${id}"`), `元信息应包含 #${id}`);
+    for (const id of ['question-number', 'answer-card-open', 'auto-next-toggle']) {
+        assert.ok(controls.includes(`id="${id}"`), `状态栏应包含 #${id}`);
     }
+    // 收藏已移到题干上方(👤 定调:放在"题目类型后面"),不再占状态栏
+    assert.ok(!controls.includes('id="favorite-btn"'), '收藏不应再留在状态栏');
     // 题型已移到题干之前(👤 要求),不再留在状态栏里
     assert.ok(!controls.includes('id="question-type"'), '题型不应再留在状态栏');
     assert.ok(
@@ -237,10 +239,11 @@ test('刷题元信息并入下方操作区:进度条已移除,手机单行且按
     assert.ok(!/updateStreakBadge/.test(readFileSync(path.join(root, 'src', 'quiz.js'), 'utf8')),
         'updateStreakBadge 代码应已删除');
 
-    // ③ 收藏按钮在元信息行内不得再靠右(它原在题目头部靠右,自带 margin-left:auto)
-    const favOverride = cssText.match(/\.quiz-meta \.favorite-btn\s*\{([^}]*)\}/);
-    assert.ok(favOverride, '应有 .quiz-meta .favorite-btn 覆盖规则');
-    assert.ok(/margin-left\s*:\s*0/.test(favOverride[1]), '元信息行内收藏按钮必须清掉 margin-left:auto');
+    // ③ 收藏按钮移出状态栏后,必须清掉自带的 margin-left:auto(它原在题目头部靠右),
+    //    否则在题型徽章旁会把整行撑开、与徽章拉出巨大间隙
+    const favOverride = cssText.match(/\.question-tags \.favorite-btn\s*\{([^}]*)\}/);
+    assert.ok(favOverride, '应有 .question-tags .favorite-btn 覆盖规则');
+    assert.ok(/margin-left\s*:\s*0/.test(favOverride[1]), '收藏按钮在新位置必须清掉 margin-left:auto');
 
     // ④ 手机端:元信息另起一行(column),按钮行保持单行不换行
     // 手机端:操作条必须是**单行**(row + nowrap),元信息在左、按钮在右。
@@ -283,21 +286,53 @@ test('状态栏按钮:智能切题在,确认答案已删', () => {
     assert.ok(!html.includes('确认答案'), '「确认答案」文案应已移除');
 });
 
-test('状态栏左区:状态一行在上,收藏与智能切题并排在下一行', () => {
+test('状态栏左区:答题卡(进度)+ 智能切题 同一行,且智能切题在答题卡之后', () => {
     const i = html.indexOf('class="quiz-meta"');
-    const meta = html.slice(i, html.indexOf('</div>', html.indexOf('quiz-meta-row')));
-    assert.ok(meta.includes('class="quiz-status"'), '左区应有状态指示块');
-    assert.ok(meta.includes('class="quiz-meta-row"'), '左区应有并排行容器');
-    // 收藏与智能切题都在并排行里,且收藏在左
-    const row = meta.slice(meta.indexOf('quiz-meta-row'));
-    assert.ok(row.indexOf('favorite-btn') < row.indexOf('auto-next-toggle'), '收藏应在智能切题左侧');
-    // 智能切题不得再留在状态行里
-    const status = meta.slice(meta.indexOf('class="quiz-status"'), meta.indexOf('quiz-meta-row'));
-    assert.ok(!status.includes('auto-next-toggle'), '智能切题不应再在状态行内');
-    // 并排行必须是 flex
+    const meta = html.slice(i, html.indexOf('class="quiz-actions"'));
+    assert.ok(meta.includes('class="quiz-status"'), '左区应有状态行');
+    // 两行结构已取消(收藏搬去题干上方)
+    assert.ok(!meta.includes('quiz-meta-row'), '左区不应再有第二行容器 quiz-meta-row');
+    // 👤 定调:答题卡按钮在前、智能切题在后
+    const status = meta.slice(meta.indexOf('class="quiz-status"'));
+    const openIdx = status.indexOf('answer-card-open');
+    const autoIdx = status.indexOf('auto-next-toggle');
+    assert.ok(openIdx > -1 && autoIdx > -1, '状态行应同时含答题卡入口与智能切题');
+    assert.ok(openIdx < autoIdx, '智能切题应在答题卡按钮之后(👤 定调)');
+    assert.ok(!status.includes('favorite-btn'), '收藏不应再在状态行内');
+    // 状态行必须是 flex 并排,且允许换行(宁可折行也不把按钮压成小方块)
     const cssText = String(cssNoComments);
-    const m = cssText.match(/\.quiz-meta-row\s*\{([^}]*)\}/);
-    assert.ok(m && /display\s*:\s*flex/.test(m[1]), '.quiz-meta-row 应为 flex 并排');
+    const m = cssText.match(/\.quiz-status\s*\{([^}]*)\}/);
+    assert.ok(m && /display\s*:\s*flex/.test(m[1]), '.quiz-status 应为 flex 并排');
+    assert.ok(/flex-wrap\s*:\s*wrap/.test(m[1]), '.quiz-status 应允许换行');
+});
+
+test('收藏按钮住在题型徽章之后、题干之前(👤 定调)', () => {
+    const tagsStart = html.indexOf('class="question-tags"');
+    const tagsEnd = html.indexOf('</div>', tagsStart);
+    const tags = html.slice(tagsStart, tagsEnd);
+    assert.ok(tags.includes('id="question-type"'), '标签行应含题型徽章');
+    assert.ok(tags.includes('id="favorite-btn"'), '标签行应含收藏按钮');
+    assert.ok(tags.indexOf('question-type') < tags.indexOf('favorite-btn'), '收藏应在题型徽章之后');
+    // 题干仍在标签行之后(收藏不得插到题干后面去)
+    assert.ok(html.indexOf('id="question-text"') > tagsEnd, '题干应在标签行之后');
+});
+
+test('答题卡与智能切题按钮已放大到中号(👤 要求"合理放大")', () => {
+    const cssText = String(cssNoComments);
+    const ruleOf = (sel) => {
+        const m = cssText.match(new RegExp(sel.replace(/[.]/g, '\\.') + '\\s*\\{([^}]*)\\}'));
+        return m ? m[1] : null;
+    };
+    for (const sel of ['.answer-card-open', '.auto-next']) {
+        const body = ruleOf(sel);
+        assert.ok(body, `缺 ${sel} 基础规则`);
+        const minH = Number((body.match(/min-height\s*:\s*(\d+)px/) || [])[1]);
+        assert.ok(minH >= 26, `${sel} 高度至少 26px(迷你版点不准),实际 ${minH}`);
+        const font = Number((body.match(/font-size\s*:\s*(\d+)px/) || [])[1]);
+        assert.ok(font >= 12, `${sel} 字号至少 12px,实际 ${font}`);
+        // 必须看得出是按钮:有边框
+        assert.ok(/border\s*:/.test(body), `${sel} 必须有边框(否则看不出可点)`);
+    }
 });
 
 // ==================== 答题卡抽屉(P0-6.1)====================

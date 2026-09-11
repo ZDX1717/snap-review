@@ -464,7 +464,8 @@ h3 {
     margin-top: 12px;
 }
 
-/* 刷题状态栏左区:状态指示在上(单行),收藏按钮在下 —— 两行很矮,故状态栏整体不高 */
+/* 刷题状态栏左区:答题卡(进度)+ 智能切题 同一行(👤 定调 2026-09-11)。
+   两行结构已取消 —— 收藏搬去题干上方后,左区只剩一组动作,不再需要第二行。 */
 .quiz-meta {
     display: flex;
     flex-direction: column;
@@ -476,11 +477,13 @@ h3 {
     color: var(--c-text-muted);
 }
 
-/* 状态指示:序号与题型**上下两行**(👤 要求) */
+/* 状态行:答题卡 + 智能切题 并排。
+   flex-wrap: 窄屏上宁可折成两行,也不把按钮压成小方块(按钮是先保证好点,再谈排一行) */
 .quiz-status {
     display: flex;
-    flex-direction: row;      /* 序号与题型**同一行**(👤 要求;原先上下两行太占高) */
-    align-items: baseline;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
     gap: 6px;
     line-height: 1.1;
     min-width: 0;
@@ -492,10 +495,19 @@ h3 {
     color: var(--c-text-secondary);
 }
 
+/* 题型徽章 + 收藏同处一行(👤 定调:收藏放在"题目类型后面")。
+   两者都是"这题是什么 / 我对它做了什么"的标签,同排归位;题干另起一行。 */
+.question-tags {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
 /* 题型徽章:置于题干之前(👤 要求),小号弱化,不抢题干视线 */
 .question-type-badge {
     display: inline-block;
-    margin-bottom: 4px;
     padding: 1px 8px;
     border-radius: 999px;
     background: var(--c-panel-bg);
@@ -515,25 +527,20 @@ h3 {
     text-align: center;
 }
 
-/* 左区第二行:收藏 + 智能切题 并排(👤 要求) */
-.quiz-meta-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 2px;
-}
-
-/* 智能切题:带框胶囊按钮(👤 要求"有框的按钮"),文案即作用,不用用户猜 */
+/* 智能切题:带框胶囊按钮(👤 要求"有框的按钮"),文案即作用,不用用户猜。
+   中号尺寸(👤 定调 2026-09-11"合理放大"):mini 版只有 15px 高,手机上点不准也看不出是可点的按钮,
+   故统一到 28px 高 / 13px 字 —— 明确是按钮,又不抢「下一题」的位置。 */
 .auto-next {
     margin-left: 0;
-    padding: 0 7px;
+    padding: 0 12px;
+    min-height: 28px;
     border: 1px solid var(--c-border);
     border-radius: 999px;
     background: var(--c-surface);
     color: var(--c-text-muted);
     font-family: inherit;
-    font-size: 11px;
-    line-height: 1.3;         /* 压到 ~15px 高,不把状态栏撑高 */
+    font-size: 13px;
+    line-height: 1.3;
     cursor: pointer;
     white-space: nowrap;
 }
@@ -546,14 +553,14 @@ h3 {
     font-weight: 600;
 }
 
-/* 收藏按钮原先在题目头部靠右(.favorite-btn 自带 margin-left:auto),
-   搬进元信息行后必须清掉,否则会把 meta 撑开、与按钮组一起跑偏。 */
-.quiz-meta .favorite-btn {
+/* 收藏按钮:搬到「题型徽章」后面(👤 定调),与徽章同排、同高 ——
+   一行两个标签,高度对齐才不会看起来一高一低。 */
+.question-tags .favorite-btn {
     margin-left: 0;
-    align-self: flex-start;   /* 与状态指示左对齐 */
-    padding: 0 7px;
-    font-size: 11px;
-    line-height: 1.5;
+    padding: 0 10px;
+    min-height: 22px;
+    font-size: 12px;
+    line-height: 1.4;
     border-radius: 999px;
 }
 
@@ -2171,12 +2178,17 @@ html[data-theme="dark"] .container {
         white-space: nowrap;
         overflow: hidden;
     }
-    /* 收藏按钮压到最小:州是左区的第二行,它的高度直接决定状态栏总高 */
-    .quiz-meta .favorite-btn {
-        padding: 0 6px;
-        font-size: 11px;
-        line-height: 1.45;
+    /* 手机档:左区两个中号按钮收小半档(26px),但仍明确是按钮 ——
+       它们与右侧「上一题/下一题/结束刷题」同处一条固定状态栏,不能让左区把按钮组挤走 */
+    .answer-card-open,
+    .auto-next {
+        min-height: 26px;
+        padding: 0 10px;
+        font-size: 12px;
     }
+    /* 状态行允许换行,故必须显式解除 .quiz-meta 的 nowrap:
+       white-space 会被子元素继承,不解除的话 flex-wrap 看似开着、实际永远折不了行 */
+    .quiz-status { gap: 4px; white-space: normal; }
     .quiz-status #question-number { font-size: 13px; }
     .quiz-meta { gap: 0; }
     /* 按钮组:自然宽度,不收缩 —— 保证"下一题/结束刷题"始终可点 */
@@ -2411,28 +2423,40 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
    入口 = 刷题状态栏里的进度("3/10")本身:要跳题时视线本来就在那儿,零新增常驻元素。
    规范见 DESIGN.md §3.2。 */
 
-/* 入口:常态做成"文字 + 小箭头"不抢视线,悬停/按下才显出按钮感 */
+/* 入口(答题卡):中号按钮(👤 定调 2026-09-11"合理放大")。
+   从"文字点亮"升级为**有框按钮**:进度数字本身就是用户找的东西,做成按钮才看得出能点 ——
+   原先的迷你形态找不到入口,等于这功能没做。开启态用主色描边与「智能切题」同一套语言。 */
 .answer-card-open {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    background: none;
-    border: none;
-    padding: 2px 4px;
-    margin: -2px -4px;          /* 负外边距抵消内边距,视觉位置与纯文字一致 */
-    border-radius: 6px;
-    font: inherit;
+    gap: 4px;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    padding: 0 12px;
+    min-height: 28px;
+    border-radius: 999px;
+    /* 显式字号,不用 `font: inherit` —— 否则它继承 .quiz-meta 的 14px,
+       与隔壁「智能切题」的 13px 不齐,两个并排按钮会一高一低 */
+    font-family: inherit;
+    font-size: 13px;
     color: inherit;
     cursor: pointer;
+    white-space: nowrap;
 }
 .answer-card-open:hover,
 .answer-card-open:focus-visible {
-    background: var(--c-border-light);
+    border-color: var(--c-primary);
+    color: var(--c-primary);
+    background: var(--c-info-bg);
 }
 .answer-card-open-chevron {
     font-size: 10px;
     color: var(--c-text-faint);
     line-height: 1;
+}
+.answer-card-open:hover .answer-card-open-chevron,
+.answer-card-open:focus-visible .answer-card-open-chevron {
+    color: var(--c-primary);
 }
 
 /* 遮罩:点空白即收起 */
