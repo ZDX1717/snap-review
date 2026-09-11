@@ -7,11 +7,10 @@ import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, updateErrorStreak } from './errorbook.js';
 import { toggleFavorite } from './favorites.js';
 import { advanceNext, backToQuizOptions, closeAnswerCard, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, isAnswerCardOpen, jumpToQuestion, openAnswerCard, readQuizSource, renderAnswerCard, resetGradingState, shouldAutoNext, shouldConfirmAnswer, syncNextButtonLabel, markEndButtonReady, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleAnswerCard, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
-import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback,
+import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorGuard, editorTogglePendingOnly, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback,
     previewAiAnswerFill,
     bankColorOf,
-    toggleEditorList,
-    switchEditorTab,
+        switchEditorTab,
     deleteQuestionAt,
     setBankColor,
     renderBankColorPicker,
@@ -142,24 +141,18 @@ const previewAiAnswerBtn = document.getElementById('preview-ai-answer-btn');
 const editorAiAnswerBtn = document.getElementById('editor-ai-answer-btn');
 // 编辑器重构(👤 2026-09-11):头部快捷动作 + 题号列表开合
 const editorHeadCloseBtn = document.getElementById('editor-head-close-btn');
-const editorListToggleBtn = document.getElementById('editor-list-toggle');
+const editorSaveBtn = document.getElementById('editor-save-btn');
 const editorTabQuestion = document.getElementById('editor-tab-question');
 const editorTabBank = document.getElementById('editor-tab-bank');
 const editorRemoveOption = document.getElementById('editor-remove-option');
 const editorExplanation = document.getElementById('editor-explanation');
 const editorAnalysis = document.getElementById('editor-analysis');
-const editorPrevBtn = document.getElementById('editor-prev-btn');
-const editorNextBtn = document.getElementById('editor-next-btn');
-const editorDeleteBtn = document.getElementById('editor-delete-btn');
-const editorSaveBtn = document.getElementById('editor-save-btn');
 const editorPendingOnly = document.getElementById('editor-pending-only');
 const editorHistRow = document.getElementById('editor-hist-row');
-const editorCloseBtn = document.getElementById('editor-close-btn');
 const bankRenameBtn = document.getElementById('bank-rename-btn');
 const bankDedupBtn = document.getElementById('bank-dedup-btn');
 const bankExportBtn = document.getElementById('bank-export-btn');
 const bankDeleteBtn = document.getElementById('bank-delete-btn');
-const editorPosition = document.getElementById('editor-position');
 
 // 首页:主题开关(hero 的开始刷题/导入题库按钮已移除,导航职责归底部 3 tab)
 const themeSwitch = document.getElementById('theme-switch');
@@ -329,12 +322,12 @@ function setupEventListeners() {
     editorAiAnswerBtn.addEventListener('click', editorAiAnswer);
     // 头部:题号列表开合 / 新增 / 关闭(与底部「关闭」同一处理路径,不另写一套)
     editorHeadCloseBtn.addEventListener('click', editorClose);
-    editorListToggleBtn.addEventListener('click', toggleEditorList);
     // 标签页切换(radio 的 change 事件;用 change 而不是 click,键盘也能切)
     editorTabQuestion.addEventListener('change', () => switchEditorTab('question'));
     editorTabBank.addEventListener('change', () => switchEditorTab('bank'));
     editorSaveBtn.addEventListener('click', () => editorSaveCurrent(false));
-    editorCloseBtn.addEventListener('click', editorClose);
+    // 关闭键在标题栏(原底栏那颗已随底栏取消)
+    editorHeadCloseBtn.addEventListener('click', editorClose);
     // 库级操作:作用于当前编辑中的题库(编辑器即该库的管理入口)
     bankRenameBtn.addEventListener('click', () => showRenameModal(state.editBankName));
     bankDedupBtn.addEventListener('click', () => {
@@ -351,9 +344,6 @@ function setupEventListeners() {
     });
     editorPendingOnly.addEventListener('change', (e) => editorTogglePendingOnly(e.target.checked));
     editorHistRow.addEventListener('click', editorHistClick);
-    editorPrevBtn.addEventListener('click', () => editorNavigate(-1));
-    editorNextBtn.addEventListener('click', () => editorNavigate(1));
-    editorDeleteBtn.addEventListener('click', editorDeleteCurrent);
     editorAddOption.addEventListener('click', () => editorMutateOptions(1));
     editorRemoveOption.addEventListener('click', () => editorMutateOptions(-1));
     editorType.addEventListener('change', () => { state.editorDirty = true; editorRenderOptions(); });
@@ -539,7 +529,6 @@ if (typeof window === 'undefined') {
         editorAddQuestion,
         editorClose,
         editorCollectOptions,
-        editorDeleteCurrent,
         editorGuard,
         editorMutateOptions,
         editorNavigate,
@@ -619,8 +608,7 @@ if (typeof window === 'undefined') {
         renderErrorsForBank,
         renderFavoritesForBank,
         bankColorOf,
-        toggleEditorList,
-        switchEditorTab,
+                switchEditorTab,
         deleteQuestionAt,
         setBankColor,
         renderBankColorPicker,

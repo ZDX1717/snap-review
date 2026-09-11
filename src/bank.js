@@ -50,14 +50,11 @@ const editorAddOption = document.getElementById('editor-add-option');
 const editorRemoveOption = document.getElementById('editor-remove-option');
 const editorExplanation = document.getElementById('editor-explanation');
 const editorAnalysis = document.getElementById('editor-analysis');
+const editorSaveBtn = document.getElementById('editor-save-btn');
 const editorAiAnswerBtn = document.getElementById('editor-ai-answer-btn');
 const bankColorPicker = document.getElementById('bank-color-picker');
 // 编辑器重构后新增的元素(👤 2026-09-11)
-const editorListPanel = document.getElementById('editor-list-panel');
-const editorListToggle = document.getElementById('editor-list-toggle');
-const editorHeadPosition = document.getElementById('editor-head-position');
 const editorListCount = document.getElementById('editor-list-count');
-const editorFoot = document.getElementById('editor-foot');
 const editorBody = document.querySelector('.editor-body');
 const editorTabQuestion = document.getElementById('editor-tab-question');
 const editorTabBank = document.getElementById('editor-tab-bank');
@@ -65,7 +62,6 @@ const editorTabQuestionCount = document.getElementById('editor-tab-question-coun
 const editorBankNameCurrent = document.getElementById('editor-bank-name-current');
 const bankColorNote = document.getElementById('bank-color-note');
 const editorAiAnswerNote = document.getElementById('editor-ai-answer-note');
-const editorPosition = document.getElementById('editor-position');
 const lastImportInfo = document.getElementById('last-import-info');
 const copyPromptBtn = document.getElementById('copy-prompt-btn');
 const viewAllBtn = document.getElementById('view-all-btn');
@@ -1291,7 +1287,7 @@ export function editorAddQuestion() {
     state.editIndex = questions.length - 1;
     // keepList = true:保持用户当前的列表开合状态(他刚拉开就接着加,不该被合上;
     // 收起着也不该突然弹开 —— 新题的去向由头部进度 + 提示行说明)
-    renderBankEditor(true);
+    renderBankEditor();
     state.editorDirty = true;
     if (editorAiAnswerNote) editorAiAnswerNote.textContent = `已新增第 ${questions.length} 题,填写后点「保存本题」`;
     editorStem.focus();
@@ -1431,7 +1427,7 @@ export function editorSaveCurrent(silent) {
     saveToLocalStorage();
     state.editorDirty = false;
     // keepList = true:保存不该把用户拉开的题号列表又合上(他可能正靠着列表连续核对)
-    renderBankEditor(true);
+    renderBankEditor();
     // 让下拉框反映真正落库的类型(被自动纠正时给出可见反馈)
     editorType.value = finalType;
     if (!silent) {
@@ -1608,7 +1604,6 @@ export function editorRenderForm() {
     editorExplanation.value = q.explanation || '';
     editorAnalysis.value = q.analysis || '';
     editorRenderOptions();
-    editorPosition.textContent = `第 ${state.editIndex + 1} / ${currentEditBank().length} 题`;
     state.editorDirty = false;
 
     // 列表选中态
@@ -1710,25 +1705,8 @@ export function deleteQuestionAt(index) {
     if (state.editIndex >= questions.length) state.editIndex = Math.max(0, questions.length - 1);
     saveToLocalStorage();
     state.editorDirty = false;
-    renderBankEditor(true);
+    renderBankEditor();
     return true;
-}
-
-// 题号列表开合(手机:默认收起,头部按钮拉出;桌面 CSS 里该按钮不显示)
-export function toggleEditorList() {
-    if (!editorListPanel) return;
-    const open = !editorListPanel.classList.contains('open');
-    editorListPanel.classList.toggle('open', open);
-    if (editorListToggle) editorListToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-}
-
-// 选完某题就自动收起列表 —— 手机上点题号的目的就是"去看那道题",
-// 收起来才能立刻看到题干(否则列表还占着 34vh)。
-function collapseEditorListOnNarrow() {
-    if (!editorListPanel) return;
-    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-        && !window.matchMedia('(max-width: 768px)').matches) return;
-    editorListPanel.classList.remove('open');
 }
 
 // 渲染配色色板(编辑器内)。每个色块 = 一个按钮,点一下即改并立即落盘 ——
@@ -2253,12 +2231,11 @@ export function editorHistClick(e) {
     renderEditorHistRow(q);
 }
 
-export function renderBankEditor(keepList = false) {
+export function renderBankEditor() {
     renderBankColorPicker();
     // 首次渲染时把标签页定到"编辑题目"(HTML 里也有默认值,这里是双保险 ——
     // 缺了它首屏会出现"两页都隐藏"的空壳,实测踩过)
     if (!editorBody || !editorBody.getAttribute('data-tab')) switchEditorTab('question');
-    if (!keepList && editorListPanel) editorListPanel.classList.remove('open');
     const questions = currentEditBank();
     const pendingOnly = !!state.editorPendingOnly;
 
@@ -2278,8 +2255,7 @@ export function renderBankEditor(keepList = false) {
         item.addEventListener('click', () => {
             if (!editorGuard()) return;
             state.editIndex = idx;
-            renderBankEditor(true);
-            collapseEditorListOnNarrow();
+            renderBankEditor();
         });
         row.appendChild(item);
         // 每题一个删除键(👤 要求:按钮可以新增和删减)—— 列表里直接删,比"翻到那题再点删除"快得多
@@ -2306,25 +2282,11 @@ export function renderBankEditor(keepList = false) {
     if (questions.length === 0 || !questions[state.editIndex]) {
         editorForm.classList.add('hidden');
         editorEmpty.classList.remove('hidden');
-        editorPosition.textContent = pendingOnly ? '没有待补答案的题目 🎉' : '';
-        if (editorHeadPosition) editorHeadPosition.textContent = editorPosition.textContent;
-        // 没题可编辑时,底部「保存本题」不该还在(点了只会报错)
-        if (editorFoot) editorFoot.classList.add('hidden');
+        // 没有可编辑的题时「保存本题」不该还在(点了只会报错)
+        if (editorSaveBtn) editorSaveBtn.classList.add('hidden');
         return;
     }
-    if (editorFoot) editorFoot.classList.remove('hidden');
-    // ⚠️ 进度必须按**筛选后**的位置算:只看待补时 editIndex 仍是全库下标,
-    //    直接显示 index+1 会出现"共 3 题、只有 1 条待补,却显示 3/3"这种自相矛盾(实测踩到)。
-    const shownIndex = questions.filter(q => !pendingOnly || !q.answer)
-        .findIndex(q => q === questions[state.editIndex]);
-    if (editorHeadPosition) {
-        editorHeadPosition.textContent = `${shownIndex + 1}/${shown}` + (pendingOnly ? '（只看待补）' : '');
-    }
-    if (editorPosition) {
-        editorPosition.textContent = pendingOnly
-            ? `第 ${shownIndex + 1} / ${shown} 题（只看待补）`
-            : `第 ${state.editIndex + 1} / ${questions.length} 题`;
-    }
+    if (editorSaveBtn) editorSaveBtn.classList.remove('hidden');
     editorForm.classList.remove('hidden');
     editorEmpty.classList.add('hidden');
     const cur = questions[state.editIndex];

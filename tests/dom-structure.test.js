@@ -495,29 +495,51 @@ test('题库卡不得再出现左侧主色装饰条(👤 2026-09-11 改成配色
 // ==================== 题库编辑器重构(👤 2026-09-11:手机优先)====================
 test('编辑器:题目级操作与题库级操作彻底分开', () => {
     const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
-    // 底部动作栏只放"保存 / 关闭"—— 删除本题绝不与保存同排(手机上极易误触)
-    const foot = modal.slice(modal.indexOf('id="editor-foot"'));
-    assert.ok(foot.includes('editor-save-btn'), '底部栏应有保存');
-    assert.ok(foot.includes('editor-close-btn'), '底部栏应有关闭');
-    assert.ok(!foot.includes('editor-delete-btn'), '「删除本题」不得放在底部动作栏');
-    // 删除本题跟着题号导航走
-    const nav = modal.slice(modal.indexOf('editor-nav-row'), modal.indexOf('editor-delete-btn') + 200);
-    assert.ok(nav.includes('editor-delete-btn'), '「删除本题」应在题号导航行里');
-    // 题库级动作(改库名/删库/配色)必须在**独立的「题库设置」标签页**里,不与单题编辑混排
-    assert.ok(modal.includes('editor-tabs'), '编辑器应有标签条');
-    for (const t of ['editor-tab-question', 'editor-tab-bank']) {
-        assert.ok(modal.includes(t), `缺标签 ${t}`);
-    }
-    // 题库设置整块落在 editor-bank-panel 里
+    // 底栏已取消(👤 要求),保存键改到题目列表**上面**的动作行里
+    assert.ok(!modal.includes('editor-foot'), '底栏应已取消');
+    const actionRow = modal.slice(modal.indexOf('editor-action-row'), modal.indexOf('editor-list-block'));
+    assert.ok(actionRow.includes('editor-save-btn'), '「保存本题」应在题目列表上方的动作行里');
+    assert.ok(actionRow.includes('editor-add-btn'), '「新增题目」应在同一动作行');
+    assert.ok(actionRow.includes('editor-pending-only'), '「只看待补答案」也在这行');
+    // 删除某一题:只在题号列表里(每行一个 ✕),不再有「删除本题」按钮
+    assert.ok(!modal.includes('editor-delete-btn'), '「删除本题」按钮应已移除(改用列表内删除)');
+    const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
+    assert.ok(/editor-list-del/.test(bank), '题号列表每行应有删除键');
+    assert.ok(/deleteQuestionAt/.test(bank), '应有按下标删题的函数');
+    // 题库级动作仍在独立的「题库设置」标签页里,不与单题编辑混排
     const bankPanelStart = modal.indexOf('editor-bank-panel');
     const bankPanel = modal.slice(bankPanelStart, modal.indexOf('</section>', bankPanelStart));
     for (const id of ['bank-rename-btn', 'bank-delete-btn', 'bank-color-picker']) {
         assert.ok(bankPanel.includes(id), `${id} 应在「题库设置」标签页内`);
     }
-    // 单题编辑区里不得出现题库级动作
     const qPanelStart = modal.indexOf('editor-question-panel');
     const qPanel = modal.slice(qPanelStart, modal.indexOf('editor-bank-panel'));
     assert.ok(!qPanel.includes('bank-delete-btn'), '「删除题库」不得出现在题目编辑页(防误点)');
+});
+
+test('编辑器:题目页的顺序 = 动作行 → 题号列表 → 题目表单(👤 定调)', () => {
+    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
+    const order = ['editor-action-row', 'editor-list-block', 'id="editor-form"']
+        .map(k => modal.indexOf(k));
+    assert.ok(order.every(i => i > -1), '三个区块都要存在');
+    assert.deepStrictEqual([...order].sort((a, b) => a - b), order,
+        '顺序必须是:动作行 → 题号列表 → 题目表单');
+    // 题号导航行与底栏都已取消(👤 要求):列表本身就是导航
+    assert.ok(!modal.includes('editor-nav-row'), '「上一题/下一题」导航行应已取消');
+    assert.ok(!modal.includes('editor-foot'), '底栏应已取消');
+    // 标题栏:库名居中 + 右上角关闭,不放其他文字
+    const head = modal.slice(modal.indexOf('class="editor-head"'), modal.indexOf('class="editor-tabs"'));
+    assert.ok(head.includes('edit-bank-title'), '标题栏应有库名');
+    assert.ok(head.includes('editor-head-close-btn'), '标题栏应有右上角关闭');
+    assert.ok(!head.includes('editor-head-position'), '标题栏不该再有进度等多余文字');
+    // 库名要**真正居中**:靠 flex 的"左右元素等宽"做不到(关闭键只有一个),
+    // 故标题占满整宽居中、关闭键绝对定位。这里从 CSS 侧钉死这个结构。
+    const headCss = cssNoComments.match(/\.editor-head\s*\{([^}]*)\}/)[1];
+    assert.ok(/position\s*:\s*relative/.test(headCss), '标题栏应为定位参照(关闭键绝对定位用)');
+    const h3Css = cssNoComments.match(/\.editor-head h3\s*\{([^}]*)\}/)[1];
+    assert.ok(/justify-content\s*:\s*center/.test(h3Css), '库名应占满整宽居中');
+    const closeCss = cssNoComments.match(/\.editor-close-x\s*\{([^}]*)\}/)[1];
+    assert.ok(/position\s*:\s*absolute/.test(closeCss), '关闭键应绝对定位在右上角');
 });
 
 test('编辑器:两个标签页的显隐由 CSS 的 data-tab 控制', () => {
@@ -549,18 +571,15 @@ test('编辑器:题目列表里每题都能直接删(👤 要求按钮可增减)
     assert.ok(/\.editor-list-del/.test(media), '手机档应给列表删除键放大触达');
 });
 
-test('编辑器:头部/滚动主体/底部固定操作栏三段结构齐备', () => {
+test('编辑器:题干/题型/选项/解释解析合成一个部分,且没有折叠', () => {
     const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
-    for (const cls of ['editor-head', 'editor-body', 'editor-foot']) {
-        assert.ok(modal.includes(cls), `缺 ${cls} 分区`);
+    const form = modal.slice(modal.indexOf('id="editor-form"'), modal.indexOf('editor-empty'));
+    for (const id of ['editor-stem', 'editor-type', 'editor-answer', 'editor-options', 'editor-explanation', 'editor-analysis']) {
+        assert.ok(form.includes(id), `${id} 应在同一个表单区块里`);
     }
-    // 头部要有进度,否则手机上列表一收起就不知道在第几题
-    assert.ok(modal.includes('id="editor-head-position"'), '头部应有位置指示');
-    // 进度"按筛选后算"是修过的真 bug(只看待补时曾显示 3/3 而实际只有 1 条)
-    const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
-    assert.ok(/shownIndex/.test(bank), '进度应按筛选后的序号计算');
-    // 保存/新增不该把用户拉开的列表又合上 → 这些路径要传 keepList
-    assert.ok(/renderBankEditor\(true\)/.test(bank), '保存与新增应保持题号列表的开合状态');
+    // 全部展开:表单里不得再有任何 details/summary 折叠
+    assert.ok(!/<details/.test(form), '表单里不得再有折叠(details)');
+    assert.ok(!modal.includes('editor-more'), '「题目解释/解析」的折叠壳应已移除');
 });
 
 test('编辑器:滚动只发生在主体,头部与底部不被滚走', () => {
@@ -577,8 +596,9 @@ test('编辑器:滚动只发生在主体,头部与底部不被滚走', () => {
     // 同一条规则里要同时给出"可滚动 + 可压缩",否则 flex 子项不会滚
     assert.ok(/min-height\s*:\s*0/.test(bodyRules) && /flex\s*:\s*1 1 auto/.test(bodyRules),
         '.editor-body 需要 flex:1 1 auto + min-height:0 才能真正滚动');
-    const footRule = cssNoComments.match(/\.editor-foot\s*\{([^}]*)\}/);
-    assert.ok(footRule && /flex\s*:\s*0 0 auto/.test(footRule[1]), '底部栏不得被压缩');
+    // 底栏已取消 → 不再断言它的样式;但要保证头部与标签条不被压缩
+    const headRule = cssNoComments.match(/\.editor-head\s*\{([^}]*)\}/);
+    assert.ok(headRule && /flex\s*:\s*0 0 auto/.test(headRule[1]), '头部不得被压缩');
 });
 
 test('编辑器:手机上可点元素达标(≥44px 触达)', () => {

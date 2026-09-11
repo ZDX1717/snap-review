@@ -2873,20 +2873,28 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
 /* 头部收矮(👤 要求"省空间"):只留 关闭 + 库名 + 进度,动作全部下沉到标签页
    高度按内容定,手机上约 44px(与一个触摸目标同高,不再额外占位) */
 .editor-head {
+    position: relative;        /* 关闭键绝对定位的参照 */
     display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 2px 8px 2px 2px;
+    align-items: stretch;
+    justify-content: center;
+    padding: 2px;
     border-bottom: 1px solid var(--c-border-light);
     background: var(--c-surface);
     flex: 0 0 auto;
     min-height: 40px;          /* 内容 40 + 上下 padding 2+2 = 整条 44 */
 }
+/* 库名**真正居中**:不能靠 flex 的"左右元素等宽"(关闭键只有一个,永远居不正)——
+   改为标题占满整宽居中、关闭键绝对定位压在右上角。 */
 .editor-head h3 {
     margin: 0;
     font-size: 15px;
-    line-height: 1.2;          /* 行高收紧,头部才能压在 44 */
+    line-height: 1.2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 48px;           /* 给关闭键留位,长库名也不会压到它 */
     min-width: 0;
+    max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2909,6 +2917,9 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     width: 40px;
     height: 40px;
     flex: 0 0 auto;
+    position: absolute;        /* 压在右上角,不参与居中计算 */
+    top: 2px;
+    right: 2px;
     font-size: 16px;
     line-height: 1;
     color: var(--c-text-muted);
