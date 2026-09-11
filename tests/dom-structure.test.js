@@ -299,3 +299,58 @@ test('状态栏左区:状态一行在上,收藏与智能切题并排在下一行
     const m = cssText.match(/\.quiz-meta-row\s*\{([^}]*)\}/);
     assert.ok(m && /display\s*:\s*flex/.test(m[1]), '.quiz-meta-row 应为 flex 并排');
 });
+
+// ==================== 答题卡抽屉(P0-6.1)====================
+test('答题卡抽屉在 <main> 之外(公理:浮层不受 section 显隐牵连)', () => {
+    const mainEnd = html.indexOf('</main>');
+    const pos = html.indexOf('id="answer-card-drawer"');
+    assert.ok(pos !== -1, '答题卡抽屉不存在');
+    // 抽屉是 position:fixed 的浮层:待在 main 内会受祖先滚动/包含块牵连
+    assert.ok(pos > mainEnd, '答题卡抽屉必须在 <main> 之外');
+    for (const id of ['answer-card-backdrop', 'answer-card-grid', 'answer-card-close']) {
+        assert.ok(html.indexOf(`id="${id}"`) > mainEnd, `${id} 必须在 <main> 之外`);
+    }
+});
+
+test('答题卡入口住在刷题状态栏的进度位置', () => {
+    // 👤 定调:入口就是状态栏里的进度本身,不得另起一个常驻按钮
+    const metaStart = html.indexOf('id="quiz-status-text"');
+    const metaEnd = html.indexOf('</div>', html.indexOf('class="quiz-meta"'));
+    const openPos = html.indexOf('id="answer-card-open"');
+    assert.ok(openPos !== -1, '答题卡入口按钮不存在');
+    assert.ok(openPos > metaStart && openPos < metaEnd, '答题卡入口必须在刷题状态栏内');
+    // 进度数字仍然是那个被显示的元素(别把 #question-number 挪走,刷题进度靠它)
+    const openTag = html.slice(openPos, html.indexOf('</button>', openPos));
+    assert.ok(openTag.includes('id="question-number"'), '进度 #question-number 必须仍在入口按钮内');
+    assert.ok(openTag.includes('aria-haspopup="dialog"'), '入口应有 aria-haspopup 语义');
+});
+
+test('答题卡抽屉:遮罩层级必须高于弹窗(否则弹窗里打开会被盖住)', () => {
+    const backdrop = cssNoComments.match(/\.answer-card-backdrop\s*\{[^}]*\}/);
+    const drawer = cssNoComments.match(/\.answer-card-drawer\s*\{[^}]*\}/);
+    assert.ok(backdrop && drawer, '应有遮罩与抽屉的样式规则');
+    const zOf = (rule) => Number((rule[0].match(/z-index\s*:\s*(\d+)/) || [])[1]);
+    assert.ok(zOf(backdrop) > 1000, `遮罩 z-index 应高于弹窗(1000),实际 ${zOf(backdrop)}`);
+    assert.ok(zOf(drawer) > zOf(backdrop), '抽屉必须高于自己的遮罩,否则被遮罩挡住点不到');
+    assert.ok(/position\s*:\s*fixed/.test(drawer[0]), '抽屉应 position: fixed 相对视口定位');
+});
+
+test('答题卡三态样式齐备,且未答用虚线框(不只靠颜色区分)', () => {
+    for (const state of ['correct', 'wrong', 'blank']) {
+        const rule = cssNoComments.match(new RegExp(`\\.answer-card-cell\\.${state}\\s*\\{[^}]*\\}`));
+        assert.ok(rule, `缺 .answer-card-cell.${state} 样式`);
+    }
+    const blank = cssNoComments.match(/\.answer-card-cell\.blank\s*\{[^}]*\}/)[0];
+    assert.ok(/border-style\s*:\s*dashed/.test(blank), '未答必须用虚线框,不能只靠颜色');
+    // 当前题用 outline:改边框会覆盖三态底色(当前题也可能是已答对的题)
+    const current = cssNoComments.match(/\.answer-card-cell\.current\s*\{[^}]*\}/);
+    assert.ok(current, '缺 .answer-card-cell.current 样式');
+    assert.ok(/outline\s*:/.test(current[0]), '当前题应用 outline 而非 border');
+    assert.ok(!/border\s*:/.test(current[0].replace(/outline[^;]*;/g, '')), '当前题不得覆盖 border(会吃掉三态底色)');
+});
+
+test('答题卡样式不得写死像素宽度(宽度走档位令牌)', () => {
+    const drawer = cssNoComments.match(/\.answer-card-drawer\s*\{[^}]*\}/)[0];
+    assert.ok(!/max-width\s*:\s*\d+px/.test(drawer), '抽屉不得写死 max-width 像素');
+    assert.ok(/var\(--pad-x\)/.test(drawer), '抽屉左右内边距应复用 --pad-x(与三页统一内边距一致)');
+});

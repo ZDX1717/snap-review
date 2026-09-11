@@ -2406,3 +2406,164 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     gap: 8px;
     justify-content: flex-end;
 }
+
+/* ==================== 答题卡抽屉(P0-6.1)====================
+   入口 = 刷题状态栏里的进度("3/10")本身:要跳题时视线本来就在那儿,零新增常驻元素。
+   规范见 DESIGN.md §3.2。 */
+
+/* 入口:常态做成"文字 + 小箭头"不抢视线,悬停/按下才显出按钮感 */
+.answer-card-open {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    padding: 2px 4px;
+    margin: -2px -4px;          /* 负外边距抵消内边距,视觉位置与纯文字一致 */
+    border-radius: 6px;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+}
+.answer-card-open:hover,
+.answer-card-open:focus-visible {
+    background: var(--c-border-light);
+}
+.answer-card-open-chevron {
+    font-size: 10px;
+    color: var(--c-text-faint);
+    line-height: 1;
+}
+
+/* 遮罩:点空白即收起 */
+.answer-card-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 1200;
+}
+
+/* 抽屉:底部弹出。比遮罩高一档,故不会被挡住 */
+.answer-card-drawer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1201;
+    max-height: 62vh;
+    overflow-y: auto;
+    background: var(--c-surface);
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    padding: 12px var(--pad-x) calc(16px + env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.25);
+}
+
+.answer-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.answer-card-summary {
+    font-size: 12px;
+    color: var(--c-text-muted);
+}
+.answer-card-close {
+    border: none;
+    background: none;
+    padding: 2px 6px;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--c-text-muted);
+    cursor: pointer;
+    border-radius: 6px;
+}
+.answer-card-close:hover {
+    background: var(--c-border-light);
+    color: var(--c-text);
+}
+
+/* 题号网格:一行 6 格,格子够大,"6 列 × 5 行"在一屏内看完全卷 */
+.answer-card-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+}
+
+/* 格子三态:颜色 + 记号双通道,不只靠颜色区分 */
+.answer-card-cell {
+    position: relative;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
+    background: var(--c-surface-alt);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--c-text-secondary);
+    cursor: pointer;
+    padding: 0;
+}
+.answer-card-cell.correct {
+    background: var(--c-success-bg);
+    border-color: var(--c-success);
+    color: var(--c-success-text);
+}
+.answer-card-cell.wrong {
+    background: var(--c-danger-bg);
+    border-color: var(--c-danger);
+    color: var(--c-danger-text);
+}
+/* 未答:虚线框 —— 一眼区分"没做"和"做了但没判" */
+.answer-card-cell.blank {
+    background: var(--c-surface);
+    border-style: dashed;
+    color: var(--c-text-muted);
+}
+/* 当前题:外圈描边,不覆盖三态底色(当前题也可能是已答对的题) */
+.answer-card-cell.current {
+    outline: 2px solid var(--c-primary);
+    outline-offset: 1px;
+}
+
+/* 题型角标:右上角一个极小的字,单/多/判 */
+.answer-card-type {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    font-size: 9px;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--c-text-faint);
+}
+.answer-card-cell.correct .answer-card-type { color: var(--c-success-text); }
+.answer-card-cell.wrong .answer-card-type { color: var(--c-danger-text); }
+
+.answer-card-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--c-text-muted);
+}
+.answer-card-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.answer-card-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    border: 1px solid var(--c-border);
+    background: var(--c-surface);
+}
+.answer-card-swatch.current { outline: 2px solid var(--c-primary); outline-offset: 1px; }
+.answer-card-swatch.correct { background: var(--c-success-bg); border-color: var(--c-success); }
+.answer-card-swatch.wrong { background: var(--c-danger-bg); border-color: var(--c-danger); }
+.answer-card-swatch.blank { border-style: dashed; }
