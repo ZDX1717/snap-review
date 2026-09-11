@@ -12,7 +12,12 @@ export function makeEl() {
     const el = {
         _listeners: {},
         addEventListener(type, fn) { this._listeners[type] = fn; },
-        setAttribute() {},
+        // 属性记录:让 aria-* 等断言可读(原先 setAttribute 是空操作,getAttribute 都不存在)
+        _attrs: {},
+        setAttribute(k, v) { this._attrs[k] = String(v); },
+        getAttribute(k) { return Object.prototype.hasOwnProperty.call(this._attrs, k) ? this._attrs[k] : null; },
+        removeAttribute(k) { delete this._attrs[k]; },
+        hasAttribute(k) { return Object.prototype.hasOwnProperty.call(this._attrs, k); },
         // classList 记录状态而非空操作:让"类有没有真的加上/去掉"可断言。
         // 这不追求视觉保真(那是真机验收的事),只防"状态没生效"这类逻辑 bug。
         _classes: new Set(),

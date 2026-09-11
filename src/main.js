@@ -170,6 +170,13 @@ function navigate(section) {
     }
 }
 
+// 自动下一题按钮的开启态外观(带框按钮 + 主色高亮 + aria-pressed)
+function syncAutoNextBtn() {
+    if (!autoNextToggle) return;
+    autoNextToggle.classList.toggle('is-on', !!state.autoNext);
+    autoNextToggle.setAttribute('aria-pressed', state.autoNext ? 'true' : 'false');
+}
+
 // 题源 UI:「选择题库」常驻(👤 验收反馈:不让它消失,避免布局跳动)。
 // 它对三种题源都生效——错题/收藏自带 bankName,可按库再收窄;
 // 标签随题源改写,使"这里在选什么"始终明确。
@@ -220,7 +227,8 @@ function init() {
     loadFromLocalStorage();
     loadCollapsedBanks();
     masteryThresholdSelect.value = String(loadMasterySetting());
-    if (autoNextToggle) autoNextToggle.checked = loadAutoNextSetting();
+    loadAutoNextSetting();
+    syncAutoNextBtn();
 
     // 更新题库选择下拉框与最近导入信息;AI 连接徽章
     updateBankSelect();
@@ -291,10 +299,11 @@ function setupEventListeners() {
     // 收藏
     favoriteBtn.addEventListener('click', toggleFavoriteCurrent);
 
-    // 自动下一题开关(存本机)
+    // 自动下一题按钮(切换式,存本机);外观状态由 syncAutoNextBtn 统一维护
     if (autoNextToggle) {
-        autoNextToggle.addEventListener('change', function() {
-            saveAutoNextSetting(this.checked);
+        autoNextToggle.addEventListener('click', function() {
+            saveAutoNextSetting(!state.autoNext);
+            syncAutoNextBtn();
         });
     }
 
@@ -532,6 +541,7 @@ if (typeof window === 'undefined') {
         loadFromLocalStorage,
         loadMasterySetting,
         loadAutoNextSetting,
+        syncAutoNextBtn,
         saveAutoNextSetting,
         nextQuestion,
         normalizeAnswerString,

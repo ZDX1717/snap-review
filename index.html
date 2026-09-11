@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=1017">
+    <link rel="stylesheet" href="styles.css?v=1018">
 </head>
 <body>
     <div class="container">
@@ -186,9 +186,9 @@ A：选项A  B：选项B
                             <div class="quiz-status" id="quiz-status-text">
                                 <span id="question-number">1/10</span>
                                 <span id="question-type">单选题</span>
-                                <label class="auto-next" title="开启后:逐题模式答对自动翻页、答错停留;套题模式作答即翻页">
-                                    <input type="checkbox" id="auto-next-toggle">自动
-                                </label>
+                                <button type="button" id="auto-next-toggle" class="auto-next"
+                                        aria-pressed="false"
+                                        title="开启后:答对自动跳到下一题,答错停在本题看解析">答对自动跳下一题</button>
                             </div>
                             <button id="favorite-btn" class="favorite-btn" title="收藏本题，可在收藏夹查看">☆ 收藏</button>
                         </div>
@@ -427,6 +427,6 @@ A：选项A  B：选项B
 
     </div>
 
-    <script type="module" src="src/main.js?v=1017"></script>
+    <script type="module" src="src/main.js?v=1018"></script>
 </body>
 </html>

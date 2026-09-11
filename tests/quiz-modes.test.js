@@ -181,13 +181,13 @@ test('自动下一题判定:开关优先,逐题模式答错停留,末题不翻',
     assert.strictEqual(T(true, true, 'immediate', 0, 5), true, '逐题答对应自动翻');
     assert.strictEqual(T(false, true, 'immediate', 0, 5), false, '逐题答错应停留');
 
-    // 套题模式:对错都翻(作答即翻页)
-    assert.strictEqual(T(true, true, 'exam', 0, 5), true, '套题答对应翻');
-    assert.strictEqual(T(false, true, 'exam', 0, 5), true, '套题答错也翻(无即时反馈,停着无意义)');
+    // 套题模式:一律不自动(👤 决定取消该模式下的自动功能)
+    assert.strictEqual(T(true, true, 'exam', 0, 5), false, '套题模式不自动翻页(答对也不翻)');
+    assert.strictEqual(T(false, true, 'exam', 0, 5), false, '套题模式不自动翻页');
 
     // 末题:一律不自动翻
     assert.strictEqual(T(true, true, 'immediate', 4, 5), false, '逐题末题不自动翻');
-    assert.strictEqual(T(true, true, 'exam', 4, 5), false, '套题末题不自动翻');
+    assert.strictEqual(T(true, true, 'exam', 4, 5), false, '套题模式恒不自动翻');
 });
 
 test('自动下一题开关:默认关闭、读写往返、非法值回退 false', () => {
@@ -200,4 +200,20 @@ test('自动下一题开关:默认关闭、读写往返、非法值回退 false'
     // 存了脏值必须回退 false,不能读成"开启"
     store.set('autoNextSetting', 'yes');
     assert.strictEqual(run(`loadAutoNextSetting()`), false, '非法值应回退关闭');
+});
+
+test('自动下一题按钮:带框按钮的开启态外观 + 套题模式下不出现', () => {
+    // 外观:开启时 is-on(主色描边)且 aria-pressed=true
+    run(`saveAutoNextSetting(true); syncAutoNextBtn();`);
+    assert.ok(elements['auto-next-toggle'].classList.contains('is-on'), '开启应有 is-on');
+    assert.strictEqual(elements['auto-next-toggle'].getAttribute('aria-pressed'), 'true');
+    run(`saveAutoNextSetting(false); syncAutoNextBtn();`);
+    assert.ok(!elements['auto-next-toggle'].classList.contains('is-on'), '关闭应无 is-on');
+    assert.strictEqual(elements['auto-next-toggle'].getAttribute('aria-pressed'), 'false');
+
+    // 逐题模式显示、套题模式隐藏
+    run(setupQuiz + ` quizMode = 'immediate'; currentQuestionIndex = 0; displayQuestion();`);
+    assert.ok(!elements['auto-next-toggle'].classList.contains('hidden'), '逐题模式应显示该按钮');
+    run(setupQuiz + ` quizMode = 'exam'; currentQuestionIndex = 0; displayQuestion();`);
+    assert.ok(elements['auto-next-toggle'].classList.contains('hidden'), '套题模式应隐藏该按钮');
 });

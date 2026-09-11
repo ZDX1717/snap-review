@@ -33,6 +33,7 @@ const answerReview = document.getElementById('answer-review');
 const reviewOnlyWrong = document.getElementById('review-only-wrong');
 const masteryNote = document.getElementById('mastery-note');
 const favoriteBtn = document.getElementById('favorite-btn');
+const autoNextBtn = document.getElementById('auto-next-toggle');
 
 // 开始刷题
 // 题源 → 题目池。"复习错题/收藏"不再是独立入口,而是与题库并列的题源;
@@ -228,6 +229,8 @@ export function displayQuestion() {
 
     // 刷新收藏按钮状态
     updateFavoriteButton();
+    // 自动下一题按钮只在逐题模式出现(套题模式不支持,见 shouldAutoNext)
+    if (autoNextBtn) autoNextBtn.classList.toggle('hidden', state.quizMode === 'exam');
 
     // 重置答题状态与按钮（逐题模式 vs 套题模式）
     state.isAnswered = false;
@@ -292,8 +295,11 @@ function cancelAutoNext() {
 // (vm 沙箱的 setTimeout 是空实现,定时器本身在测试里不会触发)
 export function shouldAutoNext(isCorrect, { autoNext, quizMode, index, total } = {}) {
     if (!autoNext) return false;                       // 开关关闭 → 永不自动
-    if (quizMode !== 'exam' && !isCorrect) return false; // 逐题模式答错 → 停留消化
-    return index < total - 1;                          // 最后一题不自动翻(留给结束/交卷)
+    // 套题模式**不支持**自动下一题(👤 决定):套题是整组作答+交卷后统一判分,
+    // 作答时并不知道对错,"答对才翻"无从谈起,一律自动翻又会让用户没机会检查/回改。
+    if (quizMode === 'exam') return false;
+    if (!isCorrect) return false;                     // 逐题模式答错 → 停留消化解析
+    return index < total - 1;                          // 最后一题不自动翻(留给「结束刷题」)
 }
 
 // 作答后调用:是否安排自动翻页由模式与对错共同决定
@@ -422,8 +428,7 @@ export function nextQuestion() {
     if (state.quizMode === 'exam') {
         // 套题模式：先保存当前作答再翻页
         state.userAnswers[state.currentQuestionIndex] = collectUserAnswer();
-        // 套题模式:作答后一律自动翻页(传 true 表示"无需判对错即可继续")
-        if (state.autoNext) scheduleAutoNext(true);
+        // 套题模式不做自动翻页(见 shouldAutoNext 注释)
         if (state.currentQuestionIndex >= state.currentQuiz.length - 1) {
             finishExam();
             return;
