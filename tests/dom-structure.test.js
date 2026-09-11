@@ -259,10 +259,14 @@ test('刷题元信息并入下方操作区:进度条已移除,手机单行且按
     assert.ok(/flex-wrap\s*:\s*nowrap/.test(mc), '手机端操作条不得换行');
     const maList = rulesFrom(/\.quiz-actions\s*\{([^}]*)\}/);
     assert.ok(maList.some(b => /flex-wrap\s*:\s*nowrap/.test(b)), '手机端按钮组不得换行');
-    // 按钮必须自然宽度(收窄),不能再 flex:1 平分或 width:100% 撑满
-    const mabList = rulesFrom(/\.quiz-actions \.action-btn\s*\{([^}]*)\}/);
-    assert.ok(mabList.length > 0, '手机端应有 .quiz-actions .action-btn 规则');
-    const mab = mabList[mabList.length - 1];
-    assert.ok(/flex\s*:\s*0 0 auto/.test(mab), '按钮应收窄为自然宽度(flex:0 0 auto)');
-    assert.ok(/width\s*:\s*auto/.test(mab), '按钮须显式 width:auto(覆盖旧的 width:100%)');
+    // 按钮必须自然宽度(收窄),不能再 flex:1 平分或 width:100% 撑满。
+    // ⚠️ 覆盖必须用 #id 选择器:上方"拇指热区"规则用 id 给了 width:100%,
+    // 类选择器特异性不够、会被压住(实测三键各 236px → 换行 → "只看得到一个按钮")。
+    const mobileBtnRules = rulesFrom(/\.quiz-actions #(?:prev-question|submit-answer|next-question|end-quiz)-btn[^{]*\{([^}]*)\}/);
+    assert.ok(mobileBtnRules.length > 0, '手机端应用 #id 选择器覆盖按钮宽度');
+    assert.ok(mobileBtnRules.some(b => /width\s*:\s*auto/.test(b)), '按钮须覆盖为 width:auto');
+    assert.ok(mobileBtnRules.some(b => /flex\s*:\s*0 0 auto/.test(b)), '按钮应 flex:0 0 auto');
+    // 翻页键允许压缩,保证三键同处一行
+    const shrink = rulesFrom(/flex\s*:\s*0 1 auto/);
+    assert.ok(shrink.length > 0, '翻页键应允许压缩(flex:0 1 auto)以保持单行');
 });

@@ -503,10 +503,21 @@ h3 {
     font-size: 12px;
 }
 
+/* ⚠️ 不要给 .quiz-actions 用 margin-left:auto 把它推右 —— 那会让它在 flex 兄弟
+   (可收缩的 .quiz-meta)旁边被压到 0 宽,里面的按钮跟着塌成 w=0(实测:disp=block 但 w=0,
+   表现为"按钮不见了")。改为 auto 外边距 + flex:0 0 auto 明确要求"按内容占宽"。 */
 .quiz-actions {
     display: flex;
     gap: 8px;
-    margin-left: auto;   /* 按钮组靠右 */
+    flex: 0 0 auto;          /* 按内容占宽,绝不被压缩 */
+    margin-left: auto;       /* 靠右 */
+    min-width: 0;
+}
+
+/* 按钮本身按文字宽度,不收缩 */
+.quiz-actions .action-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 /* 翻页按钮的禁用态:仍占位(位置稳定),仅弱化。
@@ -2087,12 +2098,25 @@ html[data-theme="dark"] .container {
         margin-left: 0;
         width: auto;
     }
-    .quiz-actions .action-btn {
-        flex: 0 0 auto;           /* 不再平分,按钮收窄到自身文字宽度 */
-        width: auto;              /* 覆盖上面"拇指热区"那条 width:100%(它会撑满整行) */
+    /* 按钮收窄到文字宽度。⚠️ 上面那条"拇指热区"规则用 #id 给了 width:100%,
+       特异性高于本类选择器 —— 只写 .quiz-actions .action-btn { width:auto } 会被它压住,
+       实测两模式三键各占 236px(整行),三键放不进一行就换行,表现为"只看得到一个按钮"。
+       故此处用同等特异性的 #id 选择器覆盖。 */
+    .quiz-actions #prev-question-btn,
+    .quiz-actions #submit-answer-btn,
+    .quiz-actions #next-question-btn,
+    .quiz-actions #end-quiz-btn {
+        flex: 0 0 auto;
+        width: auto;
         margin: 0;
-        padding: 8px 12px;
-        font-size: 14px;
+        padding: 6px 10px;
+        font-size: 13px;
+    }
+    /* 单行放不下时优先压缩较宽的"上一题/下一题",保证三个按钮都在一行 */
+    .quiz-actions #prev-question-btn,
+    .quiz-actions #next-question-btn {
+        flex: 0 1 auto;
+        min-width: 0;
     }
     #quiz-container {
         /* 预留:单行操作条(约 48) + 底部 tab 安全区 */

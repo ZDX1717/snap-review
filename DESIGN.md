@@ -191,8 +191,13 @@
 - **左区(状态指示 + 收藏)**:`flex: 1 1 auto; min-width: 0; overflow: hidden` ——
   空间不足时**收缩自己**,绝不把按钮挤出屏幕。
 - **按钮组**:`flex: 0 0 auto`,按钮 `flex: 0 0 auto` + **`width: auto`**。
-  必须显式写 `width: auto`:文件上方那条手机"拇指热区"规则会给这几个按钮 `width: 100%`,
-  不覆盖就会把单行撑成全宽。按钮收窄到自身文字宽度,结束刷题等次要按钮因此变窄。
+- ⚠️ **覆盖 `width:100%` 必须用同等特异性的选择器**。手机端那条"拇指热区"规则是
+  `#submit-answer-btn, #next-question-btn, …  { width: 100% }`(**用 id**)。
+  只写 `.quiz-actions .action-btn { width: auto }` 会被它压住(它出现更晚、特异性更高),
+  实测三键各占 **236px** —— 三键放不进一行就换行,**表现为"只看得到一个按钮"**(👤 反馈)。
+  正确做法:用 `.quiz-actions #<id>` 逐键覆盖。
+- 翻页键(`上一题/下一题`)额外给 `flex: 0 1 auto; min-width: 0`,单行放不下时优先压缩它们,
+  保证三键始终同处一行。实测手机 390px 套题模式:上一题 59 + 下一题 59 + 交卷 46 = 176px。
 - ⚠️ `.favorite-btn` 自带 `margin-left: auto`(原在题目头部靠右),进元信息行后必须用
   `.quiz-meta .favorite-btn { margin-left: 0 }` 清掉,否则会把元信息行撑开、与按钮组一起跑偏。
 - 手机端避让高度相应加大(`#quiz-container` 的 `padding-bottom` 需预留"按钮行 + 元信息行")。
