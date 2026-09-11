@@ -2548,6 +2548,24 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     border-style: dashed;
     color: var(--c-text-muted);
 }
+/* 已选未判分(**套题模式交卷前专用**):中性实底 + 实线 +
+   左上角小三角 —— 只表达"选过了",不表达对错。
+   ⚠️ 该状态**绝不能用绿/红**:套题交卷前标对错 = 直接在卡上泄题(👤 报的 bug)。 */
+.answer-card-cell.picked {
+    background: var(--c-panel-bg);
+    border-color: var(--c-text-faint);
+    color: var(--c-text-secondary);
+}
+.answer-card-cell.picked::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-top: 8px solid var(--c-text-faint);
+    border-right: 8px solid transparent;
+    border-top-left-radius: 9px;
+    pointer-events: none;
+}
 /* 当前题:外圈描边,不覆盖三态底色(当前题也可能是已答对的题) */
 .answer-card-cell.current {
     outline: 2px solid var(--c-primary);
@@ -2590,4 +2608,5 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
 .answer-card-swatch.current { outline: 2px solid var(--c-primary); outline-offset: 1px; }
 .answer-card-swatch.correct { background: var(--c-success-bg); border-color: var(--c-success); }
 .answer-card-swatch.wrong { background: var(--c-danger-bg); border-color: var(--c-danger); }
+.answer-card-swatch.picked { background: var(--c-panel-bg); border-color: var(--c-text-faint); }
 .answer-card-swatch.blank { border-style: dashed; }

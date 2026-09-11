@@ -136,8 +136,8 @@ export function startQuiz() {
     endQuizBtn.textContent = state.quizMode === 'exam' ? '交卷' : '结束刷题';
     reviewOnlyWrong.checked = false;
     state.masteryRemovedInSession = 0;
-    Object.keys(q_feedback).forEach(k => delete q_feedback[k]);
-    Object.keys(q_graded).forEach(k => delete q_graded[k]);
+    // 新一局:判分台账全部清零 —— 否则上一局交过卷后,新一局答题卡一开局就显示对错
+    resetGradingState();
     
     // 显示刷题容器
     quizContainer.classList.remove('hidden');
@@ -310,7 +310,7 @@ function setNavEnabled(btn, enabled) {
 // 用途:刷题中一眼看清"哪些做了、哪些错了、哪些还没做",点号直达。
 // 刻意不含题干/答案(防偷看);入口是状态栏里的进度("3/10")本身。
 
-const CARD_STATUS_TEXT = { correct: '答对', wrong: '答错', blank: '未答' };
+const CARD_STATUS_TEXT = { correct: '答对', wrong: '答错', blank: '未答', picked: '已选(未判分)' };
 
 export function isAnswerCardOpen() {
     return !!answerCardDrawer && !answerCardDrawer.classList.contains('hidden');
@@ -349,7 +349,11 @@ export function renderAnswerCard() {
     });
 
     if (answerCardSummary) {
-        answerCardSummary.textContent = `共 ${summary.total} 题 · 对 ${summary.correct} · 错 ${summary.wrong} · 未答 ${summary.blank}`;
+        // 套题交卷前只报"选了多少",不报对错(报了就等于泄题)
+        const corr = q_examGraded || state.quizMode !== 'exam'
+            ? `对 ${summary.correct} · 错 ${summary.wrong} · 未答 ${summary.blank}`
+            : `已选 ${summary.total - summary.blank} · 未答 ${summary.blank}`;
+        answerCardSummary.textContent = `共 ${summary.total} 题 · ${corr}`;
     }
 }
 
@@ -401,14 +405,17 @@ function bindAnswerCard() {
 const q_feedback = {};
 // 记录"哪几题真的判过分":仅凭 userAnswers 有值无法区分"已判分"与"勾了没确认"
 const q_graded = {};
+// 套题模式是否已交卷。**答题卡的对错必须以它为准**:
+// 套题是整卷一次判分、交卷前用户还能回改,交卷前标对错 = 直接在卡上泄题(👤 报的 bug)。
+let q_examGraded = false;
 
-// 该题是否已判分(答题卡三态的唯一依据):
-//  - 逐题模式:只认 q_graded —— "勾了没确认"的题不算已答(答题卡上必须仍是"未答")
-//  - 套题模式:整卷一次判,存在作答即已判分
+// 该题是否已判分(答题卡上色的唯一依据):
+//  - 逐题模式:只认 q_graded —— "勾了没确认"的题不算已答
+//  - 套题模式:**交卷后才算判分**。交卷前一律未判分,于是卡上只显示"选过了"(picked),不显示对错。
 // 对错本身不另存一份:判分口径就是 normalizeAnswerString(userAnswer) === normalizeAnswerString(answer)
 // (与 renderAnswerReview 同口径),另存副本只会在口径变动时漂移。
 function isQuestionGraded(index) {
-    if (state.quizMode === 'exam') return !!state.userAnswers[index];
+    if (state.quizMode === 'exam') return q_examGraded;
     return !!q_graded[index];
 }
 
@@ -417,6 +424,15 @@ function gradedMap() {
     const map = {};
     state.currentQuiz.forEach((_, i) => { if (isQuestionGraded(i)) map[i] = true; });
     return map;
+}
+
+// 判分台账重置(开新一局 / 测试用例之间)。**必须集中一处**:
+// q_graded / q_examGraded 是模块内部状态,漏清一个就会出现"新一局继承上一局对错"这类
+// 只在特定顺序下复现的脏状态。测试里跨用例残留过(见 tests/answer-card.test.js)。
+export function resetGradingState() {
+    Object.keys(q_feedback).forEach(k => delete q_feedback[k]);
+    Object.keys(q_graded).forEach(k => delete q_graded[k]);
+    q_examGraded = false;
 }
 
 // 选项卡片判分标色(对绿/错红/正确项高亮)并禁改。
@@ -753,6 +769,9 @@ export function finishExam() {
     state.correctCount = 0;
     state.wrongCount = 0;
     let unanswered = 0;
+
+    // 交卷 = 判分时刻。答题卡从此刻起才允许显示对错(交卷前显示 = 泄题)
+    q_examGraded = true;
 
     state.currentQuiz.forEach((question, idx) => {
         const ua = state.userAnswers[idx] || '';

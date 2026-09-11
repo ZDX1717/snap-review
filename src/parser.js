@@ -470,11 +470,16 @@ export function shuffleArray(array) {
 
 // ==================== 答题卡(刷题中快速跳题,P0-6.1)====================
 // 「一题一格」的数据:**纯函数**(不读 DOM、不读全局 state),谁调用谁传状态 —— 于是能脱离浏览器直接断言。
-// 三态定义(👤 定调):
-//   blank   = 没判过分。逐题模式下包括"勾了但没点确认"的题 —— 在卡上必须仍是未答,不能冒充已答
+// 四态定义(👤 定调):
+//   blank   = 没做过
+//   picked  = **套题模式专用**:选了但还没交卷 —— 只显示"选过了",绝不显示对错
 //   correct = 判过分且答对
 //   wrong   = 判过分且答错
-// graded:index → bool 的"是否已判分"映射(逐题模式来自 q_graded,套题模式整卷即已判)
+// ⚠️ **套题模式交卷前不得出现 correct/wrong**(👤 报的 bug):
+//    套题是"整卷一次判分",交卷前用户仍可回改,却把对错标在卡上 = 直接泄题。
+//    故判分事实由调用方决定(`graded` 映射在套题交卷前恒为空),
+//    本函数再对"选了但未判分"给出中性的 picked 态。
+// graded:index → bool 的"是否已判分"映射(逐题模式来自 q_graded;套题模式交卷后才全为真)
 // ⚠️ 刻意**不输出题干与答案**:答题卡只暴露"做没做、对不对、什么题型",防止跳题前偷看答案。
 export const CARD_TYPE_SHORT = { 单选: '单', 多选: '多', 判断: '判' };
 
@@ -486,12 +491,13 @@ export function buildCardCells(questions, userAnswers = [], graded = {}, current
         const isGraded = !!graded[index];
         const isCorrect = isGraded && !!userAnswer
             && normalizeAnswerString(userAnswer) === normalizeAnswerString(q.answer || '');
+        const status = isGraded ? (isCorrect ? 'correct' : 'wrong') : (userAnswer ? 'picked' : 'blank');
         return {
             index,
             number: index + 1,
             type: q.type || '',
             typeShort: CARD_TYPE_SHORT[q.type] || '',
-            status: isGraded ? (isCorrect ? 'correct' : 'wrong') : 'blank',
+            status,
             current: index === currentIndex,
         };
     });
@@ -503,6 +509,7 @@ export function buildCardCells(questions, userAnswers = [], graded = {}, current
             correct: cells.filter(c => c.status === 'correct').length,
             wrong: cells.filter(c => c.status === 'wrong').length,
             blank: cells.filter(c => c.status === 'blank').length,
+            picked: cells.filter(c => c.status === 'picked').length,
         },
     };
 }

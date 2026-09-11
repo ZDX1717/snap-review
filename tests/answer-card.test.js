@@ -13,19 +13,22 @@ const Q = [
     { content: 'Q4', type: '单选', options: { A: '1', B: '2' }, answer: 'B' },
 ];
 
-test('答题卡三态:答对 / 答错 / 未答', () => {
-    // 已判分: 0 对、1 错(答 B 而正确答案 AC)、2 未判分、3 对
-    const { cells, summary } = buildCardCells(Q, ['A', 'B', '', 'B'], { 0: true, 1: true, 3: true }, 1);
-    assert.deepStrictEqual(cells.map(c => c.status), ['correct', 'wrong', 'blank', 'correct']);
-    assert.deepStrictEqual(summary, { total: 4, correct: 2, wrong: 1, blank: 1 });
+test('答题卡各态:答对 / 答错 / 未答 / 已选未判分', () => {
+    // 已判分: 0 对、1 错(答 B 而正确答案 AC)、2 未判分但已选、3 对
+    const { cells, summary } = buildCardCells(Q, ['A', 'B', 'CA', 'B'], { 0: true, 1: true, 3: true }, 1);
+    assert.deepStrictEqual(cells.map(c => c.status), ['correct', 'wrong', 'picked', 'correct']);
+    assert.deepStrictEqual(summary, { total: 4, correct: 2, wrong: 1, blank: 0, picked: 1 });
 });
 
-test('未判分的勾选不得冒充已答(勾了没确认 = 未答)', () => {
-    // 这是上一批修过的真实 bug 的翻版:userAnswers 有值 ≠ 已判分
+test('未判分的勾选一律不显示对错(逐题模式:勾了没确认;套题模式:还没交卷)', () => {
+    // 这是上一批修过的真实 bug 的翻版:userAnswers 有值 ≠ 已判分。
+    // 未判分时只能落到中性的 picked / blank,绝不允许出现 correct / wrong。
     const { cells, summary } = buildCardCells(Q, ['A', 'CA', '', ''], {}, 0);
-    assert.deepStrictEqual(cells.map(c => c.status), ['blank', 'blank', 'blank', 'blank']);
+    assert.deepStrictEqual(cells.map(c => c.status), ['picked', 'picked', 'blank', 'blank']);
     assert.strictEqual(summary.correct, 0);
-    assert.strictEqual(summary.blank, 4);
+    assert.strictEqual(summary.wrong, 0);
+    assert.strictEqual(summary.blank, 2);
+    assert.strictEqual(summary.picked, 2);
 });
 
 test('多选按集合比对:CA 与 AC 视为答对', () => {
@@ -65,7 +68,10 @@ test('空卷/脏输入不炸', () => {
 const { run, elements, sandbox } = await loadApp();
 
 // 四题:q1 单选(A) / q2 多选(AC) / q3 判断(A) / q4 单选(B)
+// ⚠️ 必须显式 resetGradingState():判分台账是模块内部状态,会跨用例残留 ——
+// 不清的话"上一例 submitAnswer 判过的题"会让下一例的格子带着对错,复现出只在特定顺序下出现的假 bug。
 const setupQuiz = (mode = 'immediate') => `
+    resetGradingState();
     quizMode = '${mode}';
     currentQuiz = [
         { content: 'Q1', type: '单选', options: {A:'1',B:'2'}, answer: 'A', analysis: '', explanation: '', confidence: 1, raw: '' },
@@ -106,18 +112,45 @@ test('渲染出与题数相等的格子,且当前题带 current 类', () => {
     assert.deepStrictEqual(badges.slice(-4), ['单', '多', '判', '单']);
 });
 
-test('逐题模式:未判分的勾选在卡上仍是未答(不冒充)', () => {
+test('逐题模式:未判分的勾选不得显示对错(不冒充已判)', () => {
     // 模拟"选了但没确认":userAnswers 有值、q_graded 无记录
     const cells = cellsAfterRender(setupQuiz('immediate') + ` userAnswers = ['A', '', '', '']; openAnswerCard();`);
-    assert.ok(cells[0].classList.contains('blank'), '勾了没确认的题不得显示为答对');
-    assert.strictEqual(cells[0].classList.contains('correct'), false);
+    assert.ok(cells[0].classList.contains('picked'), '勾了没确认的题应为中性的 picked');
+    assert.strictEqual(cells[0].classList.contains('correct'), false, '不得显示为答对');
+    assert.strictEqual(cells[0].classList.contains('wrong'), false, '不得显示为答错');
 });
 
-test('套题模式:有作答即视为已判分,错题上红', () => {
+test('套题模式交卷前:绝不显示对错(👤 报的 bug:交卷前标对错 = 泄题)', () => {
     const cells = cellsAfterRender(setupQuiz('exam') + ` userAnswers = ['A', 'A', '', '']; currentQuestionIndex = 1; openAnswerCard();`);
-    assert.ok(cells[0].classList.contains('correct'), '套题模式答对应为 correct');
-    assert.ok(cells[1].classList.contains('wrong'), '套题模式答错应为 wrong');
-    assert.ok(cells[2].classList.contains('blank'), '套题模式未作答应为 blank');
+    assert.ok(cells[0].classList.contains('picked'), '套题答过的题应为中性的 picked 态');
+    assert.ok(cells[1].classList.contains('picked'), '套题答过的题应为中性的 picked 态');
+    assert.ok(cells[2].classList.contains('blank'), '未作答应为 blank');
+    // 铁律:交卷前任何格子都不得出现对错态
+    for (const [i, c] of cells.entries()) {
+        assert.ok(!c.classList.contains('correct'), `第 ${i + 1} 题交卷前不得显示"答对"`);
+        assert.ok(!c.classList.contains('wrong'), `第 ${i + 1} 题交卷前不得显示"答错"`);
+    }
+});
+
+test('套题模式交卷后才显示对错', () => {
+    // 交卷 = 判分时刻,此后答题卡才允许标对错。
+    // ⚠️ 交卷前把 currentQuestionIndex 放到一个**本来就空**的槽位,再交卷:
+    //    finishExam() 会先把自己那题的 DOM 选择收进 userAnswers —— 桩里 DOM 是空的,
+    //    落在已作答的槽位上会把答案冲掉(那是桩的局限,不是产品 bug:真机 DOM 有选中态可收)。
+    const cells = cellsAfterRender(setupQuiz('exam') + ` userAnswers = ['A', 'B', '', 'B']; currentQuestionIndex = 2; finishExam(); openAnswerCard();`);
+    assert.ok(cells[0].classList.contains('correct'), '交卷后答对应为 correct');
+    assert.ok(cells[1].classList.contains('wrong'), '交卷后答错应为 wrong');
+    assert.ok(cells[3].classList.contains('correct'), '交卷后答对应为 correct');
+    assert.ok(cells[2].classList.contains('wrong'), '交卷后未作答应记为错(进错题本)');
+});
+
+test('新开一局后套题不再残留"已交卷"状态(否则一开局就泄露对错)', () => {
+    run(setupQuiz('exam') + ` userAnswers = ['A', 'B', '', '']; finishExam();`);
+    // 上一局已交卷 → 重新开始同一套题
+    const cells = cellsAfterRender(setupQuiz('exam') + ` userAnswers = ['A', '', '', '']; openAnswerCard();`);
+    assert.ok(cells[0].classList.contains('picked'), '新一局应回到"已选未判分"');
+    assert.ok(!cells[0].classList.contains('correct'), '新一局不得继承上一局的对错');
+    assert.ok(!cells[1].classList.contains('wrong'), '新一局不得继承上一局的错题标记');
 });
 
 test('跳题:落到目标题、抽屉自动收起、进度同步刷新', () => {

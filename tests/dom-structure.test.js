@@ -377,6 +377,11 @@ test('答题卡三态样式齐备,且未答用虚线框(不只靠颜色区分)',
     }
     const blank = cssNoComments.match(/\.answer-card-cell\.blank\s*\{[^}]*\}/)[0];
     assert.ok(/border-style\s*:\s*dashed/.test(blank), '未答必须用虚线框,不能只靠颜色');
+    // 套题交卷前的"已选"态:必须是中性色,绝不能带绿/红(带了就是泄题)
+    const picked = cssNoComments.match(/\.answer-card-cell\.picked\s*\{([^}]*)\}/);
+    assert.ok(picked, '缺 .answer-card-cell.picked 样式(套题交卷前的已选态)');
+    assert.ok(!/--c-success|--c-danger/.test(picked[1]), '已选态不得用绿/红:套题交卷前标对错 = 泄题');
+    assert.ok(/::before/.test(cssNoComments.slice(cssNoComments.indexOf('.answer-card-cell.picked'))), '已选态应有独立记号(不能只靠颜色)');
     // 当前题用 outline:改边框会覆盖三态底色(当前题也可能是已答对的题)
     const current = cssNoComments.match(/\.answer-card-cell\.current\s*\{[^}]*\}/);
     assert.ok(current, '缺 .answer-card-cell.current 样式');
