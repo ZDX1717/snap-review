@@ -503,13 +503,50 @@ test('编辑器:题目级操作与题库级操作彻底分开', () => {
     // 删除本题跟着题号导航走
     const nav = modal.slice(modal.indexOf('editor-nav-row'), modal.indexOf('editor-delete-btn') + 200);
     assert.ok(nav.includes('editor-delete-btn'), '「删除本题」应在题号导航行里');
-    // 题库级动作(改库名/删库/配色)必须在「题库设置」里,不与单题编辑混排
-    assert.ok(/editor-bank-details/.test(modal), '题库设置应整块收进 details');
-    const bankDetailsStart = modal.indexOf('editor-bank-details');
-    const after = modal.slice(bankDetailsStart);
-    for (const id of ['bank-rename-btn', 'bank-delete-btn', 'bank-color-picker']) {
-        assert.ok(after.includes(id), `${id} 应在「题库设置」区块内`);
+    // 题库级动作(改库名/删库/配色)必须在**独立的「题库设置」标签页**里,不与单题编辑混排
+    assert.ok(modal.includes('editor-tabs'), '编辑器应有标签条');
+    for (const t of ['editor-tab-question', 'editor-tab-bank']) {
+        assert.ok(modal.includes(t), `缺标签 ${t}`);
     }
+    // 题库设置整块落在 editor-bank-panel 里
+    const bankPanelStart = modal.indexOf('editor-bank-panel');
+    const bankPanel = modal.slice(bankPanelStart, modal.indexOf('</section>', bankPanelStart));
+    for (const id of ['bank-rename-btn', 'bank-delete-btn', 'bank-color-picker']) {
+        assert.ok(bankPanel.includes(id), `${id} 应在「题库设置」标签页内`);
+    }
+    // 单题编辑区里不得出现题库级动作
+    const qPanelStart = modal.indexOf('editor-question-panel');
+    const qPanel = modal.slice(qPanelStart, modal.indexOf('editor-bank-panel'));
+    assert.ok(!qPanel.includes('bank-delete-btn'), '「删除题库」不得出现在题目编辑页(防误点)');
+});
+
+test('编辑器:两个标签页的显隐由 CSS 的 data-tab 控制', () => {
+    const cssText = String(cssNoComments);
+    assert.ok(/\.editor-body\[data-tab="question"\]/.test(cssText), '应有"题目页"显隐规则');
+    assert.ok(/\.editor-body\[data-tab="bank"\]/.test(cssText), '应有"设置页"显隐规则');
+    assert.ok(/\.editor-body > \.editor-panel \{ display: none/.test(cssText),
+        '默认应隐藏所有面板,由标签页决定显示哪一个');
+    // 选中态用下划线(不能只靠颜色区分)
+    assert.ok(/\.editor-tab:has\(input:checked\)/.test(cssText), '标签选中态应由 :has(input:checked) 表达');
+    assert.ok(/border-bottom-color/.test(cssText.match(/\.editor-tab:has\(input:checked\)\s*\{([^}]*)\}/)[1]),
+        '选中标签应有下划线标记');
+    // 头部收矮(👤 要求省空间):不再有 12px 上下内边距那种大块头
+    const head = cssNoComments.match(/\.editor-head\s*\{([^}]*)\}/)[1];
+    assert.ok(/min-height\s*:\s*40px/.test(head), '头部内容应为 40px(+ 上下 padding = 整条 44)');
+    assert.ok(!/padding\s*:\s*12px 16px/.test(head), '头部不该还留 12px 的上下内边距');
+});
+
+test('编辑器:题目列表里每题都能直接删(👤 要求按钮可增减)', () => {
+    const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
+    assert.ok(/editor-list-del/.test(bank), '列表项应有删除键');
+    assert.ok(/export function deleteQuestionAt/.test(bank), '应有按下标删题的函数');
+    assert.ok(/questionBanks|splice/.test(bank));
+    // 删除必须带确认(列表里的小 ✕ 太容易误点)
+    const fn = bank.slice(bank.indexOf('export function deleteQuestionAt'));
+    assert.ok(/confirm\(/.test(fn.slice(0, 400)), '列表内删除必须二次确认');
+    // 手机上删除键也要够大
+    const media = cssNoComments.slice(cssNoComments.indexOf('max-width: 768px'));
+    assert.ok(/\.editor-list-del/.test(media), '手机档应给列表删除键放大触达');
 });
 
 test('编辑器:头部/滚动主体/底部固定操作栏三段结构齐备', () => {
@@ -534,8 +571,12 @@ test('编辑器:滚动只发生在主体,头部与底部不被滚走', () => {
     assert.ok(/overflow\s*:\s*hidden/.test(modalRule[1]), '编辑器弹窗自身不得滚动(否则底部栏会被滚走)');
     const contentRule = cssNoComments.match(/\.modal#edit-bank-modal \.modal-content\s*\{([^}]*)\}/);
     assert.ok(contentRule && /flex-direction\s*:\s*column/.test(contentRule[1]), '弹窗内容应为纵向 flex 三段布局');
-    const bodyRule = cssNoComments.match(/\.editor-body\s*\{([^}]*)\}/);
-    assert.ok(bodyRule && /overflow-y\s*:\s*auto/.test(bodyRule[1]), '滚动应发生在 .editor-body');
+    // ⚠️ 取**所有** .editor-body 规则再合并:同一选择器可能出现多条,只看第一条会误判(踩过)
+    const bodyRules = [...cssNoComments.matchAll(/\.editor-body\s*\{([^}]*)\}/g)].map(m => m[1]).join(';');
+    assert.ok(/overflow-y\s*:\s*auto/.test(bodyRules), '滚动应发生在 .editor-body');
+    // 同一条规则里要同时给出"可滚动 + 可压缩",否则 flex 子项不会滚
+    assert.ok(/min-height\s*:\s*0/.test(bodyRules) && /flex\s*:\s*1 1 auto/.test(bodyRules),
+        '.editor-body 需要 flex:1 1 auto + min-height:0 才能真正滚动');
     const footRule = cssNoComments.match(/\.editor-foot\s*\{([^}]*)\}/);
     assert.ok(footRule && /flex\s*:\s*0 0 auto/.test(footRule[1]), '底部栏不得被压缩');
 });

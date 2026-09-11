@@ -1451,10 +1451,51 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
     padding: 8px;
 }
 
+/* 列表标题:手机上它是开合按钮;桌面档列表常显,它看起来就是一行标题 */
+.editor-list-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 28px;
+    padding: 0;
+    border: none;              /* 按钮必须显式声明 border,否则露出默认黑边 */
+    background: none;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--c-text-muted);
+    text-align: left;
+    cursor: pointer;
+}
+.editor-list-caret { display: inline-block; transition: transform 0.15s; }
+
+/* 题号列表项:左边正文可点选,右边一个小 ✕ 直接删(👤 要求:能增能减) */
+.editor-list-row {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+}
+.editor-list-del {
+    flex: 0 0 auto;
+    border: none;               /* 必须显式声明,否则露出默认黑边 */
+    background: none;
+    padding: 0 8px;
+    font-size: 12px;
+    color: var(--c-text-faint);
+    cursor: pointer;
+    border-radius: 6px;
+}
+.editor-list-del:hover {
+    background: var(--c-danger-bg);
+    color: var(--c-danger-text);
+}
 .editor-list-item {
     display: block;
     width: 100%;
     text-align: left;
+    flex: 1 1 auto;
+    min-width: 0;
     background: none;
     border: none;
     border-radius: 6px;
@@ -2829,25 +2870,23 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
 }
 
 /* ---------- 头部:库名 + 进度 + 快捷动作 ---------- */
+/* 头部收矮(👤 要求"省空间"):只留 关闭 + 库名 + 进度,动作全部下沉到标签页
+   高度按内容定,手机上约 44px(与一个触摸目标同高,不再额外占位) */
 .editor-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 12px 16px;
+    gap: 6px;
+    padding: 2px 8px 2px 2px;
     border-bottom: 1px solid var(--c-border-light);
     background: var(--c-surface);
     flex: 0 0 auto;
-}
-.editor-head-info {
-    display: flex;
-    align-items: baseline;
-    gap: 8px;
-    min-width: 0;
+    min-height: 40px;          /* 内容 40 + 上下 padding 2+2 = 整条 44 */
 }
 .editor-head h3 {
     margin: 0;
-    font-size: 16px;
+    font-size: 15px;
+    line-height: 1.2;          /* 行高收紧,头部才能压在 44 */
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2866,7 +2905,10 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
 .editor-close-x {
     border: none;              /* 按钮必须显式声明 border,否则露出默认黑边 */
     background: none;
-    padding: 6px 8px;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
     font-size: 16px;
     line-height: 1;
     color: var(--c-text-muted);
@@ -2875,18 +2917,60 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
 }
 .editor-close-x:hover { background: var(--c-border-light); color: var(--c-text); }
 
-/* ---------- 主体:唯一滚动区 ---------- */
+/* ---------- 标签条:编辑题目 / 题库设置 ---------- */
+.editor-tabs {
+    display: flex;
+    flex: 0 0 auto;
+    border-bottom: 1px solid var(--c-border-light);
+    background: var(--c-surface);
+}
+.editor-tab {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 10px;
+    font-size: 14px;
+    color: var(--c-text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;   /* 选中态用下划线,不只靠颜色 */
+    white-space: nowrap;
+}
+.editor-tab input { display: none; }        /* 视觉由 label 承担,语义仍归 radio */
+.editor-tab-count { color: var(--c-text-faint); font-size: 12px; }
+.editor-tab:has(input:checked) {
+    color: var(--c-primary);
+    font-weight: 600;
+    border-bottom-color: var(--c-primary);
+}
+.editor-tab:has(input:focus-visible) { outline: 2px solid var(--c-primary); outline-offset: -2px; }
+
+/* 标签页切换:题目页 = 题号列表 + 当前题;设置页 = 整库设置 */
+/* 主体:标签页决定内部怎么排(外层不再自己分栏),同时它是**唯一滚动区** */
 .editor-body {
+    display: block;
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: 12px 16px 16px;
-    display: grid;
-    grid-template-columns: 220px 1fr;
-    gap: 16px;
-    align-items: start;
 }
+.editor-body > .editor-panel { display: none; }
+.editor-body[data-tab="question"] > .editor-list-panel,
+.editor-body[data-tab="question"] > .editor-question-panel { display: block; }
+.editor-body[data-tab="bank"] > .editor-bank-panel { display: block; }
+/* 题目页:桌面仍是"左题号列表 + 右表单"两栏 */
+@media (min-width: 769px) {
+    .editor-body[data-tab="question"] {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        gap: 16px;
+        align-items: start;
+    }
+}
+
+/* ---------- 主体:唯一滚动区 ---------- */
 .editor-panel { min-width: 0; }
 .editor-panel-title {
     margin: 0 0 8px;
@@ -2899,8 +2983,7 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     font-weight: 400;
     color: var(--c-text-faint);
 }
-/* 题库设置整块跨两列,不与"当前题目"抢宽度 */
-.editor-bank-panel { grid-column: 1 / -1; }
+/* 题库设置现在是独立标签页,占满主体宽度 */
 
 /* ---------- 底部固定操作栏 ---------- */
 .editor-foot {
@@ -2968,10 +3051,10 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
         gap: 14px;
         padding: 12px 12px 16px;
     }
-    /* 题号列表默认收起(它只用来跳题,占的是最宝贵的第一屏);
-       头部按钮拉出后最多占 34vh,滚到底不会挤掉正在编辑的内容 */
-    .editor-list-panel { display: none; }
-    .editor-list-panel.open { display: block; }
+    /* 题号列表:只留标题一行(它只用来跳题),展开后最多 34vh,不挤掉正在编辑的内容 */
+    .editor-list-panel .editor-list-body { display: none; }
+    .editor-list-panel.open .editor-list-body { display: block; }
+    .editor-list-panel.open .editor-list-caret { transform: rotate(90deg); }
     .editor-list-panel .editor-question-list {
         max-height: 34vh;
         flex: none;
@@ -3000,11 +3083,17 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     }
     /* 零散控件也要够得着:色块、AI 补答案、关闭 ✕、移出规则下拉、复选框 */
     .bank-color-swatch { min-height: 44px; padding: 0 12px; }
+    .editor-list-del { min-width: 44px; font-size: 14px; }
+    .editor-tab { min-height: 44px; }
+    .editor-list-toggle { min-height: 44px; font-size: 14px; }
+    #editor-add-btn { min-height: 44px; }
     .editor-ai-answer-row .action-btn,
     .editor-option-actions .action-btn { min-height: 44px; }
     .editor-close-x {
-        min-width: 44px;
-        min-height: 44px;
+        /* 这里是 40 不是 44:头部是"省空间"的地方,44 会让整条涨到 49px。
+           40px 依然远超误触阈值(拇指目标下限通常 40–44),换来的是一行多出的可读面积。 */
+        width: 40px;
+        height: 40px;
         font-size: 18px;
     }
     .bank-admin-row select {
@@ -3036,7 +3125,8 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     .editor-foot .action-btn { padding: 0 16px; }
     .editor-nav-row .editor-position { flex: 1 1 auto; text-align: center; }
 }
-/* 桌面:题号列表常显,头部的「题目列表」按钮没有意义 */
+/* 桌面:题号列表常显 —— 隐藏那个开合标题,免得鼠标用户误点收起 */
 @media (min-width: 769px) {
-    #editor-list-toggle { display: none; }
+    .editor-list-toggle { display: none; }
+    .editor-list-panel .editor-list-body { display: block; }
 }

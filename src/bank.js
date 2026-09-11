@@ -58,6 +58,11 @@ const editorListToggle = document.getElementById('editor-list-toggle');
 const editorHeadPosition = document.getElementById('editor-head-position');
 const editorListCount = document.getElementById('editor-list-count');
 const editorFoot = document.getElementById('editor-foot');
+const editorBody = document.querySelector('.editor-body');
+const editorTabQuestion = document.getElementById('editor-tab-question');
+const editorTabBank = document.getElementById('editor-tab-bank');
+const editorTabQuestionCount = document.getElementById('editor-tab-question-count');
+const editorBankNameCurrent = document.getElementById('editor-bank-name-current');
 const bankColorNote = document.getElementById('bank-color-note');
 const editorAiAnswerNote = document.getElementById('editor-ai-answer-note');
 const editorPosition = document.getElementById('editor-position');
@@ -1687,6 +1692,28 @@ export function setBankColor(bankName, color) {
     return true;
 }
 
+// 切换编辑标签页(编辑题目 / 题库设置)。选中态由 CSS 的 :has(input:checked) 表达,
+// 这里只把状态同步到主体上,供 CSS 选择要显示哪一页。
+export function switchEditorTab(tab) {
+    const t = tab === 'bank' ? 'bank' : 'question';
+    if (editorBody) editorBody.setAttribute('data-tab', t);
+    if (editorTabQuestion) editorTabQuestion.checked = t === 'question';
+    if (editorTabBank) editorTabBank.checked = t === 'bank';
+}
+
+// 删除某一道题(按下标;题号列表里的 ✕ 用)。与「删除本题」共用同一套语义。
+export function deleteQuestionAt(index) {
+    const questions = currentEditBank();
+    if (!questions[index]) return false;
+    if (!confirm('确定删除这道题吗？')) return false;
+    questions.splice(index, 1);
+    if (state.editIndex >= questions.length) state.editIndex = Math.max(0, questions.length - 1);
+    saveToLocalStorage();
+    state.editorDirty = false;
+    renderBankEditor(true);
+    return true;
+}
+
 // 题号列表开合(手机:默认收起,头部按钮拉出;桌面 CSS 里该按钮不显示)
 export function toggleEditorList() {
     if (!editorListPanel) return;
@@ -1702,7 +1729,6 @@ function collapseEditorListOnNarrow() {
     if (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
         && !window.matchMedia('(max-width: 768px)').matches) return;
     editorListPanel.classList.remove('open');
-    if (editorListToggle) editorListToggle.setAttribute('aria-expanded', 'false');
 }
 
 // 渲染配色色板(编辑器内)。每个色块 = 一个按钮,点一下即改并立即落盘 ——
@@ -2229,16 +2255,18 @@ export function editorHistClick(e) {
 
 export function renderBankEditor(keepList = false) {
     renderBankColorPicker();
-    if (!keepList && editorListPanel) {
-        editorListPanel.classList.remove('open');
-        if (editorListToggle) editorListToggle.setAttribute('aria-expanded', 'false');
-    }
+    // 首次渲染时把标签页定到"编辑题目"(HTML 里也有默认值,这里是双保险 ——
+    // 缺了它首屏会出现"两页都隐藏"的空壳,实测踩过)
+    if (!editorBody || !editorBody.getAttribute('data-tab')) switchEditorTab('question');
+    if (!keepList && editorListPanel) editorListPanel.classList.remove('open');
     const questions = currentEditBank();
     const pendingOnly = !!state.editorPendingOnly;
 
     editorQuestionList.innerHTML = '';
     questions.forEach((q, idx) => {
         if (pendingOnly && q.answer) return; // 只看待补
+        const row = document.createElement('div');
+        row.className = 'editor-list-row';
         const item = document.createElement('button');
         item.type = 'button';
         // 待修改高亮:缺答案(待补)或选项不足的题,橙底标记;AI 标记:紫条 🤖(与预览同色系)
@@ -2250,15 +2278,30 @@ export function renderBankEditor(keepList = false) {
         item.addEventListener('click', () => {
             if (!editorGuard()) return;
             state.editIndex = idx;
-            renderBankEditor();
+            renderBankEditor(true);
             collapseEditorListOnNarrow();
         });
-        editorQuestionList.appendChild(item);
+        row.appendChild(item);
+        // 每题一个删除键(👤 要求:按钮可以新增和删减)—— 列表里直接删,比"翻到那题再点删除"快得多
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'editor-list-del';
+        del.textContent = '✕';
+        del.title = `删除第 ${idx + 1} 题`;
+        del.setAttribute('aria-label', `删除第 ${idx + 1} 题`);
+        del.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteQuestionAt(idx);   // 内部自带确认,避免误删
+        });
+        row.appendChild(del);
+        editorQuestionList.appendChild(row);
     });
 
     // 头部进度与列表计数(手机上列表是收起的,进度必须常显 —— 它是"我在第几题"的唯一线索)
     const shown = questions.filter(q => !pendingOnly || !q.answer).length;
     if (editorListCount) editorListCount.textContent = pendingOnly ? `待补 ${shown}` : `共 ${questions.length} 题`;
+    if (editorTabQuestionCount) editorTabQuestionCount.textContent = pendingOnly ? `待补 ${shown}` : `${questions.length}`;
+    if (editorBankNameCurrent) editorBankNameCurrent.textContent = state.editBankName || '';
 
     if (questions.length === 0 || !questions[state.editIndex]) {
         editorForm.classList.add('hidden');

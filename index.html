@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=1038">
+    <link rel="stylesheet" href="styles.css?v=1039">
 </head>
 <body>
     <div class="container">
@@ -357,29 +357,42 @@ A：选项A  B：选项B
              删除属于题目级操作,跟着题号导航走。 -->
         <div id="edit-bank-modal" class="modal hidden">
             <div class="modal-content modal-lg">
+                <!-- 头部收矮(👤 要求"省空间"):只有 关闭 + 库名 + 进度;动作下沉到各标签页里 -->
                 <div class="editor-head">
-                    <div class="editor-head-info">
-                        <h3 id="edit-bank-title">编辑题库</h3>
-                        <span id="editor-head-position" class="editor-head-position"></span>
-                    </div>
-                    <div class="editor-head-actions">
-                        <button type="button" id="editor-list-toggle" class="action-btn small secondary" aria-expanded="false" aria-controls="editor-list-panel">题目列表</button>
-                        <button type="button" id="editor-head-add-btn" class="action-btn small secondary">＋ 新增</button>
-                        <button type="button" id="editor-head-close-btn" class="editor-close-x" title="关闭">✕</button>
-                    </div>
+                    <button type="button" id="editor-head-close-btn" class="editor-close-x" title="关闭" aria-label="关闭">✕</button>
+                    <h3 id="edit-bank-title">编辑题库</h3>
+                    <span id="editor-head-position" class="editor-head-position"></span>
                 </div>
 
-                <div class="editor-body">
+                <!-- 标签条(👤 要求:编辑题目 / 题库设置 两个标签)。用 radio + CSS 表达选中态,
+                     JS 只负责渲染内容 —— 状态不散落在两处。 -->
+                <div class="editor-tabs" role="group" aria-label="编辑视图">
+                    <label class="editor-tab" data-tab="question">
+                        <input type="radio" name="editor-tab" id="editor-tab-question" value="question" checked>
+                        <span>编辑题目 <span id="editor-tab-question-count" class="editor-tab-count"></span></span>
+                    </label>
+                    <label class="editor-tab" data-tab="bank">
+                        <input type="radio" name="editor-tab" id="editor-tab-bank" value="bank">
+                        <span>题库设置</span>
+                    </label>
+                </div>
+
+                <div class="editor-body" data-tab="question">
                     <!-- ① 题号列表(手机默认收起;桌面常显) -->
                     <section id="editor-list-panel" class="editor-panel editor-list-panel">
-                        <h4 class="editor-panel-title">题目列表 <span id="editor-list-count" class="editor-panel-count"></span></h4>
-                        <div id="editor-question-list" class="editor-question-list"></div>
-                        <button id="editor-add-btn" class="action-btn small">＋ 新增题目</button>
+                        <!-- 标题本身是开合按钮(手机:列表默认收起,点标题拉出;桌面 CSS 让它无条件常显) -->
+                        <button type="button" id="editor-list-toggle" class="editor-list-toggle" aria-expanded="false" aria-controls="editor-list-body">
+                            <span class="editor-list-caret" aria-hidden="true">▸</span>
+                            题目列表 <span id="editor-list-count" class="editor-panel-count"></span>
+                        </button>
+                        <div id="editor-list-body" class="editor-list-body">
+                            <div id="editor-question-list" class="editor-question-list"></div>
+                            <button id="editor-add-btn" class="action-btn small">＋ 新增题目</button>
+                        </div>
                     </section>
 
                     <!-- ② 当前题目的编辑区(手机优先:题干在上,答案紧邻,选项随后) -->
                     <section class="editor-panel editor-question-panel">
-                        <h4 class="editor-panel-title">正在编辑</h4>
                         <div id="editor-form">
                             <div id="editor-hist-row" class="editor-hist-row"></div>
                             <p id="editor-ai-note" class="editor-ai-note"></p>
@@ -431,39 +444,37 @@ A：选项A  B：选项B
                                 <button id="editor-delete-btn" class="action-btn small secondary editor-delete-current">删除本题</button>
                             </div>
                         </div>
-                        <p id="editor-empty" class="empty-message hidden">该题库暂无题目，点右上角「＋ 新增」添加</p>
+                        <p id="editor-empty" class="empty-message hidden">该题库暂无题目，点「＋ 新增题目」添加</p>
                     </section>
 
-                    <!-- ③ 题库级设置(默认收起:它和"改这一道题"不是一回事,混在一起最容易误操作) -->
+                    <!-- ③ 题库级设置:独立标签页(与"改这一道题"彻底分开) -->
                     <section class="editor-panel editor-bank-panel">
-                        <details class="editor-bank-details">
-                            <summary>题库设置 <span class="editor-panel-hint">配色 · 重命名 · 去重 · 导出 · 删除题库 · 错题规则</span></summary>
-                            <div class="bank-admin">
-                                <div class="bank-admin-row bank-color-row">
-                                    <span class="bank-color-label">卡片配色</span>
-                                    <div id="bank-color-picker" class="bank-color-picker" role="group" aria-label="题库卡配色"></div>
-                                    <span id="bank-color-note" class="meta-note"></span>
-                                </div>
-                                <div class="bank-admin-row">
-                                    <button id="bank-rename-btn" class="action-btn small secondary">重命名</button>
-                                    <button id="bank-dedup-btn" class="action-btn small secondary">去重</button>
-                                    <button id="bank-export-btn" class="action-btn small secondary">导出本库</button>
-                                    <button id="bank-delete-btn" class="action-btn small secondary">删除题库</button>
-                                </div>
-                                <div class="bank-admin-row">
-                                    <button id="export-all-btn" class="action-btn small secondary">导出全部</button>
-                                    <button id="clear-errors-btn" class="action-btn small secondary">清空错题本</button>
-                                    <label class="inline-label">移出规则
-                                        <select id="mastery-threshold-select">
-                                            <option value="0">不移出</option>
-                                            <option value="1">答对 1 次</option>
-                                            <option value="2" selected>答对 2 次</option>
-                                            <option value="3">答对 3 次</option>
-                                        </select>
-                                    </label>
-                                </div>
+                        <div class="bank-admin" id="editor-bank-admin">
+                            <p class="editor-panel-title">当前题库:<span id="editor-bank-name-current" class="editor-current-bank"></span></p>
+                            <div class="bank-admin-row bank-color-row">
+                                <span class="bank-color-label">卡片配色</span>
+                                <div id="bank-color-picker" class="bank-color-picker" role="group" aria-label="题库卡配色"></div>
+                                <span id="bank-color-note" class="meta-note"></span>
                             </div>
-                        </details>
+                            <div class="bank-admin-row">
+                                <button id="bank-rename-btn" class="action-btn small secondary">重命名</button>
+                                <button id="bank-dedup-btn" class="action-btn small secondary">去重</button>
+                                <button id="bank-export-btn" class="action-btn small secondary">导出本库</button>
+                                <button id="bank-delete-btn" class="action-btn small secondary">删除题库</button>
+                            </div>
+                            <div class="bank-admin-row">
+                                <button id="export-all-btn" class="action-btn small secondary">导出全部</button>
+                                <button id="clear-errors-btn" class="action-btn small secondary">清空错题本</button>
+                                <label class="inline-label">移出规则
+                                    <select id="mastery-threshold-select">
+                                        <option value="0">不移出</option>
+                                        <option value="1">答对 1 次</option>
+                                        <option value="2" selected>答对 2 次</option>
+                                        <option value="3">答对 3 次</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
                     </section>
                 </div>
 
@@ -499,6 +510,6 @@ A：选项A  B：选项B
         </p>
     </div>
 
-    <script type="module" src="src/main.js?v=1038"></script>
+    <script type="module" src="src/main.js?v=1039"></script>
 </body>
 </html>

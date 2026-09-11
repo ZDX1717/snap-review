@@ -11,6 +11,8 @@ import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteB
     previewAiAnswerFill,
     bankColorOf,
     toggleEditorList,
+    switchEditorTab,
+    deleteQuestionAt,
     setBankColor,
     renderBankColorPicker,
     editorAiAnswer, cancelPreviewAi, rescueAiOrganize, updateAiSettingsBadge, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, clearPasteInput, editorHistClick, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, togglePromptContent, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks, renderErrorsForBank, renderFavoritesForBank, renderRecycleBin, restoreRecycled, recycleBankEntry, restoreBankVersion } from './bank.js';
@@ -139,9 +141,10 @@ const editorAddOption = document.getElementById('editor-add-option');
 const previewAiAnswerBtn = document.getElementById('preview-ai-answer-btn');
 const editorAiAnswerBtn = document.getElementById('editor-ai-answer-btn');
 // 编辑器重构(👤 2026-09-11):头部快捷动作 + 题号列表开合
-const editorListToggleBtn = document.getElementById('editor-list-toggle');
-const editorHeadAddBtn = document.getElementById('editor-head-add-btn');
 const editorHeadCloseBtn = document.getElementById('editor-head-close-btn');
+const editorListToggleBtn = document.getElementById('editor-list-toggle');
+const editorTabQuestion = document.getElementById('editor-tab-question');
+const editorTabBank = document.getElementById('editor-tab-bank');
 const editorRemoveOption = document.getElementById('editor-remove-option');
 const editorExplanation = document.getElementById('editor-explanation');
 const editorAnalysis = document.getElementById('editor-analysis');
@@ -325,9 +328,11 @@ function setupEventListeners() {
     editorAddBtn.addEventListener('click', editorAddQuestion);
     editorAiAnswerBtn.addEventListener('click', editorAiAnswer);
     // 头部:题号列表开合 / 新增 / 关闭(与底部「关闭」同一处理路径,不另写一套)
-    editorListToggleBtn.addEventListener('click', toggleEditorList);
-    editorHeadAddBtn.addEventListener('click', editorAddQuestion);
     editorHeadCloseBtn.addEventListener('click', editorClose);
+    editorListToggleBtn.addEventListener('click', toggleEditorList);
+    // 标签页切换(radio 的 change 事件;用 change 而不是 click,键盘也能切)
+    editorTabQuestion.addEventListener('change', () => switchEditorTab('question'));
+    editorTabBank.addEventListener('change', () => switchEditorTab('bank'));
     editorSaveBtn.addEventListener('click', () => editorSaveCurrent(false));
     editorCloseBtn.addEventListener('click', editorClose);
     // 库级操作:作用于当前编辑中的题库(编辑器即该库的管理入口)
@@ -615,6 +620,8 @@ if (typeof window === 'undefined') {
         renderFavoritesForBank,
         bankColorOf,
         toggleEditorList,
+        switchEditorTab,
+        deleteQuestionAt,
         setBankColor,
         renderBankColorPicker,
         previewAiAnswerFill,
