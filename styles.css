@@ -464,11 +464,13 @@ h3 {
     margin-top: 12px;
 }
 
-/* 刷题状态栏左区:题目状态指示(两行:序号 / 题型)在左,收藏按钮在其右 */
+/* 刷题状态栏左区:题目状态指示在上(序号 / 题型两行),收藏按钮在其**下方** */
 .quiz-meta {
     display: flex;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;   /* 状态在上、收藏在下(👤 要求) */
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
     min-width: 0;
     font-size: 14px;
     color: var(--c-text-muted);
@@ -496,6 +498,9 @@ h3 {
    搬进元信息行后必须清掉,否则会把 meta 撑开、与按钮组一起跑偏。 */
 .quiz-meta .favorite-btn {
     margin-left: 0;
+    align-self: flex-start;   /* 与状态指示左对齐 */
+    padding: 1px 8px;
+    font-size: 12px;
 }
 
 .quiz-actions {

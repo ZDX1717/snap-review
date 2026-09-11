@@ -86,6 +86,23 @@ export async function loadApp({ confirmResult = true, promptValue = 'x', sandbox
         setTimeout() { return 0; },
         console,
     };
+    // 用 index.html 的真实 class 初始化各元素的 classList。
+    // 否则 makeEl() 的 _classes 是空集合,contains('hidden') 恒为 false ——
+    // 于是"某按钮初始带 hidden、代码却没移除 hidden"这类 bug 会被测试**静默放过**
+    // (真实发生:套题模式「上一题」带了 hidden,断言却通过了)。
+    {
+        const htmlPath = path.join(SRC, '..', 'index.html');
+        const html = readFileSync(htmlPath, 'utf8');
+        for (const m of html.matchAll(/<[^>]*id="([\w-]+)"[^>]*>/g)) {
+            const tag = m[0];
+            const id = m[1];
+            const cls = (tag.match(/class="([^"]*)"/) || [])[1];
+            if (!cls) continue;
+            const el = (elements[id] ||= makeEl());
+            cls.split(/\s+/).filter(Boolean).forEach((c) => el._classes.add(c));
+        }
+    }
+
     // 文档级注入(如 documentElement),供主题等访问 document.documentElement 的模块测试
     if (sandboxExtras.document) Object.assign(sandbox.document, sandboxExtras.document);
     const context = vm.createContext(sandbox);

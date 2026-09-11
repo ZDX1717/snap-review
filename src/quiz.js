@@ -237,6 +237,9 @@ export function displayQuestion() {
         // 看起来像"上一题和下一题在循环"(👤 反馈的 bug)。
         // 现在改为**始终可见**,只在边界置灰禁用 —— 位置稳定,不会造成误解。
         submitAnswerBtn.classList.add('hidden');
+        // ⚠️ 必须显式 remove('hidden'):该按钮在 HTML 里初始带 hidden,
+        // 只设置禁用态会留下 hidden,导致"按钮不见了"(👤 反馈的 bug)。
+        prevQuestionBtn.classList.remove('hidden');
         nextQuestionBtn.classList.remove('hidden');
         setNavEnabled(prevQuestionBtn, state.currentQuestionIndex > 0);
         setNavEnabled(nextQuestionBtn, state.currentQuestionIndex < state.currentQuiz.length - 1);
