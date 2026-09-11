@@ -222,9 +222,15 @@ test('刷题元信息并入下方操作区:进度条已移除,手机单行且按
     const controls = html.slice(html.indexOf('class="quiz-controls"'), html.indexOf('</div>', html.indexOf('class="quiz-actions"')));
     assert.ok(controls.includes('class="quiz-meta"'), '操作区内应有 .quiz-meta');
     assert.ok(controls.indexOf('quiz-meta') < controls.indexOf('quiz-actions'), '元信息应在按钮组之前(左侧)');
-    for (const id of ['question-number', 'question-type', 'favorite-btn']) {
+    for (const id of ['question-number', 'favorite-btn']) {
         assert.ok(controls.includes(`id="${id}"`), `元信息应包含 #${id}`);
     }
+    // 题型已移到题干之前(👤 要求),不再留在状态栏里
+    assert.ok(!controls.includes('id="question-type"'), '题型不应再留在状态栏');
+    assert.ok(
+        html.indexOf('id="question-type"') < html.indexOf('id="question-text"'),
+        '题型应出现在题干之前',
+    );
     // 连对(🔥)展示功能已按 👤 要求整体删除,不得残留元素/样式/代码
     assert.ok(!html.includes('streak-badge'), '连对徽标元素应已删除');
     assert.ok(!/streak-badge/.test(cssText), '连对徽标样式应已删除');

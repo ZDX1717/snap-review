@@ -492,9 +492,16 @@ h3 {
     color: var(--c-text-secondary);
 }
 
-.quiz-status #question-type {
+/* 题型徽章:置于题干之前(👤 要求),小号弱化,不抢题干视线 */
+.question-type-badge {
+    display: inline-block;
+    margin-bottom: 4px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--c-panel-bg);
+    color: var(--c-text-muted);
     font-size: 11px;
-    color: var(--c-text-faint);
+    line-height: 1.6;
 }
 
 /* 行内轻提示:替代 alert 的窄条(琥珀底),出现在状态栏上方 */

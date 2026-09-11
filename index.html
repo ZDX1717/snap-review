@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=1021">
+    <link rel="stylesheet" href="styles.css?v=1022">
 </head>
 <body>
     <div class="container">
@@ -137,6 +137,7 @@ A：选项A  B：选项B
 
                 <div id="quiz-container" class="quiz-container hidden">
                     <div class="question-content">
+                        <span id="question-type" class="question-type-badge">单选题</span>
                         <h3 id="question-text">题目内容</h3>
                         <p id="question-explanation" class="explanation">题目解释</p>
                     </div>
@@ -187,7 +188,6 @@ A：选项A  B：选项B
                         <div class="quiz-meta">
                             <div class="quiz-status" id="quiz-status-text">
                                 <span id="question-number">1/10</span>
-                                <span id="question-type">单选题</span>
                             </div>
                             <div class="quiz-meta-row">
                                 <button id="favorite-btn" class="favorite-btn" title="收藏本题，可在收藏夹查看">☆ 收藏</button>
@@ -428,6 +428,6 @@ A：选项A  B：选项B
 
     </div>
 
-    <script type="module" src="src/main.js?v=1021"></script>
+    <script type="module" src="src/main.js?v=1022"></script>
 </body>
 </html>

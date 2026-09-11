@@ -305,3 +305,53 @@ test('空作答的提示是行内提示,不再用 alert 弹窗', () => {
     assert.ok(!hint.classList.contains('hidden'), '应显示行内提示');
     assert.ok(String(hint.textContent).includes('选择'), '提示文案应说明要选择答案');
 });
+
+test('回看已作答的题:选项卡片高亮必须一并恢复(不能只设 checked)', () => {
+    // 回归:原生 radio/checkbox 是视觉隐藏的,选中态由 .option-item.selected 表达。
+    // 只恢复 inp.checked 时,界面"看不到刚才选了啥"(👤 反馈)。
+    const made = [];
+    sandbox.document.querySelectorAll = (sel) =>
+        sel.includes('input[name="answer"]') ? made.map((m) => m.inp) : [];
+    // 用 makeEl 造选项项,记录 querySelector 返回的 input 与 classList 状态
+    const mkItem = (value) => {
+        const inp = makeEl();
+        inp.value = value;
+        inp.checked = false;
+        const item = {
+            _inp: inp,
+            _classes: new Set(),
+            querySelector: () => inp,
+            classList: {
+                toggle: (c, on) => { if (on) item._classes.add(c); else item._classes.delete(c); },
+                contains: (c) => item._classes.has(c),
+                add: (c) => item._classes.add(c),
+                remove: (c) => item._classes.delete(c),
+            },
+        };
+        made.push({ inp, item });
+        return item;
+    };
+    const items = [mkItem('A'), mkItem('B'), mkItem('C')];
+    // optionsContainer 由 document.querySelector('.options-container') 取得,
+    // 代码随后调的是 **该容器** 的 querySelectorAll —— 必须把容器桩交出去
+    sandbox.document.querySelector = (sel) =>
+        sel.includes('.options-container')
+            ? { querySelectorAll: () => items, appendChild() {}, innerHTML: '' }
+            : makeEl();
+    sandbox.document.querySelectorAll = () => [];
+    run(`
+        quizMode = 'immediate';
+        currentQuiz = [{ content:'M', type:'多选', options:{A:'1',B:'2',C:'3'}, answer:'AC', analysis:'', explanation:'', confidence:1, raw:'' }];
+        questionBank = currentQuiz; currentQuestionIndex = 0; isAnswered = true;
+        userAnswers = ['AC'];
+    `);
+    run('displayQuestion()');
+    assert.strictEqual(items[0]._inp.checked, true, 'A 应被勾选');
+    assert.strictEqual(items[2]._inp.checked, true, 'C 应被勾选');
+    assert.strictEqual(items[1]._inp.checked, false, 'B 不应被勾选');
+    assert.ok(items[0]._classes.has('selected'), 'A 的卡片应有 selected 高亮');
+    assert.ok(items[2]._classes.has('selected'), 'C 的卡片应有 selected 高亮');
+    assert.ok(!items[1]._classes.has('selected'), 'B 的卡片不应有高亮');
+    sandbox.document.querySelector = () => makeEl();
+    sandbox.document.querySelectorAll = () => [];
+});

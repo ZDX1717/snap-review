@@ -220,11 +220,16 @@ export function displayQuestion() {
         optionsContainer.appendChild(optionItem);
     });
     
-    // 恢复套题模式下保存的作答（翻页回来可修改）
+    // 翻页回来时恢复已保存的作答(套题可改;逐题回看时为只读展示)
+    // ⚠️ 必须同时恢复卡片高亮:原生 radio/checkbox 是**视觉隐藏**的(选中态由 .option-item.selected
+    // 的卡片高亮表达),只设 inp.checked 时界面上"看不到刚才选了啥"(👤 反馈的 bug)。
     const savedAnswer = state.userAnswers[state.currentQuestionIndex] || '';
     if (savedAnswer) {
-        optionsContainer.querySelectorAll('input[name="answer"]').forEach(inp => {
+        optionsContainer.querySelectorAll('.option-item').forEach(optionItem => {
+            const inp = optionItem.querySelector('input[name="answer"]');
+            if (!inp) return;
             inp.checked = question.type === '多选' ? savedAnswer.includes(inp.value) : inp.value === savedAnswer;
+            optionItem.classList.toggle('selected', inp.checked);
         });
     }
 
