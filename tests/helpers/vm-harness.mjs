@@ -31,6 +31,15 @@ export function makeEl() {
             },
             contains: (c) => el._classes.has(c),
         },
+        // ⚠️ className 必须与 classList 共用同一个账本:真实 DOM 里两者本就是同一份数据。
+        // 桩里若只记 classList,那么用 `el.className = 'a b'` 建出来的元素在断言里
+        // `classList.contains('a')` 恒为 false —— 测试写得像在验证,实际什么都没验证。
+        // (真实踩坑:答题卡格子用 className 组装三态类,三态断言全落空。)
+        get className() { return [...el._classes].join(' '); },
+        set className(v) {
+            el._classes.clear();
+            String(v).split(/\s+/).filter(Boolean).forEach(x => el._classes.add(x));
+        },
         style: {}, appendChild() {}, textContent: '', value: '', innerHTML: '', files: [],
         checked: false, placeholder: '', rows: 0, dataset: {},
         querySelector: () => makeEl(), querySelectorAll: () => [],
