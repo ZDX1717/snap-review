@@ -52,6 +52,10 @@
     --c-ai-connected-bg: #e9f7ef;    /* AI 已连接底 */
     --c-border-hairline: #eef0f3;    /* 极浅分隔边框(救援区) */
     --c-progress-tip: #6c8fc7;       /* 进度条渐变尾色(蓝灰) */
+    /* ===== 内容区内边距(统一,三页共用;改动只改这两行) ===== */
+    --pad-x: 24px;                   /* 左右留白 */
+    --pad-top: 16px;                 /* 标题栏与首模块之间的呼吸位 */
+    --pad-bottom: 32px;
     /* --- 以下为「无等价令牌」的独立颜色,亮色值 = 原硬编码值,保证零视觉变化 --- */
     --c-star-border: #fd7e14;        /* ☆ 收藏 hover 边框(亮橙) */
     --c-star-text: #b4690e;          /* ★ 收藏激活文字(深橙) */
@@ -157,10 +161,10 @@ nav {
     border-bottom: 3px solid var(--c-primary);
 }
 
+/* 内容区统一内边距:三个分区共用同一套值(👤 要求"以后统一")。
+   顶部必须留一点呼吸位 —— 曾一次设成 0,结果刷题/题库页内容直接贴住标题栏。 */
 main {
-    /* 顶部不留内边距:标题栏之下紧接内容块。原先 32px 会在"导入题库"与"刷题统计"
-       等首个模块上方留出一大块空白(👤 反馈)。 */
-    padding: 0 32px 32px;
+    padding: var(--pad-top) var(--pad-x) var(--pad-bottom);
 }
 
 .section {
@@ -465,12 +469,6 @@ h3 {
     border-radius: 6px;
     padding: 24px;
     margin-top: 24px;
-}
-
-/* 每个分区里的首个元素不再自带上外边距 —— 顶部空白统一由 main 控制,
-   避免"改了 main 却仍看到空白"(子元素 margin 叠加) */
-.section.active > *:first-child {
-    margin-top: 0;
 }
 
 /* ==================== 结果页(重设计:1 行大字 + 1 行 chips) ====================
@@ -1741,8 +1739,11 @@ h3 {
         box-shadow: none;
         min-height: 100vh;
     }
-    main {
-        padding: 0 12px 24px;
+    /* 手机:同一套令牌取小档 —— 改内边距只需改这里与 :root,不必再找散落的写死值 */
+    :root {
+        --pad-x: 12px;
+        --pad-top: 12px;
+        --pad-bottom: 24px;
     }
     section h2 {
         font-size: 20px;

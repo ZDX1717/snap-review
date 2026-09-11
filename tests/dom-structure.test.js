@@ -96,23 +96,32 @@ test('开始刷题按钮必须全屏宽隐藏(不能只写在手机媒体查询�
     );
 });
 
-test('首个模块上方不留空白:main 无上内边距 + 首元素 margin-top 归零', () => {
-    // 👤 两次反馈"模块框上面空白太大"。根因是 main 的 32px 上内边距,
-    // 且子元素自带上外边距会把它抵消掉,所以两处都要守。
+test('内容区内边距统一:三页共用一套值(含手机小档)', () => {
+    // 演进:先是有 32px 上内边距(模块上方空白太大)→ 改成 0(内容贴住标题栏)→
+    // 现在统一为一套令牌。守的是"统一"与"顶部有呼吸位"这两点。
     const cssText = String(cssNoComments);
-    const mains = [...cssText.matchAll(/(?:^|[\s,])main\s*\{([^}]*)\}/g)].map(m => m[1]);
-    assert.ok(mains.length >= 1, '应有 main 规则');
-    for (const body of mains) {
-        const pad = (body.match(/padding\s*:\s*([^;]+)/) || [])[1];
-        if (pad) {
-            const top = pad.trim().split(/\s+/)[0];
-            assert.strictEqual(top, '0', `main 的 padding 上值应为 0,实际 ${top}`);
-        }
+
+    // ① 令牌存在且有值
+    for (const tok of ['--pad-x', '--pad-top', '--pad-bottom']) {
+        assert.ok(new RegExp(`^\\s*${tok}\\s*:\\s*\\d+px`, 'm').test(cssText), `应定义 ${tok}`);
     }
+
+    // ② 桌面 main 使用令牌,而不是写死像素(写死就没法"统一")
+    const mainRule = cssText.match(/(?:^|[\s,])main\s*\{([^}]*)\}/);
+    assert.ok(mainRule, '应有 main 规则');
     assert.ok(
-        /\.section\.active\s*>\s*\*:first-child\s*\{[^}]*margin-top\s*:\s*0/.test(cssText),
-        '每个分区的首元素应 margin-top:0,否则会抵消 main 的收窄',
+        /padding\s*:\s*var\(--pad-top\)\s+var\(--pad-x\)\s+var\(--pad-bottom\)/.test(mainRule[1]),
+        'main 的 padding 应使用统一令牌',
     );
+
+    // ③ 手机端只覆盖令牌值,不再另写一套 main padding
+    const mobileTokens = (cssText.match(/@media[^{]*max-width:\s*768px[^{]*\{[\s\S]*?:root\s*\{([^}]*)\}/) || [])[1];
+    assert.ok(mobileTokens, '手机端应覆盖 :root 的间距令牌');
+    assert.ok(/--pad-top\s*:\s*\d+px/.test(mobileTokens), '手机端应给 --pad-top 一个非零小档');
+
+    // ④ 顶部不得为 0 —— 曾被设成 0,导致刷题/题库页内容直接贴住标题栏(👤 反馈)
+    const top = cssText.match(/--pad-top\s*:\s*(\d+)px/);
+    assert.ok(Number(top[1]) > 0, '顶部必须有呼吸位(不得为 0)');
 });
 
 test('品牌小字紧随 logo 的右下角(在同一行,不单独占一行)', () => {
