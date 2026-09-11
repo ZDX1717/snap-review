@@ -145,8 +145,7 @@ export function displayQuestion() {
     questionType.textContent = question.type;
     questionText.textContent = question.content;
 
-    // 连对徽标(进度条已按 👤 反馈移除,避免残留无用的写入)
-    updateStreakBadge();
+
     
     // 题目解释：逐题模式作答时可见；套题模式交卷前隐藏（回顾时统一展示）
     if (state.quizMode !== 'exam') {
@@ -286,18 +285,6 @@ function bindQuizGestures() {
     }, { passive: true });
 }
 
-// 方案 A:连对徽标(≥2 显示)
-function updateStreakBadge() {
-    const badge = document.getElementById('streak-badge');
-    if (!badge) return;
-    if (state.correctStreak >= 2) {
-        badge.textContent = `🔥 连对 ${state.correctStreak}`;
-        badge.classList.remove('hidden');
-    } else {
-        badge.classList.add('hidden');
-    }
-}
-
 
 // 读取当前题的用户作答（单选/判断返回字母，多选返回排序后的字母串，未选返回 ''）
 export function collectUserAnswer() {
@@ -331,10 +318,8 @@ export function submitAnswer() {
     let removedFromErrorBook = 0;
     if (isCorrect) {
         state.correctCount++;
-        state.correctStreak++;
     } else {
         state.wrongCount++;
-        state.correctStreak = 0;
 
         // 将错题添加到错题本
         addToErrorBook(question, userAnswer);
@@ -352,7 +337,6 @@ export function submitAnswer() {
     answerResult.className = isCorrect ? 'correct-answer' : 'wrong-answer';
     answerExplanation.textContent = question.analysis || '';
     answerFeedback.classList.remove('hidden');
-    updateStreakBadge();
 
     // 方案 A:选项卡片判分标色(对绿/错红/正确项高亮)并禁改
     const optsContainer = document.querySelector('.options-container');

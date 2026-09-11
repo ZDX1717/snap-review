@@ -209,7 +209,7 @@ test('按钮类必须显式声明 border(否则露出浏览器默认黑边)', ()
     assert.deepStrictEqual(missing, [], `这些按钮类缺少 border 声明,会露出默认黑边: ${missing.join(', ')}`);
 });
 
-test('刷题元信息并入下方操作区:进度条已移除,桌面同行左、手机另起一行', () => {
+test('刷题元信息并入下方操作区:进度条已移除,手机单行且按钮收窄', () => {
     // 👤 要求:删进度条,把「1/45 判断 收藏 连对」放到下一题/结束刷题按钮左边。
     const cssText = String(cssNoComments);
 
@@ -222,9 +222,14 @@ test('刷题元信息并入下方操作区:进度条已移除,桌面同行左、
     const controls = html.slice(html.indexOf('class="quiz-controls"'), html.indexOf('</div>', html.indexOf('class="quiz-actions"')));
     assert.ok(controls.includes('class="quiz-meta"'), '操作区内应有 .quiz-meta');
     assert.ok(controls.indexOf('quiz-meta') < controls.indexOf('quiz-actions'), '元信息应在按钮组之前(左侧)');
-    for (const id of ['question-number', 'question-type', 'favorite-btn', 'streak-badge']) {
+    for (const id of ['question-number', 'question-type', 'favorite-btn']) {
         assert.ok(controls.includes(`id="${id}"`), `元信息应包含 #${id}`);
     }
+    // 连对(🔥)展示功能已按 👤 要求整体删除,不得残留元素/样式/代码
+    assert.ok(!html.includes('streak-badge'), '连对徽标元素应已删除');
+    assert.ok(!/streak-badge/.test(cssText), '连对徽标样式应已删除');
+    assert.ok(!/updateStreakBadge/.test(readFileSync(path.join(root, 'src', 'quiz.js'), 'utf8')),
+        'updateStreakBadge 代码应已删除');
 
     // ③ 收藏按钮在元信息行内不得再靠右(它原在题目头部靠右,自带 margin-left:auto)
     const favOverride = cssText.match(/\.quiz-meta \.favorite-btn\s*\{([^}]*)\}/);
@@ -232,12 +237,32 @@ test('刷题元信息并入下方操作区:进度条已移除,桌面同行左、
     assert.ok(/margin-left\s*:\s*0/.test(favOverride[1]), '元信息行内收藏按钮必须清掉 margin-left:auto');
 
     // ④ 手机端:元信息另起一行(column),按钮行保持单行不换行
-    // 手机端:在包含 max-width:768px 的媒体块内,存在把 .quiz-controls 设为 column 的规则。
-    // 不用嵌套结构匹配(易碎),改为在整个文件里找该媒体块起点之后的片段。
+    // 手机端:操作条必须是**单行**(row + nowrap),元信息在左、按钮在右。
     const mediaIdx = cssText.indexOf('max-width: 768px');
     assert.ok(mediaIdx > -1, '应有手机媒体查询');
     const after = cssText.slice(mediaIdx);
-    assert.ok(/\.quiz-controls\s*\{[^}]*flex-direction\s*:\s*column/.test(after),
-        '手机端操作条应为 column(元信息一行、按钮一行)');
-    assert.ok(/\.quiz-actions\s*\{[^}]*flex-wrap\s*:\s*nowrap/.test(after), '手机端按钮行不得换行');
+    // ⚠️ 必须取"位于手机媒体查询之后"的那条规则:文件里 .quiz-controls 还有桌面版本(更靠前),
+    // 直接用 after 段匹配会命中桌面规则(判据错位)。这里按出现位置过滤。
+    const rulesFrom = (re) => {
+        const out = [];
+        let m;
+        const rx = new RegExp(re.source, 'g');
+        while ((m = rx.exec(cssText)) !== null) {
+            if (m.index >= mediaIdx) out.push(m[1]);
+        }
+        return out;
+    };
+    const mcList = rulesFrom(/\.quiz-controls\s*\{([^}]*)\}/);
+    assert.ok(mcList.length > 0, '手机端应有 .quiz-controls 规则');
+    const mc = mcList[mcList.length - 1];
+    assert.ok(/flex-direction\s*:\s*row/.test(mc), '手机端操作条应为单行(row)');
+    assert.ok(/flex-wrap\s*:\s*nowrap/.test(mc), '手机端操作条不得换行');
+    const maList = rulesFrom(/\.quiz-actions\s*\{([^}]*)\}/);
+    assert.ok(maList.some(b => /flex-wrap\s*:\s*nowrap/.test(b)), '手机端按钮组不得换行');
+    // 按钮必须自然宽度(收窄),不能再 flex:1 平分或 width:100% 撑满
+    const mabList = rulesFrom(/\.quiz-actions \.action-btn\s*\{([^}]*)\}/);
+    assert.ok(mabList.length > 0, '手机端应有 .quiz-actions .action-btn 规则');
+    const mab = mabList[mabList.length - 1];
+    assert.ok(/flex\s*:\s*0 0 auto/.test(mab), '按钮应收窄为自然宽度(flex:0 0 auto)');
+    assert.ok(/width\s*:\s*auto/.test(mab), '按钮须显式 width:auto(覆盖旧的 width:100%)');
 });

@@ -38,7 +38,6 @@
 | `--c-warn` / `-text` | `#ffc107` / `#7a5c00` | `#ffd666` / `#ffd666` | 警告 |
 | `--c-warn-bg` / `-accent` | `#fff3cd` / `#b8860b` | `#423a15` / `#e0b34c` | 警告底/强调 |
 | `--c-accent-purple` / `-bg` / `-text` | `#8e7cc3` / `#efeaff` / `#6a4fb6` | `#a08fd6` / `#2a2440` / `#c3b3ff` | 🤖 AI 动过(未核验) |
-| `--c-accent-orange` | `#f0a500` | `#f0a500` | ⏳/⚠ 待修 |
 | `--c-info-bg` / `-border` | `#eef3fb` / `#b9c6dd` | `#1e2632` / `#3a4a63` | 信息位/提示块 |
 | `--c-panel-bg` | `#f1f3f5` | `#262a30` | 面板底(🕘 历史 chip 等) |
 | `--c-surface-warm` | `#fffdf5` | `#242320` | 暖底(救援区等) |
@@ -66,7 +65,6 @@
 | `--c-warn-text-strong` / `-alt` | `#7a5200` / `#b45309` | `#ffd666` / `#e0b34c` | 待修文字 / 双标说明 |
 | `--c-star-border` / `-text` / `-bg` | `#fd7e14` / `#b4690e` / `#fff8e1` | `#f0a500` / `#ffd666` / `#3a3320` | ☆→★ 收藏三态 |
 | `--c-star-hover-bg` | `#fffaf0` | `#302a1c` | ☆ 收藏 hover 底 |
-| `--c-streak-bg` | `#fff4e0` | `#3a3320` | 连对徽章底(≠ `--c-star-bg`) |
 | `--c-option-exp-text` | `#fd7e14` | `#ffd666` | 选项解释文字(逐题模式) |
 | `--c-danger-hover` | `#c82333` | `#ff8a94` | 删除按钮 hover |
 | `--c-input-border` | `#ced4da` | `#3f444b` | 表单输入边框 |
@@ -86,7 +84,7 @@
 | 语义 | 色 | 形态 |
 |---|---|---|
 | 🤖 AI 动过(未核验) | 紫 `--c-accent-purple-*` | 列表左条 3px + 徽章 |
-| ⏳/⚠ 待修 | 橙 `--c-accent-orange` 系 | 列表左条 3px + 徽章 + 底色 |
+| ⏳/⚠ 待修 | 橙 `--c-warn-icon` / `--c-warn-text-strong` / `--c-warn-bg-soft` | 列表左条 3px + 徽章 + 底色 |
 | 🕘 历史(仅 × 删) | 中性灰 `--c-panel-bg` 系 | 小 chip,不做左条 |
 | 对/成功 | `--c-success-*` | 反馈/状态条 |
 | 错/危险 | `--c-danger-*` | 反馈/状态条/删除 |
@@ -153,17 +151,21 @@
 题目元信息(序号 `1/45`、题型、☆收藏、🔥连对)**不再占题干上方一行**,改为并入底部操作区:
 
 ```
-[ 1/45  判断  ☆收藏  🔥连对 ]  [ 上一题 | 提交答案 | 下一题 | 结束刷题 ]   ← 桌面:同行,元信息在左
-─────────────────────────────────────────────
-[ 1/45  判断  ☆收藏  🔥连对 ]                                            ← 手机:元信息另起一行
-[ 上一题 | 提交答案 | 下一题 | 结束刷题 ]                                 ← 按钮行仍单行
+[ 1/45  判断  ☆收藏 ]  [ 上一题 | 提交答案 | 下一题 | 结束刷题 ]   ← 桌面与手机均为单行
 ```
 
 规则:
 - **进度条已移除**(👤 反馈)。题干直接贴顶,不再有"头部 + 进度条"两层占位。
-- 桌面 `flex` 同行、`align-items: center`,元信息在左、按钮组 `margin-left: auto` 靠右。
-- 手机操作条是**固定底栏**,窄屏挤不下,故 `flex-direction: column`:元信息一行、按钮一行;
-  **按钮行必须 `flex-wrap: nowrap`**(保持既有"窄操作条单行"约定)。
+- **连对(🔥)展示功能已整体删除**(👤 反馈):元素、样式、专用令牌 `--c-streak-bg`、
+  本局计数 `state.correctStreak`、`updateStreakBadge()` 及两处调用一并清除。
+  ⚠️ 不要与**题目级** `correctStreak` 混淆 —— 后者是"连对 N 次自动移出错题本"的**规则**,
+  仍然保留(`updateErrorStreak` / `masteryThreshold`)。
+- 桌面与手机**都是单行**(`flex` + `flex-wrap: nowrap`),元信息在左、按钮组在右。
+- **元信息**:`flex: 1 1 auto; min-width: 0; overflow: hidden` —— 空间不足时**收缩自己**,
+  绝不把按钮挤出屏幕。
+- **按钮组**:`flex: 0 0 auto`,按钮 `flex: 0 0 auto` + **`width: auto`**。
+  必须显式写 `width: auto`:文件上方那条手机"拇指热区"规则会给这几个按钮 `width: 100%`,
+  不覆盖就会把单行撑成全宽。按钮收窄到自身文字宽度,结束刷题等次要按钮因此变窄。
 - ⚠️ `.favorite-btn` 自带 `margin-left: auto`(原在题目头部靠右),进元信息行后必须用
   `.quiz-meta .favorite-btn { margin-left: 0 }` 清掉,否则会把元信息行撑开、与按钮组一起跑偏。
 - 手机端避让高度相应加大(`#quiz-container` 的 `padding-bottom` 需预留"按钮行 + 元信息行")。

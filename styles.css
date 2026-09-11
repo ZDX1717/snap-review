@@ -27,7 +27,6 @@
     --c-accent-purple: #8e7cc3;
     --c-accent-purple-bg: #efeaff;
     --c-accent-purple-text: #6a4fb6;
-    --c-accent-orange: #f0a500;
     --c-info-bg: #eef3fb;
     --c-info-border: #b9c6dd;
     --c-panel-bg: #f1f3f5;
@@ -42,7 +41,7 @@
     --c-warn-border: #e0a800;        /* 告警提示边框 */
     --c-badge-warn-text: #856404;    /* ⚠ 徽章文字 */
     --c-badge-warn-border: #ffeeba;  /* ⚠ 徽章边框 */
-    --c-warn-icon: #f0a020;          /* ⏳ 待修左条(暖橙,区别于 --c-accent-orange) */
+    --c-warn-icon: #f0a020;          /* ⏳ 待修左条(暖橙) */
     --c-warn-text-strong: #7a5200;   /* 待修文字/说明 */
     --c-warn-text-alt: #b45309;      /* 🤖+⏳ 双标并存时的说明文字 */
     --c-accent-purple-faint: #fbfaff;/* 🤖 标记行底(极淡) */
@@ -64,7 +63,6 @@
     --c-star-border: #fd7e14;        /* ☆ 收藏 hover 边框(亮橙) */
     --c-star-text: #b4690e;          /* ★ 收藏激活文字(深橙) */
     --c-star-bg: #fff8e1;            /* ★ 收藏激活底 */
-    --c-streak-bg: #fff4e0;          /* 连对徽章底 */
     --c-option-exp-text: #fd7e14;    /* 选项解释文字(橙色,逐题模式) */
     --c-star-hover-bg: #fffaf0;      /* ☆ 收藏 hover 底 */
     --c-danger-hover: #c82333;       /* 删除按钮 hover(深红) */
@@ -688,10 +686,9 @@ h3 {
         font-size: 14px;
     }
     
-    .quiz-controls {
-        flex-direction: column;
-    }
-    
+    /* 注意:此处曾有 .quiz-controls { flex-direction: column },是"旧版竖排操作条"的遗留。
+       手机端操作条的权威定义在文件后段的 P0-1.5 刷题聚焦块里(固定底栏 + 单行)。
+       两处同特异性会让"后一处胜出"变得隐晦,故删除本条。 */
 }
 
 
@@ -1360,15 +1357,6 @@ h3 {
 
 /* ==================== 方案 A:大卡片即点即判(手机刷题交互) ==================== */
 
-.streak-badge {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--c-accent-orange);
-    background: var(--c-streak-bg);
-    border-radius: 12px;
-    padding: 2px 8px;
-}
-
 /* 选项整行卡片:整行可点,触达 ≥44px */
 .option-item {
     position: relative;
@@ -1910,7 +1898,6 @@ html[data-theme="dark"] {
     --c-accent-purple: #a08fd6;
     --c-accent-purple-bg: #2a2440;
     --c-accent-purple-text: #c3b3ff;
-    --c-accent-orange: #f0a500;
     --c-info-bg: #1e2632;
     --c-info-border: #3a4a63;
     --c-panel-bg: #262a30;
@@ -1936,10 +1923,9 @@ html[data-theme="dark"] {
     --c-ai-connected-text: #8fe3a8;   /* 同暗色 --c-success-text */
     --c-ai-connected-bg: #1d3a26;     /* 同暗色 --c-success-bg */
     --c-border-hairline: #2c3138;     /* 同暗色 --c-border-light */
-    --c-star-border: #f0a500;          /* 暗色下并入 --c-accent-orange */
+    --c-star-border: #f0a500;          /* 暗色下并入主色橙 */
     --c-star-text: #ffd666;
     --c-star-bg: #3a3320;
-    --c-streak-bg: #3a3320;
     --c-star-hover-bg: #302a1c;
     --c-option-exp-text: #ffd666;
     --c-danger-hover: #ff8a94;
@@ -2029,8 +2015,9 @@ html[data-theme="dark"] .container {
     }
 
     /* 操作条固定于底部 tab 栏上方,不随内容滚动。
-       手机宽度下元信息与按钮挤不进一行,故元信息**另起一行**放在按钮行之上;
-       按钮行仍是单行(不换行),这是既有的窄操作条约定。 */
+       手机端**单行**:元信息在左(可压缩),按钮在右(不被压缩)。
+       连对徽标已删除,故窄屏能容下;按钮改为自然宽度(不再 flex:1 平分),
+       结束刷题等次要按钮因此收窄。 */
     .quiz-controls {
         position: fixed;
         left: 0;
@@ -2038,7 +2025,8 @@ html[data-theme="dark"] .container {
         bottom: calc(52px + env(safe-area-inset-bottom));
         z-index: 90;
         display: flex;
-        flex-direction: column;
+        flex-direction: row;      /* 单行 */
+        flex-wrap: nowrap;
         gap: 6px;
         margin-top: 0;
         padding: 8px 8px;
@@ -2046,27 +2034,37 @@ html[data-theme="dark"] .container {
         border-top: 1px solid var(--c-border);
         box-shadow: 0 -1px 6px rgba(0, 0, 0, 0.05);
     }
+    /* 元信息:占剩余空间,空间不足时收缩而不是把按钮挤走 */
     .quiz-meta {
-        gap: 8px;
-        font-size: 13px;
+        flex: 1 1 auto;
+        min-width: 0;
+        gap: 6px;
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
     }
-    /* 按钮行:横向单行,不换行 */
+    .quiz-meta .favorite-btn {
+        padding: 2px 8px;
+        font-size: 12px;
+    }
+    /* 按钮组:自然宽度,不收缩 —— 保证"下一题/结束刷题"始终可点 */
     .quiz-actions {
-        display: flex;
+        flex: 0 0 auto;
         flex-wrap: nowrap;
-        gap: 8px;
-        margin-left: 0;        /* 单行占满,不再靠右 */
-        width: 100%;
+        gap: 6px;
+        margin-left: 0;
+        width: auto;
     }
     .quiz-actions .action-btn {
-        flex: 1;
+        flex: 0 0 auto;           /* 不再平分,按钮收窄到自身文字宽度 */
+        width: auto;              /* 覆盖上面"拇指热区"那条 width:100%(它会撑满整行) */
         margin: 0;
-        padding: 8px 8px;
+        padding: 8px 12px;
         font-size: 14px;
     }
     #quiz-container {
-        /* 预留:按钮行(约 48) + 元信息行(约 22) + 底部 tab 安全区 */
-        padding-bottom: calc(78px + env(safe-area-inset-bottom));
+        /* 预留:单行操作条(约 48) + 底部 tab 安全区 */
+        padding-bottom: calc(60px + env(safe-area-inset-bottom));
     }
 }
 
