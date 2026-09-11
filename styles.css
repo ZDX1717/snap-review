@@ -56,6 +56,11 @@
     --pad-x: 24px;                   /* 左右留白 */
     --pad-top: 16px;                 /* 标题栏与首模块之间的呼吸位 */
     --pad-bottom: 32px;
+    /* ===== 宽度档位(见 DESIGN.md §13;唯一来源,勿在别处写死像素) ===== */
+    --reading-width: 640px;   /* 阅读档:刷题容器 / 结果页 / 首页与题库页模块 */
+    --modal-sm: 500px;        /* 表单/确认类弹窗 */
+    --modal-lg: 760px;        /* 导入预览 / 题库编辑 */
+    --page-width: 1000px;     /* 全局 .container */
     /* --- 以下为「无等价令牌」的独立颜色,亮色值 = 原硬编码值,保证零视觉变化 --- */
     --c-star-border: #fd7e14;        /* ☆ 收藏 hover 边框(亮橙) */
     --c-star-text: #b4690e;          /* ★ 收藏激活文字(深橙) */
@@ -89,7 +94,7 @@ body {
 }
 
 .container {
-    max-width: 1000px;
+    max-width: var(--page-width);
     margin: 0 auto;
     background-color: var(--c-surface);
     border-radius: 6px;
@@ -360,7 +365,7 @@ h3 {
     border-radius: 6px;
     padding: 24px;
     margin-top: 24px;
-    max-width: 640px;   /* 阅读宽度:选项行不拉满千像素 */
+    max-width: var(--reading-width);   /* 阅读宽度:选项行不拉满千像素 */
     margin-left: auto;
     margin-right: auto;
 }
@@ -462,7 +467,7 @@ h3 {
 }
 
 .quiz-result {
-    max-width: 640px;
+    max-width: var(--reading-width);
     margin-left: auto;
     margin-right: auto;
     background-color: var(--c-surface-alt);
@@ -709,6 +714,18 @@ h3 {
 }
 
 
+/* 首页最外层模块与刷题页同宽 —— 否则首页卡片会撑满 1000px 容器,
+   比刷题/结果页(阅读档)明显更宽(👤 反馈"首页明显比后俩页宽")。
+   ⚠️ 这里限的是**宽度档位**,与 main 的内边距无关,不要靠调 padding 去解决。 */
+#home-section > .operation-card,
+#banks-section > .banks-header,
+#banks-section > .banks-list,
+#banks-section > .rescue-box {
+    max-width: var(--reading-width);
+    margin-left: auto;
+    margin-right: auto;
+}
+
 .operation-card {
     background-color: var(--c-surface-alt);
     border-radius: 6px;
@@ -740,7 +757,7 @@ h3 {
     background-color: var(--c-surface);
     border-radius: 12px;
     padding: 32px;
-    max-width: 500px;
+    max-width: var(--modal-sm);
     width: 90%;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
@@ -830,7 +847,7 @@ h3 {
 }
 
 .modal-lg {
-    max-width: 760px;
+    max-width: var(--modal-lg);
 }
 
 .preview-summary {

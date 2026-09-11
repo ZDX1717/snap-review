@@ -134,3 +134,30 @@ test('品牌小字紧随 logo 的右下角(在同一行,不单独占一行)', ()
     assert.ok(tagline, '应有 .brand-tagline 规则');
     assert.ok(/font-size\s*:\s*10px/.test(tagline[1]), '小字应为 10px');
 });
+
+test('宽度档位唯一来源:不得在别处写死 max-width 像素', () => {
+    // 👤 反馈"首页明显比后俩页宽"。根因是首页卡片没有 max-width,撑满 1000px 页面档,
+    // 而刷题/结果页走 640px 阅读档。为了让"三页同宽"成为可守的不变量,
+    // 四档宽度全部提为令牌;任何地方再写死 max-width 像素都会破坏一致性。
+    const cssText = String(cssNoComments);
+    // 排除 :root 里的令牌定义行
+    // 只匹配"声明的属性",不匹配 @media 条件(它们不是属性,写法上带括号)
+    const offenders = cssText
+        .split('\n')
+        .filter(l => /(^|[;{\s])max-width\s*:\s*\d+px/.test(l) && !/^\s*--/.test(l) && !/@media/.test(l));
+    assert.deepStrictEqual(offenders, [], `不得写死 max-width 像素,应使用档位令牌:\n${offenders.join('\n')}`);
+
+    for (const tok of ['--reading-width', '--modal-sm', '--modal-lg', '--page-width']) {
+        assert.ok(new RegExp(`^\\s*${tok}\\s*:\\s*\\d+px`, 'm').test(cssText), `应定义 ${tok}`);
+    }
+});
+
+test('三页内容同宽:首页与题库页的模块走阅读档', () => {
+    const cssText = String(cssNoComments);
+    for (const sel of ['#home-section > .operation-card', '#banks-section > .banks-list']) {
+        const re = new RegExp(sel.replace(/[.#>]/g, (c) => '\\' + c) + '[^{]*\\{([^}]*)\\}');
+        const m = cssText.match(re);
+        assert.ok(m, `应有 ${sel} 的宽度规则`);
+        assert.ok(/max-width\s*:\s*var\(--reading-width\)/.test(m[1]), `${sel} 应走阅读档宽度`);
+    }
+});
