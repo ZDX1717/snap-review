@@ -969,7 +969,9 @@ export function showSection(sectionName) {
     // 底部导航切换时滚回顶部(移动端标准行为;vm 沙箱无 window,guarded)
     if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') window.scrollTo(0, 0);
     
-    // 题库页:库列表 + 错题 + 收藏 + 最近导入一并刷新
+    // 切到题库页时整体刷新:updateBanksList() 会把库卡与**内嵌的错题/收藏面板**一起重绘
+    // (面板不再有独立的刷新入口 —— 那两条曾在 showSection 里被调用的 updateErrorsList/
+    //  updateFavoritesList 是死代码,2026-09-11 已删)
     if (sectionName === 'banks') {
         updateBanksList();
         updateLastImportInfo();
