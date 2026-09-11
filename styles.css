@@ -497,6 +497,17 @@ h3 {
     color: var(--c-text-faint);
 }
 
+/* 行内轻提示:替代 alert 的窄条(琥珀底),出现在状态栏上方 */
+.quiz-hint {
+    margin: 0 0 6px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: var(--c-warn-bg-soft);
+    color: var(--c-warn-text-deep);
+    font-size: 13px;
+    text-align: center;
+}
+
 /* 左区第二行:收藏 + 智能切题 并排(👤 要求) */
 .quiz-meta-row {
     display: flex;

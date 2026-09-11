@@ -200,6 +200,7 @@ export function displayQuestion() {
         // 方案 A:卡片选中态 + 逐题模式单选/判断点选即判
         inputElement.addEventListener('change', () => {
             optionItem.classList.toggle('selected', inputElement.checked);
+            clearQuizHint();   // 已动手选择 → 提示自然失效
             if (inputElement.checked && question.type !== '多选') {
                 optionsContainer.querySelectorAll('.option-item').forEach(o => o.classList.remove('selected'));
                 optionItem.classList.add('selected');
@@ -247,8 +248,9 @@ export function displayQuestion() {
         setNavEnabled(prevQuestionBtn, state.currentQuestionIndex > 0);
         setNavEnabled(nextQuestionBtn, state.currentQuestionIndex < state.currentQuiz.length - 1);
     } else {
-        // 逐题模式:下一题 | 结束刷题(结束刷题常驻;上一题与逐题模式无关)
-        prevQuestionBtn.classList.add('hidden');
+        // 逐题模式:上一题 | 下一题 | 结束刷题(👤 要求逐题模式也能回看)
+        prevQuestionBtn.classList.remove('hidden');
+        setNavEnabled(prevQuestionBtn, state.currentQuestionIndex > 0);
         // 单选/判断点卡片即判分;多选勾选后点「下一题」即确认并判分
         nextQuestionBtn.classList.remove('hidden');
         setNavEnabled(nextQuestionBtn, state.currentQuestionIndex < state.currentQuiz.length - 1);
@@ -266,6 +268,26 @@ function setNavEnabled(btn, enabled) {
     btn.disabled = !enabled;
 }
 
+// ==================== 行内轻提示 ====================
+// 替代 alert:用于"还没选答案就想切题/结束"这类提醒。
+// 显示在状态栏上方的窄条里,选中答案即消失,不打断操作。
+let hintTimer = null;
+
+export function showQuizHint(text) {
+    const el = document.getElementById('quiz-hint');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove('hidden');
+    if (hintTimer !== null) cancelTimer(hintTimer);
+    hintTimer = setTimeout(() => { el.classList.add('hidden'); hintTimer = null; }, 2200);
+}
+
+export function clearQuizHint() {
+    const el = document.getElementById('quiz-hint');
+    if (el) el.classList.add('hidden');
+    if (hintTimer !== null) { cancelTimer(hintTimer); hintTimer = null; }
+}
+
 // ==================== 自动下一题 ====================
 // 语义(👤 需求,按模式区分):
 //   逐题模式:答**对**才自动翻页;答错**停留**在当前题(要看解析、消化错因)。
@@ -279,9 +301,14 @@ let autoNextTimer = null;
 
 function cancelAutoNext() {
     if (autoNextTimer !== null) {
-        clearTimeout(autoNextTimer);
+        cancelTimer(autoNextTimer);
         autoNextTimer = null;
     }
+}
+
+// 定时器工具守卫:vm 测试沙箱只桩了 setTimeout,没有 clearTimeout
+function cancelTimer(id) {
+    if (typeof clearTimeout === 'function') clearTimeout(id);
 }
 
 // 纯判定:这次作答之后该不该自动翻页。抽出成纯函数以便单测
@@ -359,9 +386,11 @@ export function submitAnswer() {
     const userAnswer = collectUserAnswer();
 
     if (!userAnswer) {
-        alert(question.type === '多选' ? '请至少选择一个答案' : '请选择一个答案');
+        // 不用 alert 弹窗(👤 要求):内联提示更轻,且不打断视线
+        showQuizHint(question.type === '多选' ? '请至少选择一个答案' : '请先选择答案');
         return;
     }
+    clearQuizHint();
 
     // 记录作答，供结果页逐题回顾
     state.userAnswers[state.currentQuestionIndex] = userAnswer;
@@ -420,7 +449,12 @@ export function submitAnswer() {
 // 背景:多选的「确认答案」按钮已删除(👤 决定),改由"任何切题动作即确认"承担 ——
 // 点「下一题」或左滑都算提交。收在这一处,避免两条入口各写一份判定而漂移。
 export function advanceNext() {
-    if (state.quizMode !== 'exam' && !state.isAnswered) submitAnswer();  // 多选:以当前勾选为准判分
+    if (state.quizMode !== 'exam' && !state.isAnswered) {
+        // 未作答:以当前勾选判分。若一选项都没选,submitAnswer 会给出内联提示并返回,
+        // 此时**必须留在本题**(👤 反馈:原来提示完仍会跳过,等于把题跳过去了)。
+        if (!collectUserAnswer()) { submitAnswer(); return; }
+        submitAnswer();
+    }
     cancelAutoNext();   // 判分可能刚安排了自动切题,手动/手势推进优先,取消它
     nextQuestion();
 }
@@ -455,8 +489,12 @@ export function nextQuestion() {
 // 上一题（仅套题模式，已作答内容保留）
 export function prevQuestion() {
     cancelAutoNext();   // 手动翻页优先,取消待执行的自动翻页
-    if (state.quizMode !== 'exam' || state.currentQuestionIndex === 0) return;
-    state.userAnswers[state.currentQuestionIndex] = collectUserAnswer();
+    if (state.currentQuestionIndex === 0) return;
+    // 逐题模式也可回看(👤 要求)。已作答的题已锁定并记分,回看不改分;
+    // 仅当该题尚未作答时才把当前勾选保存下来,避免覆盖已判定的记录。
+    if (state.quizMode === 'exam' || !state.userAnswers[state.currentQuestionIndex]) {
+        state.userAnswers[state.currentQuestionIndex] = collectUserAnswer();
+    }
     state.currentQuestionIndex--;
     displayQuestion();
 }
@@ -625,6 +663,10 @@ export function endQuiz() {
         }
         return;
     }
+    // 逐题模式:结束前先把当前题按已勾选判分 ——
+    // 否则末题若是多选,选完直接点「结束刷题」会被记成"未作答"(👤 反馈的 bug)。
+    // 一选项都没选时只提示、仍允许结束(不该被提示困住)。
+    if (!state.isAnswered && collectUserAnswer()) submitAnswer();
     if (confirm('确定要结束刷题吗？')) {
         showQuizResult();
     }

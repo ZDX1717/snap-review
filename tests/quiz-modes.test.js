@@ -30,9 +30,17 @@ test('下一题前进,上一题回退,作答不丢失', () => {
     assert.strictEqual(run('userAnswers[0]'), 'A'); // 回退时保存当前作答,原值不丢
     sandbox.document.querySelector = () => makeEl();
 });
-test('逐题模式没有上一题按钮逻辑', () => {
+test('逐题模式也能回上一题(👤 要求),首题不可回退', () => {
+    // 首题:回退无效
+    run(setupQuiz + ` quizMode = 'immediate'; currentQuestionIndex = 0; prevQuestion();`);
+    assert.strictEqual(run('currentQuestionIndex'), 0, '首题不应回退');
+    // 第 2 题:可回退
     run(setupQuiz + ` quizMode = 'immediate'; currentQuestionIndex = 1; prevQuestion();`);
-    assert.strictEqual(run('currentQuestionIndex'), 1); // 不应回退
+    assert.strictEqual(run('currentQuestionIndex'), 0, '逐题模式应能回上一题');
+    // 回退不得覆盖已判定的作答记录
+    run(setupQuiz + ` quizMode = 'immediate'; currentQuestionIndex = 1;
+        userAnswers = ['A', 'B', '']; prevQuestion();`);
+    assert.strictEqual(run(`userAnswers[1]`), 'B', '已作答记录不应被回退覆盖');
 });
 
 test('判分正确:对2/错0/未答1,未作答入错题本', () => {
@@ -246,10 +254,10 @@ test('「下一题」即确认答案:未作答的多选会被判分并前进', (
     assert.strictEqual(run('currentQuestionIndex'), 1, '同样应前进');
     assert.strictEqual(run('wrongCount'), 1, 'AB 与标准 AC 不符 → 计错');
 
-    // 完全没勾就点下一题:照常前进,但**不判分**(submitAnswer 有防空守卫,避免把空选记成错)
+    // 完全没勾就点下一题:**留在本题**并给出提示(👤 反馈:原来提示完仍会跳过)
     pick([]);
     run(base + ` advanceNext();`);
-    assert.strictEqual(run('currentQuestionIndex'), 1, '空作答也应前进');
+    assert.strictEqual(run('currentQuestionIndex'), 0, '空作答应留在本题,不得跳过该题');
     assert.strictEqual(run('wrongCount'), 0, '空作答不应被记为错');
     assert.strictEqual(run('correctCount'), 0, '空作答也不计对');
 
@@ -258,3 +266,42 @@ test('「下一题」即确认答案:未作答的多选会被判分并前进', (
 
 
 
+
+test('末题多选:选完点「结束刷题」必须判分,不得记成未作答', () => {
+    // 回归:末题若是多选,选完直接点结束刷题 → 结果页显示"未作答"(👤 反馈)。
+    // 修法:endQuiz 结束前把当前题按已勾选判分。
+    sandbox.document.querySelectorAll = (sel) =>
+        sel.includes('input[name="answer"]:checked') ? [{ value: 'A' }, { value: 'C' }] : [];
+    run(`
+        quizMode = 'immediate';
+        currentQuiz = [
+          { content:'S1', type:'单选', options:{A:'1',B:'2'}, answer:'A', analysis:'', explanation:'', confidence:1, raw:'' },
+          { content:'M2', type:'多选', options:{A:'1',B:'2',C:'3'}, answer:'AC', analysis:'', explanation:'', confidence:1, raw:'' },
+        ];
+        questionBank = currentQuiz; questionBanks = { T: currentQuiz }; currentBankName = 'T';
+        currentQuestionIndex = 1; isAnswered = false;
+        correctCount = 1; wrongCount = 0;   // 第 1 题已作答且判对(模拟真实流程)
+        userAnswers = ['A', ''];
+    `);
+    run(`endQuiz()`);   // confirm 桩返回 true
+    assert.strictEqual(run(`userAnswers[1]`), 'AC', '末题作答应被记录');
+    assert.strictEqual(run('correctCount'), 2, '末题多选应判对并计分(1 + 本题)');
+    assert.strictEqual(run('wrongCount'), 0);
+    sandbox.document.querySelectorAll = () => [];
+});
+
+test('空作答的提示是行内提示,不再用 alert 弹窗', () => {
+    // 👤 要求:提示"请选择一个答案"不要弹窗
+    alerts.length = 0;
+    sandbox.document.querySelectorAll = () => [];
+    run(`
+        quizMode = 'immediate';
+        currentQuiz = [{ content:'M', type:'多选', options:{A:'1',B:'2'}, answer:'AB', analysis:'', explanation:'', confidence:1, raw:'' }];
+        questionBank = currentQuiz; currentQuestionIndex = 0; isAnswered = false; userAnswers = [''];
+        submitAnswer();
+    `);
+    assert.strictEqual(alerts.length, 0, '不应弹 alert');
+    const hint = elements['quiz-hint'];
+    assert.ok(!hint.classList.contains('hidden'), '应显示行内提示');
+    assert.ok(String(hint.textContent).includes('选择'), '提示文案应说明要选择答案');
+});
