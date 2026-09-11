@@ -217,6 +217,12 @@
     (`5.02`,达 AA)。另外末题判分后是蓝色 `.ready`,两套**实心**强调色会互相打架。
   - 判定抽成纯函数 `shouldConfirmAnswer(quizMode, isAnswered, q)`;按钮外观由 `syncNextButtonLabel()` 统一刷新
     (显示题目时、勾选/取消时各调一次)。
+  - ⚠️ **末题必须解除禁用**:末题的「下一题」在 `displayQuestion` 里被 `setNavEnabled(..., index < total-1)`
+    置为 `disabled`(末题本就不该再"下一题")。但它在确认态承担的是**「确认答案」职责**,
+    必须可点 —— 否则出现"文字变成确认答案、按钮却点不动"。
+    故 `syncNextButtonLabel()` 在 `hasPick` 时显式 `setNavEnabled(nextQuestionBtn, true)`。
+  - **测试教训**:验证这类状态机不能只断言"文案/类名",必须断言 **`disabled` 与可点性** ——
+    之前只验文案与 `.confirming`,漏掉了"被 disabled 挡住"这一层,导致 bug 上线。
   - 完全没勾选就点按钮:`submitAnswer` 的防空守卫给出内联提示并**留在本题**。
 
 ⚠️ **定时器要加守卫**:vm 沙箱只桩了 `setTimeout`,**没有 `clearTimeout`** ——

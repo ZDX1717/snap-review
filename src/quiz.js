@@ -332,6 +332,10 @@ export function syncNextButtonLabel() {
     const hasPick = confirm && !!collectUserAnswer();
     nextQuestionBtn.classList.toggle('confirming', hasPick);
     nextQuestionBtn.textContent = hasPick ? '确认答案' : '下一题';
+    // ⚠️ 末题的「下一题」在 displayQuestion 里被 setNavEnabled 置为 disabled
+    // (因为末题通常不该再"下一题")。但确认态下它承担的是「确认答案」职责,必须可点 ——
+    // 否则出现"变成确认答案却点不动"(👤 反馈的 bug)。故此处按确认态重新启用。
+    if (hasPick) setNavEnabled(nextQuestionBtn, true);
 }
 
 // 最后一题的「结束刷题 / 交卷」变色提示收尾(👤 规则):

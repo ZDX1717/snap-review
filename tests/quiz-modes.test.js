@@ -503,3 +503,39 @@ test('套题模式末题:选完即变色,取消选择恢复颜色', () => {
     sandbox.document.querySelector = () => makeEl();
     sandbox.document.querySelectorAll = () => [];
 });
+
+test('末题多选:「确认答案」必须真的可点(不能被 disabled 挡住)', () => {
+    // 回归:末题的「下一题」在 displayQuestion 里被 setNavEnabled 置为 disabled;
+    // 多选勾选后文字虽变成「确认答案」,按钮却仍是 disabled → 点不动(👤 反馈的 bug)。
+    // 教训:之前只用桩验了文案与 confirming 类,没验"能否点击",所以漏了。
+    const q = (c, t, o, a) => ({ content:c, type:t, options:o, answer:a, analysis:'', explanation:'', confidence:1, raw:'' });
+    const btn = elements['next-question-btn'];
+    let picked = [];
+    const containerStub = { innerHTML: '', appendChild() {}, querySelectorAll: () => [] };
+    sandbox.document.querySelector = (sel) => (sel.includes('.options-container') ? containerStub : null);
+    sandbox.document.querySelectorAll = (sel) =>
+        sel.includes('input[name="answer"]:checked') ? picked.map((x) => ({ value: x })) : [];
+    picked = [];
+    run(`quizMode='immediate';
+        currentQuiz=[${JSON.stringify(q('S1','单选',{A:'1',B:'2'},'A'))},${JSON.stringify(q('M2','多选',{A:'1',B:'2',C:'3'},'AC'))}];
+        questionBank=currentQuiz; currentQuestionIndex=1; isAnswered=false; userAnswers=['A',''];`);
+    run('displayQuestion()');
+    assert.strictEqual(btn.disabled, true, '末题未勾选时「下一题」应为禁用(无可前进)');
+
+    // 勾选后:文字变确认答案,且**必须解除禁用**
+    picked = ['A', 'C'];
+    run('syncNextButtonLabel()');
+    assert.strictEqual(String(btn.textContent), '确认答案', '应变为「确认答案」');
+    assert.strictEqual(btn.disabled, false, '确认态必须可点(不得仍为 disabled)');
+
+    // 真点一次:应判分并停在本题
+    run('advanceNext()');
+    assert.strictEqual(run('isAnswered'), true, '点击后应判分');
+    assert.strictEqual(run('currentQuestionIndex'), 1, '应停在本题展示结果');
+    // 判分后回到前进态:文字恢复「下一题」(末题的收尾由「结束刷题/交卷」承担)
+    assert.strictEqual(String(btn.textContent), '下一题', '判分后应回到「下一题」文案');
+    assert.ok(!btn.classList.contains('confirming'), '判分后不应再有确认态');
+
+    sandbox.document.querySelector = () => makeEl();
+    sandbox.document.querySelectorAll = () => [];
+});
