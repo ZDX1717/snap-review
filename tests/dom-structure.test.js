@@ -197,8 +197,9 @@ test('按钮类必须显式声明 border(否则露出浏览器默认黑边)', ()
         '\.prompt-toggle', '\.favorite-btn', '\\.delete-btn', '\.foot-toggle'];
     const missing = [];
     for (const cls of buttonClasses) {
-        // 取该类的**基础**规则(选择器末尾就是类名,不含伪类)
-        const re = new RegExp('(?:^|[\\s,])\\s*' + cls + '\\s*\\{([^}]*)\\}', 'm');
+        // 取该类的**基础**规则:选择器的第一项必须正好是该类(不含伪类/祖先选择器),
+        // 否则会误命中 `.quiz-meta .favorite-btn` 这类复合规则(其 body 里自然没有 border)
+        const re = new RegExp('(?:^|\\})[^{}]*?(?:^|[\\n,])\\s*' + cls + '\\s*\\{([^}]*)\\}', 'm');
         const m = cssText.match(re);
         if (!m) continue;                       // 该类可能只在复合选择器里出现
         // 注意:必须排除 border-radius —— 它含 'border' 子串,会让判据形同虚设
@@ -206,4 +207,37 @@ test('按钮类必须显式声明 border(否则露出浏览器默认黑边)', ()
         if (!hasBorderDecl) missing.push(cls.replace('\\', ''));
     }
     assert.deepStrictEqual(missing, [], `这些按钮类缺少 border 声明,会露出默认黑边: ${missing.join(', ')}`);
+});
+
+test('刷题元信息并入下方操作区:进度条已移除,桌面同行左、手机另起一行', () => {
+    // 👤 要求:删进度条,把「1/45 判断 收藏 连对」放到下一题/结束刷题按钮左边。
+    const cssText = String(cssNoComments);
+
+    // ① 进度条元素与其样式都已移除
+    assert.ok(!html.includes('quiz-progress'), '进度条元素应已移除');
+    assert.ok(!/quiz-progress/.test(cssText), '进度条样式应已移除');
+    assert.ok(!html.includes('question-header'), '题目头部元素应已移除');
+
+    // ② 元信息位于操作区内,且在按钮组之前(左)
+    const controls = html.slice(html.indexOf('class="quiz-controls"'), html.indexOf('</div>', html.indexOf('class="quiz-actions"')));
+    assert.ok(controls.includes('class="quiz-meta"'), '操作区内应有 .quiz-meta');
+    assert.ok(controls.indexOf('quiz-meta') < controls.indexOf('quiz-actions'), '元信息应在按钮组之前(左侧)');
+    for (const id of ['question-number', 'question-type', 'favorite-btn', 'streak-badge']) {
+        assert.ok(controls.includes(`id="${id}"`), `元信息应包含 #${id}`);
+    }
+
+    // ③ 收藏按钮在元信息行内不得再靠右(它原在题目头部靠右,自带 margin-left:auto)
+    const favOverride = cssText.match(/\.quiz-meta \.favorite-btn\s*\{([^}]*)\}/);
+    assert.ok(favOverride, '应有 .quiz-meta .favorite-btn 覆盖规则');
+    assert.ok(/margin-left\s*:\s*0/.test(favOverride[1]), '元信息行内收藏按钮必须清掉 margin-left:auto');
+
+    // ④ 手机端:元信息另起一行(column),按钮行保持单行不换行
+    // 手机端:在包含 max-width:768px 的媒体块内,存在把 .quiz-controls 设为 column 的规则。
+    // 不用嵌套结构匹配(易碎),改为在整个文件里找该媒体块起点之后的片段。
+    const mediaIdx = cssText.indexOf('max-width: 768px');
+    assert.ok(mediaIdx > -1, '应有手机媒体查询');
+    const after = cssText.slice(mediaIdx);
+    assert.ok(/\.quiz-controls\s*\{[^}]*flex-direction\s*:\s*column/.test(after),
+        '手机端操作条应为 column(元信息一行、按钮一行)');
+    assert.ok(/\.quiz-actions\s*\{[^}]*flex-wrap\s*:\s*nowrap/.test(after), '手机端按钮行不得换行');
 });

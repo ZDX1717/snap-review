@@ -51,7 +51,6 @@
     --c-ai-connected-text: #1e7e46;  /* AI 已连接文字 */
     --c-ai-connected-bg: #e9f7ef;    /* AI 已连接底 */
     --c-border-hairline: #eef0f3;    /* 极浅分隔边框(救援区) */
-    --c-progress-tip: #6c8fc7;       /* 进度条渐变尾色(蓝灰) */
     /* ===== 内容区内边距(统一,三页共用;改动只改这两行) ===== */
     --pad-x: 24px;                   /* 左右留白 */
     --pad-top: 16px;                 /* 标题栏与首模块之间的呼吸位 */
@@ -389,20 +388,6 @@ h3 {
     margin-right: auto;
 }
 
-.question-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 16px;
-    font-weight: 500;
-    color: var(--c-text-secondary);
-}
-.quiz-progress {
-    flex: 1;
-    min-width: 40px;
-    margin: 0 4px;
-}
-
 .question-content {
     margin-bottom: 24px;
 }
@@ -472,13 +457,38 @@ h3 {
     margin-bottom: 8px;
 }
 
+/* 操作区:左侧题目元信息(序号/题型/收藏/连对),右侧动作按钮。
+   元信息从题目头部下移到这里 —— 头部不再占一行,题目可直接贴顶(👤 反馈)。 */
 .quiz-controls {
     display: flex;
+    align-items: center;      /* meta 行与按钮组共用一条中线 */
     gap: 8px;
+    margin-top: 12px;
 }
 
-.quiz-controls button {
-    flex: 1;
+.quiz-meta {
+    display: flex;
+    align-items: center;      /* 元信息内部居中,徽标与按钮同一中线 */
+    gap: 8px;
+    min-width: 0;
+    font-size: 14px;
+    color: var(--c-text-muted);
+}
+
+/* 收藏按钮原先在题目头部靠右(.favorite-btn 自带 margin-left:auto),
+   搬进元信息行后必须清掉,否则会把 meta 撑开、与按钮组一起跑偏。 */
+.quiz-meta .favorite-btn {
+    margin-left: 0;
+}
+
+.quiz-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;   /* 按钮组靠右 */
+}
+
+.quiz-actions button {
+    flex: none;
 }
 
 .hidden {
@@ -1350,20 +1360,6 @@ h3 {
 
 /* ==================== 方案 A:大卡片即点即判(手机刷题交互) ==================== */
 
-.quiz-progress {
-    height: 6px;
-    background: var(--c-border-light);
-    border-radius: 999px;
-    overflow: hidden;
-    margin-bottom: 12px;
-}
-#quiz-progress-fill {
-    height: 100%;
-    width: 0;
-    background: linear-gradient(90deg, var(--c-primary), var(--c-progress-tip));
-    transition: width 0.2s;
-}
-
 .streak-badge {
     font-size: 14px;
     font-weight: 600;
@@ -1431,10 +1427,6 @@ h3 {
         width: 100%;
         padding: 16px;
         font-size: 16px;
-    }
-    .question-header {
-        flex-wrap: wrap;
-        gap: 8px;
     }
 }
 
@@ -1944,7 +1936,6 @@ html[data-theme="dark"] {
     --c-ai-connected-text: #8fe3a8;   /* 同暗色 --c-success-text */
     --c-ai-connected-bg: #1d3a26;     /* 同暗色 --c-success-bg */
     --c-border-hairline: #2c3138;     /* 同暗色 --c-border-light */
-    --c-progress-tip: #4a6a9e;         /* 暗色进度渐变尾色(压暗) */
     --c-star-border: #f0a500;          /* 暗色下并入 --c-accent-orange */
     --c-star-text: #ffd666;
     --c-star-bg: #3a3320;
@@ -2021,13 +2012,7 @@ html[data-theme="dark"] .container {
         padding: 8px 0 12px;
         background: transparent;
     }
-    /* 题干紧跟进度条,只留一行的呼吸感(居中版留白过大,按 👤 反馈改顶对齐) */
-    #quiz-section.active:has(#quiz-container:not(.hidden)) .question-header {
-        margin-bottom: 8px;
-    }
-    #quiz-section.active:has(#quiz-container:not(.hidden)) .quiz-progress {
-        height: 5px;
-    }
+    /* 题干直接贴顶(头部已并到下方操作区) */
     #quiz-section.active:has(#quiz-container:not(.hidden)) .question-content {
         margin-top: 0;
     }
@@ -2043,7 +2028,9 @@ html[data-theme="dark"] .container {
         margin-top: auto;
     }
 
-    /* 操作条固定于底部 tab 栏上方,不随内容滚动 */
+    /* 操作条固定于底部 tab 栏上方,不随内容滚动。
+       手机宽度下元信息与按钮挤不进一行,故元信息**另起一行**放在按钮行之上;
+       按钮行仍是单行(不换行),这是既有的窄操作条约定。 */
     .quiz-controls {
         position: fixed;
         left: 0;
@@ -2051,22 +2038,35 @@ html[data-theme="dark"] .container {
         bottom: calc(52px + env(safe-area-inset-bottom));
         z-index: 90;
         display: flex;
-        flex-direction: row;   /* 旧规则是 column(竖排占两行),强制单行 */
-        flex-wrap: nowrap;
-        gap: 8px;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 0;
         padding: 8px 8px;
         background: var(--c-surface);
         border-top: 1px solid var(--c-border);
         box-shadow: 0 -1px 6px rgba(0, 0, 0, 0.05);
     }
-    .quiz-controls .action-btn {
+    .quiz-meta {
+        gap: 8px;
+        font-size: 13px;
+    }
+    /* 按钮行:横向单行,不换行 */
+    .quiz-actions {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 8px;
+        margin-left: 0;        /* 单行占满,不再靠右 */
+        width: 100%;
+    }
+    .quiz-actions .action-btn {
         flex: 1;
         margin: 0;
         padding: 8px 8px;
         font-size: 14px;
     }
     #quiz-container {
-        padding-bottom: calc(48px + env(safe-area-inset-bottom));  /* 紧凑操作条的精确避让 */
+        /* 预留:按钮行(约 48) + 元信息行(约 22) + 底部 tab 安全区 */
+        padding-bottom: calc(78px + env(safe-area-inset-bottom));
     }
 }
 

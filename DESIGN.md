@@ -77,7 +77,6 @@
 | `--c-review-wrong-bg` | `#fff5f5` | `#3f0d18` | 回顾·答错行底 |
 | `--c-ai-connected-text` / `-bg` | `#1e7e46` / `#e9f7ef` | `#8fe3a8` / `#1d3a26` | AI 已连接徽章 |
 | `--c-border-hairline` | `#eef0f3` | `#2c3138` | 极浅分隔边框(救援区) |
-| `--c-progress-tip` | `#6c8fc7` | `#4a6a9e` | 进度条渐变尾色 |
 
 > ✅ **已决(2026-09-10,👤 拍板)**:`--c-primary-alt` / `--c-primary-alt-deep` 已**并入 `--c-primary` / `--c-primary-deep`**,14 处引用一并改写,定义行已删。二者取值原本亮暗两档就完全相同(别名是"紫→宝蓝"过渡期的遗留,无独立语义),故**本次合并零视觉变化**。同时删除零引用的 `--c-chip-bg`。令牌总数 66 → 63。
 > **现状:全站已无未被引用的令牌**。新增令牌后请用这条自检:`for t in $(grep -o '^\s*--c-[a-z-]*' styles.css | tr -d ' ' | sort -u); do [ "$(grep -c "var($t)" styles.css)" = 0 ] && echo "未被引用: $t"; done`
@@ -148,6 +147,26 @@
   多一次展开就多一次打断;**压行数只能靠控件形态(分段控件/单行文案),不能靠藏功能**。
 - 一个 `.seg` 在源码里写成一行(每个 `<label>` 内含 input+span),避免每条选项占 4 行。
 - 单开关(如随机顺序)用 `.setting-check`,须显式 `flex: none`(否则被 `.seg label` 的 `flex:1` 拉满)且 `min-height: 40px`。
+
+### 刷题操作区(`.quiz-controls`)
+
+题目元信息(序号 `1/45`、题型、☆收藏、🔥连对)**不再占题干上方一行**,改为并入底部操作区:
+
+```
+[ 1/45  判断  ☆收藏  🔥连对 ]  [ 上一题 | 提交答案 | 下一题 | 结束刷题 ]   ← 桌面:同行,元信息在左
+─────────────────────────────────────────────
+[ 1/45  判断  ☆收藏  🔥连对 ]                                            ← 手机:元信息另起一行
+[ 上一题 | 提交答案 | 下一题 | 结束刷题 ]                                 ← 按钮行仍单行
+```
+
+规则:
+- **进度条已移除**(👤 反馈)。题干直接贴顶,不再有"头部 + 进度条"两层占位。
+- 桌面 `flex` 同行、`align-items: center`,元信息在左、按钮组 `margin-left: auto` 靠右。
+- 手机操作条是**固定底栏**,窄屏挤不下,故 `flex-direction: column`:元信息一行、按钮一行;
+  **按钮行必须 `flex-wrap: nowrap`**(保持既有"窄操作条单行"约定)。
+- ⚠️ `.favorite-btn` 自带 `margin-left: auto`(原在题目头部靠右),进元信息行后必须用
+  `.quiz-meta .favorite-btn { margin-left: 0 }` 清掉,否则会把元信息行撑开、与按钮组一起跑偏。
+- 手机端避让高度相应加大(`#quiz-container` 的 `padding-bottom` 需预留"按钮行 + 元信息行")。
 
 ### 刷题完成(`.quiz-result`)
 
@@ -254,7 +273,7 @@
 
 - **12px**(`rounded-xl`):卡片、模态框、嵌入面板(operation-card / quiz-container / modal-content / rescue-box)
 - **6px**(`rounded-md`):按钮、输入框、行内控件、徽章
-- **999px**(胶囊):主题开关、状态 chip、细进度条
+- **999px**(胶囊):主题开关、状态 chip、连对徽标
 
 嵌套圆角:子元素 ≤ 父元素。
 

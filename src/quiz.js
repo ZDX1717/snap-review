@@ -145,9 +145,7 @@ export function displayQuestion() {
     questionType.textContent = question.type;
     questionText.textContent = question.content;
 
-    // 方案 A:进度条 + 连对徽标
-    const progressFill = document.getElementById('quiz-progress-fill');
-    if (progressFill) progressFill.style.width = `${Math.round(((state.currentQuestionIndex + 1) / state.currentQuiz.length) * 100)}%`;
+    // 连对徽标(进度条已按 👤 反馈移除,避免残留无用的写入)
     updateStreakBadge();
     
     // 题目解释：逐题模式作答时可见；套题模式交卷前隐藏（回顾时统一展示）
