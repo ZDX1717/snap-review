@@ -379,8 +379,8 @@ h3 {
 .quiz-container {
     background-color: var(--c-surface-alt);
     border-radius: 6px;
-    padding: 24px;
-    margin-top: 24px;
+    padding: 16px 24px 24px;   /* 顶部收到 16:上面是吸顶标题栏,不需要再留 24px */
+    margin-top: 8px;           /* 原 24px:与 main 的 --pad-top 叠加后题干区离标题栏 64px,太空 */
     max-width: var(--reading-width);   /* 阅读宽度:选项行不拉满千像素 */
     margin-left: auto;
     margin-right: auto;
@@ -496,6 +496,13 @@ h3 {
     color: var(--c-text-secondary);
 }
 
+/* 标签行三件的统一高度(👤 要求"统一高度")。
+   ⚠️ 三件(答题卡 / 题型徽章 / 收藏)的高度**只能从这里取** —— 各自硬编码就会重新漂移成
+   28/20/22 那种高低不齐;手机档只改这一个值,三件一起变。 */
+:root {
+    --tag-row-h: 28px;
+}
+
 /* 题干上方的标签行:[答题卡(含进度)] [题型] [☆收藏](👤 定调 2026-09-11)。
    ⚠️ 铁律:这排按钮的宽窄变化**不得影响下面题干的宽度**。
    做法 = 本行 `nowrap`,且每个子项 `flex: 0 0 auto`(各自按内容占宽、谁也别想靠伸缩挤别人);
@@ -511,15 +518,21 @@ h3 {
     flex: 0 0 auto;
 }
 
-/* 题型徽章:置于题干之前(👤 要求),小号弱化,不抢题干视线 */
+/* 题型徽章:放在题干之前(👤 要求),小号弱化,不抢题干视线。
+   ⚠️ 它和答题卡/收藏同处一行,**三者必须等高**(👤 要求"统一高度")——
+   先前徽章靠 padding+line-height 撑出 20px,与相邻按钮的 28px 参差,一行看着高低不齐。
+   改为 inline-flex 居中 + 与按钮同一套 min-height。 */
 .question-type-badge {
-    display: inline-block;
-    padding: 1px 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--tag-row-h);
+    padding: 0 10px;
     border-radius: 999px;
     background: var(--c-panel-bg);
     color: var(--c-text-muted);
-    font-size: 11px;
-    line-height: 1.6;
+    font-size: 12px;          /* 与旁边两个按钮同字号:三件等高也要等"视觉重量",11px 会显得小一号 */
+    line-height: 1.2;
 }
 
 /* 行内轻提示:替代 alert 的窄条(琥珀底),出现在状态栏上方 */
@@ -539,13 +552,13 @@ h3 {
 .auto-next {
     margin-left: 0;
     padding: 0 12px;
-    min-height: 28px;
+    min-height: var(--tag-row-h);
     border: 1px solid var(--c-border);
     border-radius: 999px;
     background: var(--c-surface);
     color: var(--c-text-muted);
     font-family: inherit;
-    font-size: 13px;
+    font-size: 12px;          /* 与标签行三件统一 */
     line-height: 1.3;
     cursor: pointer;
     white-space: nowrap;
@@ -559,14 +572,18 @@ h3 {
     font-weight: 600;
 }
 
-/* 收藏按钮:搬到「题型徽章」后面(👤 定调),与徽章同排、同高 ——
-   一行两个标签,高度对齐才不会看起来一高一低。 */
+/* 收藏按钮:住在标签行第三位(👤 定调)。
+   ⚠️ 必须与答题卡、题型徽章**等高**(👤 要求"统一高度"):三个不同高度(28/20/22)排一行
+   看起来高高低低。字号提到 12px、min-height 与按钮一致,并清掉自带的 margin-left:auto。 */
 .question-tags .favorite-btn {
     margin-left: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 0 10px;
-    min-height: 22px;
+    min-height: var(--tag-row-h);
     font-size: 12px;
-    line-height: 1.4;
+    line-height: 1.2;
     border-radius: 999px;
 }
 
@@ -2204,12 +2221,19 @@ html[data-theme="dark"] .container {
         gap: 6px;
         font-size: 12px;
     }
-    /* 手机档:状态栏里两个中号按钮收小半档(26px),但仍明确是按钮 ——
-       它们与右侧「上一题/下一题/结束刷题」同处一条固定状态栏,不能让左区把按钮组挤走 */
-    .answer-card-open,
-    .auto-next {
-        min-height: 26px;
+    /* 手机档:统一高度收半档(28 → 26) */
+    :root { --tag-row-h: 26px; }
+    /* 手机档:按钮收小半档(26px),但仍明确是按钮。
+       ⚠️ 标签行三件(答题卡/题型/收藏)必须**一起**收 —— 只改其中一个就又不等高了。 */
+    .auto-next,
+    .question-tags .question-type-badge,
+    .question-tags .favorite-btn {
+        min-height: var(--tag-row-h);
         padding: 0 10px;
+        font-size: 12px;
+    }
+    /* 答题卡入口的 min-height 在它自己的基础规则里(文件更靠后),这里只需收字号 */
+    .question-tags .answer-card-open {
         font-size: 12px;
     }
     /* ⚠️ 左区只剩一个按钮,且状态行禁止折行(👤 报的 bug:折行会让状态栏变高、按钮上下排列)。
@@ -2458,13 +2482,13 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     gap: 4px;
     background: var(--c-surface);
     border: 1px solid var(--c-border);
-    padding: 0 12px;
-    min-height: 28px;
+    padding: 0 10px;              /* 与题型徽章/收藏一致的三件内边距 */
+    min-height: var(--tag-row-h);
     border-radius: 999px;
-    /* 显式字号,不用 `font: inherit` —— 否则它继承 .quiz-meta 的 14px,
-       与隔壁「智能切题」的 13px 不齐,两个并排按钮会一高一低 */
+    /* 显式字号,不用 `font: inherit`(会继承父级 14px)。
+       12px = 标签行三件(答题卡/题型/收藏)的统一字号 —— 等高之外还要等视觉重量 */
     font-family: inherit;
-    font-size: 13px;
+    font-size: 12px;
     color: inherit;
     cursor: pointer;
     white-space: nowrap;

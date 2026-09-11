@@ -337,25 +337,113 @@ test('收藏按钮住在题型徽章之后、题干之前(👤 定调)', () => {
     assert.ok(html.indexOf('id="question-text"') > tagsEnd, '题干应在标签行之后');
 });
 
+// CSS 断言小工具。
+// 三条踩过的坑(每次都是"断言读到了错的值"而不是"解析器崩了",所以格外难查):
+//   ① 不能假设媒体查询都在文件后半段 —— 本文件有 20+ 个 @media,基础规则反而在后面;
+//   ② 解析必须连**花括号前的选择器前缀**一起收 —— 只取 `{...}` 内部的话,选择器就丢了;
+//   ③ @media 是**嵌套**的(里面有内层规则),要把内层规则也收进来并标成"媒体查询内",
+//      否则要么丢掉手机档覆盖、要么把手机档的值当成桌面基准值(两种错都踩过)。
+function buildIndex(cssText) {
+    const index = new Map();      // 选择器 → [{body, inMedia}]
+    const stack = [];
+    let buf = '';
+    for (let i = 0; i < cssText.length; i++) {
+        const ch = cssText[i];
+        if (ch === '{') {
+            const sel = buf.trim();
+            if (sel.startsWith('@media')) { stack.push('media'); buf = ''; continue; }
+            const inMedia = stack.includes('media');
+            if (!index.has(sel)) index.set(sel, []);
+            // 花括号配对后回填 body
+            let depth = 1, j = i + 1;
+            while (j < cssText.length && depth > 0) {
+                if (cssText[j] === '{') depth++;
+                else if (cssText[j] === '}') depth--;
+                if (depth === 0) break;
+                j++;
+            }
+            index.get(sel).push({ body: cssText.slice(i + 1, j), inMedia });
+            i = j; buf = '';
+            continue;
+        }
+        if (ch === '}') { stack.pop(); buf = ''; continue; }
+        buf += ch;
+    }
+    return index;
+}
+// 声明值:必须剥掉行尾/行内注释,否则 `padding: 0 10px;   /* … */` 整段注释都算进值里(→ NaN)
+const decl = (body, prop) => {
+    const raw = (body.match(new RegExp(prop + '\\s*:\\s*([^;]+)')) || [])[1];
+    return raw === undefined ? undefined : raw.replace(/\/\*[\s\S]*?\*\//g, '').trim();
+};
+// 基准形态 = 文件里第一条(媒体查询之外的)规则 —— 后面的 @media 只算覆盖
+const baseRule = (index, sel) => {
+    const hits = (index.get(sel) || []).filter(h => !h.inMedia);
+    return hits.length ? hits[0].body : '';
+};
+const baseMinHeight = (index, sel) => decl(baseRule(index, sel), 'min-height');
+const baseToken = (index, name) => {
+    const hits = index.get(':root') || [];
+    let value;
+    for (const h of hits) {
+        const hit = decl(h.body, name);
+        if (hit !== undefined) value = hit;
+    }
+    return value;
+};
+// 合并同名规则(后者胜,含媒体查询覆盖)—— 用于"某处声明过就算"的宽松断言
+const mergedRule = (index, sel) => (index.get(sel) || []).map(h => h.body).join(';');
+
 test('答题卡与智能切题按钮已放大到中号(👤 要求"合理放大")', () => {
-    const cssText = String(cssNoComments);
-    const ruleOf = (sel) => {
-        const m = cssText.match(new RegExp(sel.replace(/[.]/g, '\\.') + '\\s*\\{([^}]*)\\}'));
-        return m ? m[1] : null;
-    };
+    const index = buildIndex(String(cssNoComments));
     for (const sel of ['.answer-card-open', '.auto-next']) {
-        const body = ruleOf(sel);
-        assert.ok(body, `缺 ${sel} 基础规则`);
-        const minH = Number((body.match(/min-height\s*:\s*(\d+)px/) || [])[1]);
-        assert.ok(minH >= 26, `${sel} 高度至少 26px(迷你版点不准),实际 ${minH}`);
-        const font = Number((body.match(/font-size\s*:\s*(\d+)px/) || [])[1]);
-        assert.ok(font >= 12, `${sel} 字号至少 12px,实际 ${font}`);
-        // 必须看得出是按钮:有边框
-        assert.ok(/border\s*:/.test(body), `${sel} 必须有边框(否则看不出可点)`);
+        const base = baseRule(index, sel);
+        const raw = baseMinHeight(index, sel) || '';
+        // 高度可以写成令牌:令牌本身也要 >= 26px,否则"等同"也等于一起变小
+        const value = /var\(--tag-row-h\)/.test(raw) ? (baseToken(index, '--tag-row-h') || '') : raw;
+        const minH = parseInt(value, 10);
+        assert.ok(minH >= 26, `${sel} 高度至少 26px(迷你版点不准),实际 ${raw} → ${value}`);
+        const font = parseFloat(decl(base, 'font-size') || '');   // ⚠️ 带单位,必须 parseFloat 不能 Number
+        assert.ok(font >= 12, `${sel} 基准字号至少 12px(不得靠继承父级的 16px),实际 ${decl(base, 'font-size')}`);
+        assert.ok(/(^|[;\s])border\s*:/.test(base), `${sel} 必须有边框(否则看不出可点)`);
     }
 });
 
-// ==================== 答题卡抽屉(P0-6.1)====================
+test('标签行三件(答题卡/题型/收藏)必须等高(👤 要求"统一高度")', () => {
+    // 事故:三件各自硬编码高度 → 28 / 20 / 22,排一行高低参差,手机档还漏改一个。
+    // 根治:高度只从单一令牌 --tag-row-h 取 —— 手机档只改令牌,三件一起变。
+    const cssText = String(cssNoComments);
+    const index = buildIndex(cssText);
+    // ⚠️ 用**基础选择器**取基准值:三件的基础规则分别是 .answer-card-open / .question-type-badge /
+    //    .question-tags .favorite-btn(收藏是复合的,因为它只在标签行里用)。手机档的覆盖写在
+    //    `.question-tags ...` 复合选择器里,解析时会被媒体查询过滤掉,不会污染基准值。
+    const sels = {
+        '答题卡': '.answer-card-open',
+        '题型徽章': '.question-type-badge',
+        '收藏': '.question-tags .favorite-btn',
+    };
+    for (const [name, sel] of Object.entries(sels)) {
+        const v = baseMinHeight(index, sel);
+        assert.ok(v, `${name} 缺 min-height(${sel})`);
+        assert.ok(/var\(--tag-row-h\)/.test(v),
+            `${name} 的 min-height 必须取自 --tag-row-h,不得写死(实际 ${v}):各自写死就会重新漂移成不等高`);
+    }
+    // 令牌:基准 28px,手机档只覆盖这一个值
+    const base = Number((baseToken(index, '--tag-row-h') || '').replace('px', ''));
+    assert.ok(base >= 26, `--tag-row-h 基准值至少 26px,实际 ${baseToken(index, '--tag-row-h')}`);
+    const mediaIdx = cssText.indexOf('max-width: 768px');
+    assert.ok(/--tag-row-h\s*:\s*\d+px/.test(cssText.slice(mediaIdx)),
+        '手机档应只改 --tag-row-h 一个值(而不是挨个改三件)');
+    // 三件水平内边距一致,宽度节奏才齐
+    const pads = Object.values(sels).map(sel => decl(mergedRule(index, sel), 'padding'));
+    assert.ok(pads.every(p => p), '三件都应有 padding:' + JSON.stringify(pads));
+    assert.strictEqual(new Set(pads).size, 1, '三件内边距应一致(否则一行里宽度节奏不齐):' + JSON.stringify(pads));
+    // 字号也要一致,否则三件里的文字视觉大小不齐
+    const fonts = Object.values(sels).map(sel => decl(mergedRule(index, sel), 'font-size'));
+    assert.ok(fonts.every(f => f && parseFloat(f) >= 12), '三件字号都应 >= 12px:' + JSON.stringify(fonts));
+    assert.strictEqual(new Set(fonts).size, 1, '三件字号应一致(等高之外还要等视觉重量):' + JSON.stringify(fonts));
+});
+
 test('答题卡抽屉在 <main> 之外(公理:浮层不受 section 显隐牵连)', () => {
     const mainEnd = html.indexOf('</main>');
     const pos = html.indexOf('id="answer-card-drawer"');
@@ -413,23 +501,19 @@ test('答题卡三态样式齐备,且未答用虚线框(不只靠颜色区分)',
 test('手机上题目容器不得被 auto 边距压塌(👤 报的"很窄很突兀")', () => {
     // 事故:.quiz-container 桌面靠 margin-left/right:auto 居中(配 max-width 640)。
     // 手机档把它变成 flex 子项后,**flex 子项的 auto 横向边距会吃掉全部剩余空间**:
-    // 元素既不拉伸、又被压到最小内容宽 —— 实测 390px 手机上容器只剩 82px,
+    // 元素既不拉伸、又被压到最小内容宽 —— Chromium 实测 390px 手机上容器只剩 82px,
     // 题干与选项全成一条窄柱,且与题干长短无关(每一题都窄)。
-    // 故手机档必须显式把这两条 auto 边距清零。判据要求"同一条规则体内同时出现三者",
-    // 避免只写 flex 而漏掉 margin 这种半修状态。
-    const mediaIdx = cssNoComments.indexOf('max-width: 768px');
-    assert.ok(mediaIdx > -1, '应有手机媒体查询');
-    const mobile = cssNoComments.slice(mediaIdx);
-    const reset = [...mobile.matchAll(/([^{}]+)\{([^}]*)\}/g)].find(m =>
-        /quiz-container/.test(m[1]) &&
-        /display\s*:\s*flex/.test(m[2]) &&
-        /margin-left\s*:\s*0/.test(m[2]) &&
-        /margin-right\s*:\s*0/.test(m[2]));
-    assert.ok(reset, '手机档应有一条同时含 display:flex 与 margin-left/right:0 的 #quiz-container 规则:'
-        + '否则 auto 边距会把容器压成窄柱(实测 82px)');
-    // 结果页同样是该 flex 容器的子项,auto 边距会让它塌成窄条
-    const resultReset = [...mobile.matchAll(/([^{}]+)\{([^}]*)\}/g)].find(m =>
-        /quiz-result/.test(m[1]) && /margin-left\s*:\s*0/.test(m[2]));
+    // 判据要求"同一条规则体内同时出现 display:flex 与 margin-left/right:0",避免半修状态。
+    const index = buildIndex(String(cssNoComments));
+    const mobileContainer = (index.get('#quiz-section.active:has(#quiz-container:not(.hidden)) #quiz-container') || [])
+        .filter(h => h.inMedia)
+        .find(h => /display\s*:\s*flex/.test(h.body) && !/flex-direction\s*:\s*row/.test(h.body));
+    assert.ok(mobileContainer, '手机档应有一条把 #quiz-container 变成 flex 子项的规则');
+    assert.ok(/margin-left\s*:\s*0/.test(mobileContainer.body) && /margin-right\s*:\s*0/.test(mobileContainer.body),
+        '手机档必须同时清掉 auto 横向边距:否则 flex 子项的 auto 边距会把容器压成窄柱(实测 82px)');
+    // 结果页同样是该 flex 容器的子项
+    const resultReset = (index.get('#quiz-section.active:has(#quiz-result:not(.hidden)) #quiz-result') || [])
+        .find(h => /margin-left\s*:\s*0/.test(h.body));
     assert.ok(resultReset, '手机档结果页也要清掉 auto 边距');
 });
 
