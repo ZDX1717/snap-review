@@ -497,6 +497,33 @@ h3 {
     color: var(--c-text-faint);
 }
 
+/* 自动下一题开关:置于状态行右侧(序号/题型之后),不额外占行 */
+.auto-next {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: 2px;
+    font-size: 11px;
+    line-height: 1.2;
+    color: var(--c-text-faint);
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.auto-next input {
+    width: 12px;
+    height: 12px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--c-primary);
+}
+
+.auto-next:has(input:checked) {
+    color: var(--c-primary);
+    font-weight: 600;
+}
+
 /* 收藏按钮原先在题目头部靠右(.favorite-btn 自带 margin-left:auto),
    搬进元信息行后必须清掉,否则会把 meta 撑开、与按钮组一起跑偏。 */
 .quiz-meta .favorite-btn {

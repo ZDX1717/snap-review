@@ -2,11 +2,11 @@ import { buildAiNotes } from './ai.js';
 import { state } from './state.js';
 import { applyTheme, initTheme, setThemeSetting } from './theme.js';
 import { finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey, shuffleArray, splitInlineOptions } from './parser.js';
-import { loadCollapsedBanks, loadFromLocalStorage, loadMasterySetting, saveCollapsedBanks, saveMasterySetting, saveToLocalStorage, recordImportBatch } from './storage.js';
+import { loadAutoNextSetting, loadCollapsedBanks, loadFromLocalStorage, loadMasterySetting, saveAutoNextSetting, saveCollapsedBanks, saveMasterySetting, saveToLocalStorage, recordImportBatch } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, toggleAllBanks, updateErrorStreak, updateErrorsList, updateToggleAllBanksLabel } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
-import { backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, readQuizSource, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
+import { backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, readQuizSource, shouldAutoNext, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
 import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback, cancelPreviewAi, rescueAiOrganize, updateAiSettingsBadge, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, clearPasteInput, editorHistClick, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, togglePromptContent, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks, renderErrorsForBank, renderRecycleBin, restoreRecycled, recycleBankEntry, restoreBankVersion } from './bank.js';
 
 // Zquiz · 期末周刷题 —— 应用装配入口
@@ -118,6 +118,7 @@ const answerReview = document.getElementById('answer-review');
 const reviewOnlyWrong = document.getElementById('review-only-wrong');
 const masteryNote = document.getElementById('mastery-note');
 const favoriteBtn = document.getElementById('favorite-btn');
+const autoNextToggle = document.getElementById('auto-next-toggle');
 const favoritesList = document.getElementById('favorites-list');
 const masteryThresholdSelect = document.getElementById('mastery-threshold-select');
 // 复习范围选择
@@ -219,6 +220,7 @@ function init() {
     loadFromLocalStorage();
     loadCollapsedBanks();
     masteryThresholdSelect.value = String(loadMasterySetting());
+    if (autoNextToggle) autoNextToggle.checked = loadAutoNextSetting();
 
     // 更新题库选择下拉框与最近导入信息;AI 连接徽章
     updateBankSelect();
@@ -288,6 +290,13 @@ function setupEventListeners() {
 
     // 收藏
     favoriteBtn.addEventListener('click', toggleFavoriteCurrent);
+
+    // 自动下一题开关(存本机)
+    if (autoNextToggle) {
+        autoNextToggle.addEventListener('change', function() {
+            saveAutoNextSetting(this.checked);
+        });
+    }
 
     // 错题移出规则设置
     masteryThresholdSelect.addEventListener('change', function() {
@@ -510,6 +519,7 @@ if (typeof window === 'undefined') {
         finalizeQuestion,
         finishExam,
         getSourcePool,
+        shouldAutoNext,
         updateSourceUI,
         readQuizSource,
         formatQuestionsForExport,
@@ -521,6 +531,8 @@ if (typeof window === 'undefined') {
         loadCollapsedBanks,
         loadFromLocalStorage,
         loadMasterySetting,
+        loadAutoNextSetting,
+        saveAutoNextSetting,
         nextQuestion,
         normalizeAnswerString,
         openImportPreview,

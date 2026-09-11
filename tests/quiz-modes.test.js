@@ -166,3 +166,38 @@ test('末题禁用后点击「下一题」不得重复交卷(禁用必须真挡�
     if (n._listeners && n._listeners.click) n._listeners.click();   // 模拟点击
     assert.strictEqual(run('correctCount'), before, '禁用状态下点击不应改变计分');
 });
+
+test('自动下一题判定:开关优先,逐题模式答错停留,末题不翻', () => {
+    // 规则(👤 需求):
+    //   开关关 → 永不自动;逐题模式答错 → 停留;最后一题 → 不自动(留给结束/交卷)
+    const T = (isCorrect, autoNext, quizMode, index, total) =>
+        run(`shouldAutoNext(${isCorrect}, { autoNext: ${autoNext}, quizMode: '${quizMode}', index: ${index}, total: ${total} })`);
+
+    // 开关关闭:任何情形都不自动
+    assert.strictEqual(T(true, false, 'immediate', 0, 5), false, '关闭时答对也不翻');
+    assert.strictEqual(T(true, false, 'exam', 0, 5), false, '关闭时套题也不翻');
+
+    // 逐题模式:答对才翻,答错停留
+    assert.strictEqual(T(true, true, 'immediate', 0, 5), true, '逐题答对应自动翻');
+    assert.strictEqual(T(false, true, 'immediate', 0, 5), false, '逐题答错应停留');
+
+    // 套题模式:对错都翻(作答即翻页)
+    assert.strictEqual(T(true, true, 'exam', 0, 5), true, '套题答对应翻');
+    assert.strictEqual(T(false, true, 'exam', 0, 5), true, '套题答错也翻(无即时反馈,停着无意义)');
+
+    // 末题:一律不自动翻
+    assert.strictEqual(T(true, true, 'immediate', 4, 5), false, '逐题末题不自动翻');
+    assert.strictEqual(T(true, true, 'exam', 4, 5), false, '套题末题不自动翻');
+});
+
+test('自动下一题开关:默认关闭、读写往返、非法值回退 false', () => {
+    run(`state.autoNext = false`);
+    assert.strictEqual(run(`loadAutoNextSetting()`), false, '未设置过时默认关闭');
+    assert.strictEqual(run(`saveAutoNextSetting(true)`), true);
+    assert.strictEqual(run(`loadAutoNextSetting()`), true, '开启后应持久化');
+    assert.strictEqual(run(`saveAutoNextSetting(false)`), false);
+    assert.strictEqual(run(`loadAutoNextSetting()`), false);
+    // 存了脏值必须回退 false,不能读成"开启"
+    store.set('autoNextSetting', 'yes');
+    assert.strictEqual(run(`loadAutoNextSetting()`), false, '非法值应回退关闭');
+});

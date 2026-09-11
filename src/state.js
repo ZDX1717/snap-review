@@ -23,6 +23,7 @@ export const state = {
     quizMode: 'immediate',
     userAnswers: [],
     masteryRemovedInSession: 0,
+    autoNext: false,          // 自动下一题(默认关闭,存本机)
     // 导入预览
     previewData: [],
     previewFilterWarned: false,

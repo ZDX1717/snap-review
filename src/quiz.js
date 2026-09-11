@@ -63,6 +63,7 @@ const EMPTY_SOURCE_HINT = {
 };
 
 export function startQuiz() {
+    cancelAutoNext();
     // 题源:题库 / 错题本 / 收藏夹
     const source = readQuizSource();
     let pool = getSourcePool(source);
@@ -269,6 +270,49 @@ function setNavEnabled(btn, enabled) {
     btn.disabled = !enabled;
 }
 
+// ==================== 自动下一题 ====================
+// 语义(👤 需求,按模式区分):
+//   逐题模式:答**对**才自动翻页;答错**停留**在当前题(要看解析、消化错因)。
+//   套题模式:作答后一律自动翻页(套题本就不即时反馈,停着没有意义)。
+// 细节:
+//   · 延迟 900ms 再翻,留出看反馈/选项判色动画的时间,避免"闪一下就没了"。
+//   · 最后一题不自动翻(逐题模式交由用户点「结束刷题」;套题模式点「交卷」)。
+//   · 任何手动翻页/结束/离开都会取消待执行的定时器,防止"手点完又被自动带走"。
+const AUTO_NEXT_DELAY_MS = 900;
+let autoNextTimer = null;
+
+function cancelAutoNext() {
+    if (autoNextTimer !== null) {
+        clearTimeout(autoNextTimer);
+        autoNextTimer = null;
+    }
+}
+
+// 纯判定:这次作答之后该不该自动翻页。抽出成纯函数以便单测
+// (vm 沙箱的 setTimeout 是空实现,定时器本身在测试里不会触发)
+export function shouldAutoNext(isCorrect, { autoNext, quizMode, index, total } = {}) {
+    if (!autoNext) return false;                       // 开关关闭 → 永不自动
+    if (quizMode !== 'exam' && !isCorrect) return false; // 逐题模式答错 → 停留消化
+    return index < total - 1;                          // 最后一题不自动翻(留给结束/交卷)
+}
+
+// 作答后调用:是否安排自动翻页由模式与对错共同决定
+function scheduleAutoNext(isCorrect) {
+    cancelAutoNext();
+    if (!shouldAutoNext(isCorrect, {
+        autoNext: state.autoNext,
+        quizMode: state.quizMode,
+        index: state.currentQuestionIndex,
+        total: state.currentQuiz.length,
+    })) return;
+    autoNextTimer = setTimeout(() => {
+        autoNextTimer = null;
+        // 兜底:期间可能已结束或换题,状态不一致就不动
+        if (quizContainer.classList.contains('hidden')) return;
+        nextQuestion();
+    }, AUTO_NEXT_DELAY_MS);
+}
+
 // 方案 A:左右滑切题 + 长按收藏(仅绑定一次)
 function bindQuizGestures() {
     const host = document.querySelector('.quiz-container');
@@ -337,6 +381,7 @@ export function submitAnswer() {
     }
     // 已在错题本中的题：答对累计连对（达阈值自动移出），答错清零
     removedFromErrorBook += updateErrorStreak(question, isCorrect, userAnswer);
+    scheduleAutoNext(isCorrect);
     state.masteryRemovedInSession += removedFromErrorBook;
 
     // 显示答案反馈
@@ -373,9 +418,12 @@ export function submitAnswer() {
 
 // 下一题
 export function nextQuestion() {
+    cancelAutoNext();   // 手动翻页优先,取消待执行的自动翻页
     if (state.quizMode === 'exam') {
         // 套题模式：先保存当前作答再翻页
         state.userAnswers[state.currentQuestionIndex] = collectUserAnswer();
+        // 套题模式:作答后一律自动翻页(传 true 表示"无需判对错即可继续")
+        if (state.autoNext) scheduleAutoNext(true);
         if (state.currentQuestionIndex >= state.currentQuiz.length - 1) {
             finishExam();
             return;
@@ -399,6 +447,7 @@ export function nextQuestion() {
 
 // 上一题（仅套题模式，已作答内容保留）
 export function prevQuestion() {
+    cancelAutoNext();   // 手动翻页优先,取消待执行的自动翻页
     if (state.quizMode !== 'exam' || state.currentQuestionIndex === 0) return;
     state.userAnswers[state.currentQuestionIndex] = collectUserAnswer();
     state.currentQuestionIndex--;
@@ -558,6 +607,7 @@ export function renderAnswerReview() {
 
 // 结束刷题（逐题模式）/ 交卷（套题模式）
 export function endQuiz() {
+    cancelAutoNext();
     if (state.quizMode === 'exam') {
         const unanswered = state.userAnswers.filter(a => !a).length;
         const message = unanswered > 0
@@ -576,6 +626,7 @@ export function endQuiz() {
 
 // 返回刷题设置
 export function backToQuizOptions() {
+    cancelAutoNext();
     quizResult.classList.add('hidden');
     quizSettings.classList.remove('hidden');
 }

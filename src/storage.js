@@ -117,6 +117,20 @@ export function saveMasterySetting(value) {
     return state.masteryThreshold;
 }
 
+// 自动下一题开关:默认关闭。非法值一律落回 false(与 loadMasterySetting 同样的白名单思路)
+export function loadAutoNextSetting() {
+    state.autoNext = localStorage.getItem('autoNextSetting') === '1';
+    return state.autoNext;
+}
+
+export function saveAutoNextSetting(on) {
+    state.autoNext = !!on;
+    try {
+        localStorage.setItem('autoNextSetting', state.autoNext ? '1' : '0');
+    } catch (e) { /* 存储异常时静默降级:本次会话内仍生效,仅不持久化 */ }
+    return state.autoNext;
+}
+
 // ==================== 导入批次记录(撤销)与覆盖前快照 ====================
 
 // 批次记录:最近 5 次;损坏时静默降级为无记录(仅失去撤销能力,不影响题库数据)
