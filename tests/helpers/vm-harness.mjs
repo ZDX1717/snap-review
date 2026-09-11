@@ -76,6 +76,11 @@ export async function loadApp({ confirmResult = true, promptValue = 'x', sandbox
     const sandbox = {
         // 最小 CustomEvent + document 事件总线(供事件通道导航测试)
         CustomEvent: class { constructor(type, opts = {}) { this.type = type; if (opts.detail !== undefined) this.detail = opts.detail; } },
+        // vm 上下文**没有** Node 的 URL 全局。产品代码要校验接口地址就必须用它
+        // (aiBaseUrlProblem),故这里补上 —— 否则一调就 ReferenceError,
+        // 表现为"AI 请求压根没发出去",而报错信息完全指不到沙箱头上(踩过)。
+        URL,
+        URLSearchParams,
         ...sandboxExtras,
         document: {
             getElementById: (id) => (elements[id] ||= makeEl()),

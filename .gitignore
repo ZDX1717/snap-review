@@ -1,0 +1,29 @@
+# ⚠️ 这个仓库的根目录**同时就是 GitHub Pages 站点**(Pages 源 = main / 根目录)。
+# 也就是说:凡是**被提交**的文件,都会立刻出现在公网上,而不只是留在 git 历史里。
+# 所以这里的规矩是 —— 任何"只属于本机"的东西,一律进 .gitignore,绝不提交。
+
+# 依赖(本项目运行时零依赖、零构建;node_modules 只可能被误装进来)
+node_modules/
+package-lock.json.bak
+
+# 密钥与凭据:绝对不能进仓库(会被 Pages 直接公开)
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*credentials*
+*secret*
+
+# 编辑器与系统杂物
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# 本地临时产物
+*.log
+*.tmp
+__pycache__/

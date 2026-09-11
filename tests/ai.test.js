@@ -1,7 +1,7 @@
 // AI 模块测试(0.9.x):预设/配置 + chat 客户端(假 fetch) + 分块 + 编排 + 存储 + 预览兜底/救援/B 路线集成
 import assert from 'node:assert';
 import test from 'node:test';
-import { AI_PROVIDERS, normalizeAiConfig, aiConfigReady, chatCompletion, testConnection, splitIntoChunks, aiFormatMaterial, aiFixQuestions, serializeQuestion, groupQuestionChunks, buildAiNotes } from '../src/ai.js';
+import { AI_PROVIDERS, normalizeAiConfig, aiConfigReady, aiBaseUrlProblem, chatCompletion, testConnection, splitIntoChunks, aiFormatMaterial, aiFixQuestions, serializeQuestion, groupQuestionChunks, buildAiNotes } from '../src/ai.js';
 import { loadAiConfig, saveAiConfig, loadAiUsage, recordAiUsage } from '../src/storage.js';
 
 // ---------- 厂商预设与配置 ----------
@@ -643,4 +643,67 @@ test('错题条目渲染:题型在题干前、选项裸露、不泄露用户错�
         .map(c => String(c.el.textContent));
     assert.ok(revealTexts.some(t => t.includes('对')), '判断题正确答案应显示"对"');
     assert.ok(!revealTexts.some(t => /答案[：:]\s*[AB]\s*$/.test(t)), '不得显示裸 A/B');
+});
+
+// ==================== 接口地址安全校验(安全审计 §4.3)====================
+// 背景:请求会带 `Authorization: Bearer <API Key>` 发往 baseUrl —— 填谁就等于把 Key 交给谁。
+// 从他人处抄来一份含"自定义地址"的配置,Key 就会被发到对方服务器。
+// (aiBaseUrlProblem / chatCompletion 已在文件顶部 import)
+
+test('接口地址校验:明文 http 拒绝,https 与本机 http 放行', () => {
+    assert.strictEqual(aiBaseUrlProblem('https://api.deepseek.com/v1'), null, 'https 应放行');
+    assert.ok(aiBaseUrlProblem('http://api.example.com/v1'), '公网明文 http 应拒绝(Key 会裸奔)');
+    assert.strictEqual(aiBaseUrlProblem('http://localhost:8080/v1'), null, '本机调试应放行');
+    assert.strictEqual(aiBaseUrlProblem('http://127.0.0.1:11434/v1'), null, '本机(127.0.0.1)应放行');
+    assert.strictEqual(aiBaseUrlProblem('http://[::1]:8080/v1'), null, '本机(IPv6 回环)应放行');
+});
+
+test('接口地址校验:格式错误与非 http(s) 协议都要拒绝', () => {
+    assert.ok(aiBaseUrlProblem(''), '空地址应拒绝');
+    assert.ok(aiBaseUrlProblem('api.example.com/v1'), '缺协议头应拒绝(不是完整网址)');
+    assert.ok(aiBaseUrlProblem('file:///etc/passwd'), 'file:// 应拒绝');
+    assert.ok(aiBaseUrlProblem('data:text/plain,hi'), 'data: 应拒绝');
+});
+
+test('出口守卫:地址不安全时绝不发起请求(Key 连发都不发出去)', async () => {
+    let called = false;
+    const spy = async () => { called = true; return { ok: true, json: async () => ({}) }; };
+    await assert.rejects(
+        () => chatCompletion({ baseUrl: 'http://evil.example.com/v1', apiKey: 'sk-xxx', model: 'm' },
+            [{ role: 'user', content: 'hi' }], { fetchImpl: spy }),
+        /接口地址不安全/,
+    );
+    assert.strictEqual(called, false, '地址不安全时不得调用 fetch(否则 Key 已经泄漏了)');
+});
+
+test('出口守卫不误伤正常 https 地址', async () => {
+    let url = '';
+    const spy = async (u) => { url = u; return { ok: true, json: async () => ({ choices: [{ message: { content: 'OK' } }] }) }; };
+    const out = await chatCompletion({ baseUrl: 'https://api.deepseek.com/v1/', apiKey: 'sk-x', model: 'deepseek-chat' },
+        [{ role: 'user', content: 'hi' }], { fetchImpl: spy });
+    assert.strictEqual(out, 'OK');
+    assert.strictEqual(url, 'https://api.deepseek.com/v1/chat/completions', '应正常拼接路径(并去掉尾斜杠)');
+});
+
+test('表单侧也走同一套校验(设置面板里填 http 会被拦住)', async () => {
+    // 保存与「测试连接」都先经 collectAiConfigFromForm():它在 aiConfigReady 之后校验地址。
+    // 这里直接驱动表单元素 + saveAiSettings(),断言"只加了校验函数却没接线"这种情况会被抓住。
+    // (saveAiSettings 是同步的,返回 false 表示被拦下未保存)
+    const { run, store, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp());
+    run(`init()`);
+    // 表单里填一个明文 http 地址
+    elements['ai-provider-select'].value = 'custom';
+    elements['ai-base-url'].value = 'http://evil.example.com/v1';
+    elements['ai-api-key'].value = 'k-test';
+    elements['ai-model-input'].value = 'm';
+    const saved = run(`saveAiSettings()`);
+    assert.strictEqual(saved, false, '明文 http 地址应被拦下,不保存');
+    assert.ok(!/evil\.example\.com/.test(store.get('aiConfig') || ''), '不安全地址不得落盘');
+    assert.ok(String(elements['ai-test-status'].textContent).includes('不安全') ||
+              String(elements['ai-test-status'].textContent).includes('https'),
+        '应给出可读的拒绝原因,实际:' + elements['ai-test-status'].textContent);
+    // 换成合法 https 地址 → 应能保存
+    elements['ai-base-url'].value = 'https://api.example.com/v1';
+    assert.strictEqual(run(`saveAiSettings()`), true, '合法 https 地址应能保存');
+    assert.ok(/api\.example\.com/.test(store.get('aiConfig') || ''), '合法地址应落盘');
 });

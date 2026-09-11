@@ -5,7 +5,7 @@ import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
 import { OFFICIAL_PROMPT, buildCopyText, copyText } from './prompt.js';
 import { toggleFavorite } from './favorites.js';
-import { aiConfigReady, aiFixQuestions, aiFormatMaterial, aiMatchKey, aiDiffParts, buildAiNotes, getProvider, normalizeAiConfig, testConnection } from './ai.js';
+import { aiConfigReady, aiFixQuestions, aiBaseUrlProblem, aiFormatMaterial, aiMatchKey, aiDiffParts, buildAiNotes, getProvider, normalizeAiConfig, testConnection } from './ai.js';
 import { isAiTested, loadAiConfig, loadRecycledBanks, markAiTested, purgeRecycledBank, recycleBank, restoreRecycledBank, saveAiConfig, saveRecycledBanks, recordAiUsage } from './storage.js';
 
 // 本次预览的来源标签(撤销记录展示用),由导入入口设置
@@ -367,6 +367,12 @@ function collectAiConfigFromForm() {
     });
     if (!aiConfigReady(cfg)) {
         setAiTestStatus('⚠ 接口地址、API Key、模型名都需要填写', 'error');
+        return null;
+    }
+    // 🔒 地址校验:**填谁就等于把 API Key 交给谁**,故非 https 一律拦住(本机回环地址除外)
+    const problem = aiBaseUrlProblem(cfg.baseUrl);
+    if (problem) {
+        setAiTestStatus('⚠ ' + problem, 'error');
         return null;
     }
     return cfg;

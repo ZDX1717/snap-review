@@ -35,11 +35,40 @@ export function aiConfigReady(cfg) {
     return !!(c.baseUrl && c.apiKey && c.model);
 }
 
+// 接口地址安全校验(2026-09-11 加,安全审计 §4.3)。
+// 背景:请求会带 `Authorization: Bearer <你的 API Key>` 发往这个地址 ——
+// **填谁就等于把 Key 交给谁**。若从他人处抄来一份含"自定义 baseUrl"的配置,
+// Key 就会被发到对方服务器。故:
+//   ① 拒绝明文 http(Key 会明文过网);
+//   ② 放行 https,以及本机回环地址( http://localhost / 127.0.0.1 / ::1 —— 本地调试与自建代理要用);
+//   ③ 拒绝非 http(s) 协议(防止 file://、data: 之类被当成接口地址)。
+// 返回 null = 通过;否则返回可直接展示给用户的原因。
+export function aiBaseUrlProblem(baseUrl) {
+    const raw = (baseUrl || '').trim();
+    if (!raw) return '接口地址不能为空';
+    let u;
+    try {
+        u = new URL(raw);
+    } catch (e) {
+        return '接口地址格式不对(需要完整网址,如 https://api.example.com/v1)';
+    }
+    if (u.protocol === 'https:') return null;
+    const host = u.hostname.replace(/^\[|\]$/g, '');
+    const isLoopback = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+    if (u.protocol === 'http:' && isLoopback) return null;   // 本机调试放行
+    if (u.protocol === 'http:') return '明文 http 会让 API Key 在网络上裸奔,请改用 https://';
+    return `不支持的协议 ${u.protocol}(只能用 https,或本机 http)`;
+}
+
 // OpenAI 兼容 chat 调用(非流式)。fetchImpl 可注入(测试);timeoutMs 仅在支持 AbortController 的环境生效。
 export async function chatCompletion(config, messages, { signal, timeoutMs = 60000, fetchImpl } = {}) {
     const cfg = normalizeAiConfig(config);
     if (!cfg.baseUrl || !cfg.model) throw new Error('AI 配置不完整:请先在「AI 设置」里填好接口地址与模型');
     if (!cfg.apiKey) throw new Error('AI 配置不完整:缺少 API Key');
+    // 🔒 出口守卫:地址不安全就**绝不发起请求** —— 否则 Key 已经发出去了,再提示也晚了。
+    // (表单侧也有同样的校验;这里是"就算配置从别处来也拦得住"的第二道)
+    const problem = aiBaseUrlProblem(cfg.baseUrl);
+    if (problem) throw new Error('接口地址不安全:' + problem);
     const f = fetchImpl || (typeof fetch !== 'undefined' ? fetch : null);
     if (!f) throw new Error('当前环境不支持网络请求');
 

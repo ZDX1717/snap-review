@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=1034">
+    <link rel="stylesheet" href="styles.css?v=1035">
 </head>
 <body>
     <div class="container">
@@ -329,6 +329,7 @@ A：选项A  B：选项B
                 <div class="form-group">
                     <label for="ai-base-url">接口地址（OpenAI 兼容，不含 /chat/completions）：</label>
                     <input type="text" id="ai-base-url" class="form-input" placeholder="https://open.bigmodel.cn/api/paas/v4">
+                    <p class="meta-note">⚠ 你的 API Key 会以 <code>Authorization: Bearer</code> 发往这个地址 —— <b>填谁就等于把 Key 交给谁</b>。请只填你自己信任的接口；非 https 地址会被拒绝（本机 localhost 除外）。</p>
                 </div>
                 <div class="form-group">
                     <label for="ai-api-key">API Key（仅存本机 localStorage，不上传）：</label>
@@ -452,6 +453,6 @@ A：选项A  B：选项B
         </p>
     </div>
 
-    <script type="module" src="src/main.js?v=1034"></script>
+    <script type="module" src="src/main.js?v=1035"></script>
 </body>
 </html>
