@@ -207,3 +207,40 @@ test('编辑器导航越界保护', () => {
     assert.strictEqual(run('editIndex'), 0);
 });
 
+
+test('题型与答案一致性:单选答案改成 AC 后自动变多选(防"单选+多字母"死题)', async () => {
+    // 关卡 bug:编辑器里把答案从 A 改成 AC 却没改题型 → type='单选' 而 answer='AC',
+    // 刷题时按单选渲染(控件只能选一个字母)→ 永远判不对。
+    // 注意:本文件前面的用例会永久改写 elements['editor-options'].querySelectorAll,
+    // 故这里用**独立 app 实例**,避免继承那份带空选项的桩。
+    const app = await loadApp();
+    app.elements['editor-options'].querySelectorAll = () => ([
+        { dataset: { letter: 'A' }, value: '选项甲', disabled: false },
+        { dataset: { letter: 'B' }, value: '选项乙', disabled: false },
+        { dataset: { letter: 'C' }, value: '选项丙', disabled: false },
+    ]);
+    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('原题', 'A'))}] };
+        editBankName = 'T'; editIndex = 0;
+        editorStem.value = '原题'; editorType.value = '单选'; editorAnswer.value = 'AC';`);
+    assert.strictEqual(app.run('editorSaveCurrent(true)'), true);
+    const saved = JSON.parse(app.run('JSON.stringify(questionBanks["T"][0])'));
+    assert.strictEqual(saved.answer, 'AC');
+    assert.strictEqual(saved.type, '多选', '答案多字母必须自动改为多选');
+    assert.strictEqual(app.run('editorType.value'), '多选', '下拉框应回显真正落库的类型');
+});
+
+test('题型与答案一致性:finalizeQuestion 兜底纠正历史坏数据', async () => {
+    const app = await loadApp();
+    app.run(`globalThis.__q1 = finalizeQuestion({ content:'x', type:'单选', options:{A:'甲',B:'乙',C:'丙'}, answer:'AC' })`);
+    assert.strictEqual(app.run('__q1.type'), '多选', '应纠正为多选');
+    // 导入材料写「类型:多选」但答案是单字母 → 仍以答案为准判为单选(既有规则,判分自洽)
+    app.run(`globalThis.__q2 = finalizeQuestion({ content:'x', type:'多选', options:{A:'甲',B:'乙'}, answer:'A' })`);
+    assert.strictEqual(app.run('__q2.type'), '单选', '导入路径:类型提示服从答案');
+    // 但编辑器里**用户亲手选**的多选必须保留(多选只有一个正确项是合法形态)
+    app.run(`globalThis.__q4 = finalizeQuestion({ content:'x', type:'多选', options:{A:'甲',B:'乙'}, answer:'A', _typeExplicit:true })`);
+    assert.strictEqual(app.run('__q4.type'), '多选', '编辑器显式选的多选应保留');
+    assert.ok(!('_typeExplicit' in JSON.parse(app.run('JSON.stringify(__q4)'))), '内部标记不得落库');
+    // 判断题不受影响
+    app.run(`globalThis.__q3 = finalizeQuestion({ content:'x', type:'判断', options:{A:'正确',B:'错误'}, answer:'A' })`);
+    assert.strictEqual(app.run('__q3.type'), '判断', '判断题不应被改编');
+});

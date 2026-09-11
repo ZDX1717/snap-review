@@ -329,11 +329,13 @@ function bindQuizGestures() {
         const t = e.changedTouches[0];
         const dx = t.clientX - tsX, dy = t.clientY - tsY;
         if (Math.abs(dx) < 60 || Math.abs(dx) <= Math.abs(dy) * 1.5) return;
-        if (dx < 0) { // 左滑:下一题(逐题模式下未作答的题按"确认答案"处理)
-            if (state.quizMode === 'exam' && state.currentQuestionIndex >= state.currentQuiz.length - 1) return;
+        const isLast = state.currentQuestionIndex >= state.currentQuiz.length - 1;
+        if (dx < 0) { // 左滑:下一题(未作答的题按"确认答案"处理)
+            // 最后一题不允许用手势前进 —— 收尾必须走「结束刷题」/「交卷」,避免误滑结束
+            if (isLast) return;
             advanceNext();
-        } else if (state.currentQuestionIndex > 0 && state.quizMode === 'exam') {
-            prevQuestion(); // 右滑上一题:仅套题
+        } else if (state.currentQuestionIndex > 0) {
+            prevQuestion(); // 右滑:上一题(逐题模式也能回看,答过的题已锁定不可改)
         }
     }, { passive: true });
 }

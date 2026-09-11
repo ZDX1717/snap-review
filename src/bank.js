@@ -1211,12 +1211,19 @@ export function editorSaveCurrent(silent) {
 
     const wasAi = q.aiSource === 'ai';
     const wasPending = !q.answer;
+    // 保存前对齐题型与答案:答案是多个字母就必须是多选。
+    // 否则会出现"单选 + 答案 AC"——刷题时按单选渲染(只能选一个字母)而永远判不对。
+    // 先落值,再归一化 —— 顺序不能反:finalizeQuestion 要读的就是刚采集的 options/answer
     q.content = stem;
-    q.type = type;
     q.options = options;
     q.answer = answer;
     q.explanation = editorExplanation.value.trim();
     q.analysis = editorAnalysis.value.trim();
+    // 用户在下拉框里的选择是明确意图,打标记让 finalize 不要用答案长度覆盖它
+    q._typeExplicit = true;
+    q.type = type;
+    finalizeQuestion(q);   // 归一化,并按答案长度纠正题型(多字母 → 多选)
+    const finalType = q.type;
     // 人工保存 = 人工核验完成:撤销 AI 标记,并把消散的自动标记记入历史日志
     if (wasAi) {
         delete q.aiSource;
@@ -1227,7 +1234,13 @@ export function editorSaveCurrent(silent) {
     saveToLocalStorage();
     state.editorDirty = false;
     renderBankEditor();
-    if (!silent) alert('本题已保存');
+    // 让下拉框反映真正落库的类型(被自动纠正时给出可见反馈)
+    editorType.value = finalType;
+    if (!silent) {
+        alert(finalType !== type
+            ? `已按答案自动改为「${finalType}」并保存`
+            : '本题已保存');
+    }
     return true;
 }
 

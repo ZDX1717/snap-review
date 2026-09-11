@@ -113,7 +113,16 @@ export function finalizeQuestion(q) {
         else q.answer = '';
     } else {
         q.answer = rawAnswer.replace(/[^A-H]/g, '');
-        q.type = q.answer.length > 1 ? '多选' : '单选';
+        // 题型按答案长度推导。两种情形要区分:
+        //  · 导入路径:材料里的「类型:多选」只是**提示**,与答案矛盾时以答案为准(判分自洽)——
+        //    见 import-pipeline 的『类型提示与答案矛盾时以答案推断为准』。
+        //  · 编辑器保存:用户在表单里**亲手选**的类型是明确意图,单字母答案不该把它改掉
+        //    (多选题只有一个正确项是合法形态)。由 editorSaveCurrent 打 `_typeExplicit` 标记区分。
+        // 反向必须纠正:答案是多字母时一定是多选,否则刷题按单选渲染会永远判不对。
+        q.type = q.answer.length > 1
+            ? '多选'
+            : (q._typeExplicit && q.type === '多选' ? '多选' : '单选');
+        delete q._typeExplicit;   // 内部标记不落库
     }
 
     // 置信度：预览时用于提示"需要人工看一眼"的题

@@ -276,3 +276,20 @@ test('状态栏按钮:智能切题在,确认答案已删', () => {
     assert.ok(!html.includes('submit-answer-btn'), '「确认答案」按钮元素应已移除');
     assert.ok(!html.includes('确认答案'), '「确认答案」文案应已移除');
 });
+
+test('状态栏左区:状态一行在上,收藏与智能切题并排在下一行', () => {
+    const i = html.indexOf('class="quiz-meta"');
+    const meta = html.slice(i, html.indexOf('</div>', html.indexOf('quiz-meta-row')));
+    assert.ok(meta.includes('class="quiz-status"'), '左区应有状态指示块');
+    assert.ok(meta.includes('class="quiz-meta-row"'), '左区应有并排行容器');
+    // 收藏与智能切题都在并排行里,且收藏在左
+    const row = meta.slice(meta.indexOf('quiz-meta-row'));
+    assert.ok(row.indexOf('favorite-btn') < row.indexOf('auto-next-toggle'), '收藏应在智能切题左侧');
+    // 智能切题不得再留在状态行里
+    const status = meta.slice(meta.indexOf('class="quiz-status"'), meta.indexOf('quiz-meta-row'));
+    assert.ok(!status.includes('auto-next-toggle'), '智能切题不应再在状态行内');
+    // 并排行必须是 flex
+    const cssText = String(cssNoComments);
+    const m = cssText.match(/\.quiz-meta-row\s*\{([^}]*)\}/);
+    assert.ok(m && /display\s*:\s*flex/.test(m[1]), '.quiz-meta-row 应为 flex 并排');
+});
