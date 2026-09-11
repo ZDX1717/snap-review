@@ -202,6 +202,8 @@ export function displayQuestion() {
         inputElement.addEventListener('change', () => {
             optionItem.classList.toggle('selected', inputElement.checked);
             clearQuizHint();   // 已动手选择 → 提示自然失效
+            // 多选勾选状态变化 → 按钮在「下一题 / 确认答案」之间切换
+            if (question.type === '多选') syncNextButtonLabel();
             if (inputElement.checked && question.type !== '多选') {
                 optionsContainer.querySelectorAll('.option-item').forEach(o => o.classList.remove('selected'));
                 optionItem.classList.add('selected');
@@ -272,6 +274,7 @@ export function displayQuestion() {
             restoreGradedAnswer(question, state.userAnswers[state.currentQuestionIndex]);
         }
     }
+    syncNextButtonLabel();
 
     markEndButtonReady();
     bindQuizGestures();
@@ -306,6 +309,23 @@ function paintGradedOptions(question, userAnswer, isCorrect, optsContainer) {
         if (correctSet.has(inp.value)) item.classList.add('correct-card', 'correct');
         if (userSet.has(inp.value) && !isCorrect) item.classList.add('wrong-card', 'incorrect');
     });
+}
+
+// 「确认答案」态的判定:逐题模式的多选,已勾选但尚未判分。
+// 为什么需要它:多选的判分时机原来与"下一题"合并,导致判分与翻页同步发生,
+// 用户看不到本题结果(👤 反馈)。现在把它显式化 —— 有勾选时按钮变「确认答案」,
+// 点它只判分并停在本题,再点一次才前进,与单选"先判分、后翻页"的节奏一致。
+export function shouldConfirmAnswer(quizMode, isAnswered, q) {
+    return quizMode !== 'exam' && !isAnswered && !!q && q.type === '多选';
+}
+
+// 按当前状态刷新「下一题」按钮的外观(是否已勾选决定是否为确认态)
+export function syncNextButtonLabel() {
+    const q = state.currentQuiz[state.currentQuestionIndex];
+    const confirm = shouldConfirmAnswer(state.quizMode, state.isAnswered, q);
+    const hasPick = confirm && !!collectUserAnswer();
+    nextQuestionBtn.classList.toggle('confirming', hasPick);
+    nextQuestionBtn.textContent = hasPick ? '确认答案' : '下一题';
 }
 
 // 最后一题的「结束刷题 / 交卷」在判分完成后变色,提示"可以收尾了"(👤 要求)
@@ -514,13 +534,29 @@ export function submitAnswer() {
 // 背景:多选的「确认答案」按钮已删除(👤 决定),改由"任何切题动作即确认"承担 ——
 // 点「下一题」或左滑都算提交。收在这一处,避免两条入口各写一份判定而漂移。
 export function advanceNext() {
-    if (state.quizMode !== 'exam' && !state.isAnswered) {
-        // 未作答:以当前勾选判分。若一选项都没选,submitAnswer 会给出内联提示并返回,
-        // 此时**必须留在本题**(👤 反馈:原来提示完仍会跳过,等于把题跳过去了)。
-        if (!collectUserAnswer()) { submitAnswer(); return; }
+    const question = state.currentQuiz[state.currentQuestionIndex];
+    const confirmMode = shouldConfirmAnswer(state.quizMode, state.isAnswered, question);
+
+    if (confirmMode) {
+        if (!collectUserAnswer()) {
+            // 一个都没勾:提示并留在本题(不得把没答的题跳过去)
+            submitAnswer();
+            return;
+        }
+        // 有勾选 → 本次点击是「确认答案」:只判分,停在本题展示结果。
+        // 下一次点击才前进(与单选"先判分、后翻页"的节奏一致)。
         submitAnswer();
+        syncNextButtonLabel();
+        return;
     }
-    cancelAutoNext();   // 判分可能刚安排了自动切题,手动/手势推进优先,取消它
+
+    if (state.quizMode !== 'exam' && !state.isAnswered) {
+        // 非多选但未作答(理论上不会走到):同样先判分
+        submitAnswer();
+        if (!state.isAnswered) return;   // 未通过校验(空选)→ 留在本题
+    }
+
+    cancelAutoNext();   // 手动/手势推进优先,取消待执行的自动切题
     nextQuestion();
 }
 

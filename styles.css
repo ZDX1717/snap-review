@@ -574,6 +574,17 @@ h3 {
     white-space: nowrap;
 }
 
+/* 「确认答案」态(👤 方案):多选已勾选、尚未判分时,「下一题」变橘色描边。
+   为何不实心橘:--c-warn(#ffc107) 上白字对比度仅 1.63,不可读;
+   且末题判分后是蓝色 .ready,两套实心强调色会互相打架。故用描边 + 橘字。 */
+.quiz-actions #next-question-btn.confirming {
+    background-color: var(--c-warn-bg-soft);
+    border: 1px solid var(--c-warn-accent);
+    color: var(--c-warn-text-alt);
+    font-weight: 600;
+}
+
+
 /* 末题判分完成 →「结束刷题 / 交卷」变色,提示"可以收尾了"(👤 要求)。
    用强调色 + 轻微脉冲,与普通次要按钮区分开。 */
 .quiz-actions #end-quiz-btn.ready {

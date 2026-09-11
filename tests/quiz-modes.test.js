@@ -243,16 +243,23 @@ test('「下一题」即确认答案:未作答的多选会被判分并前进', (
         sandbox.document.querySelectorAll = (sel) =>
             sel.includes('input[name="answer"]:checked') ? vals.map((v) => ({ value: v })) : [];
     };
+    // 第一次点击 = 「确认答案」:判分并**停在本题**(让用户看到结果)
     pick(['A', 'C']);
     run(base + ` advanceNext();`);
-    assert.strictEqual(run('currentQuestionIndex'), 1, '应前进到第 2 题');
+    assert.strictEqual(run('currentQuestionIndex'), 0, '确认答案应停在本题');
     assert.strictEqual(run('correctCount'), 1, '未作答的多选应按当前勾选判分(AC 正确)');
+    assert.strictEqual(run('isAnswered'), true, '确认后应标记为已作答');
+    // 第二次点击 = 前进
+    run(`advanceNext()`);
+    assert.strictEqual(run('currentQuestionIndex'), 1, '再点一次才前进到第 2 题');
 
-    // 勾错(AB)→ 仍判分并前进,不会卡住
+    // 勾错(AB)→ 同样先判分停留,再前进
     pick(['A', 'B']);
     run(base + ` advanceNext();`);
-    assert.strictEqual(run('currentQuestionIndex'), 1, '同样应前进');
+    assert.strictEqual(run('currentQuestionIndex'), 0, '勾错也应先停在本题');
     assert.strictEqual(run('wrongCount'), 1, 'AB 与标准 AC 不符 → 计错');
+    run(`advanceNext()`);
+    assert.strictEqual(run('currentQuestionIndex'), 1, '再点前进');
 
     // 完全没勾就点下一题:**留在本题**并给出提示(👤 反馈:原来提示完仍会跳过)
     pick([]);
@@ -365,4 +372,50 @@ test('末题判分后「结束刷题/交卷」变色(非末题或未作答则不
     run('prevQuestion()');
     assert.ok(!endBtn.classList.contains('ready'), '离开末题后不应残留高亮');
     sandbox.document.querySelector = () => makeEl();
+});
+
+test('确认答案按钮状态机:未选=下一题,已选=确认答案(橘),判分后=下一题', () => {
+    const btn = elements['next-question-btn'];
+    const multi = `
+        quizMode = 'immediate';
+        currentQuiz = [{ content:'M', type:'多选', options:{A:'1',B:'2',C:'3'}, answer:'AC', analysis:'', explanation:'', confidence:1, raw:'' }];
+        questionBank = currentQuiz; currentQuestionIndex = 0; isAnswered = false; userAnswers = [''];
+    `;
+    const noPick = () => { sandbox.document.querySelectorAll = () => []; };
+    const pick = (v) => { sandbox.document.querySelectorAll = (sel) =>
+        sel.includes('input[name="answer"]:checked') ? v.map((x) => ({ value: x })) : []; };
+
+    // ① 未勾选 → 「下一题」,无 confirming 态
+    noPick();
+    run(multi + ` displayQuestion();`);
+    assert.strictEqual(String(btn.textContent), '下一题', '未勾选应为「下一题」');
+    assert.ok(!btn.classList.contains('confirming'), '未勾选不应有 confirming 态');
+
+    // ② 勾选一个 → 「确认答案」+ confirming
+    pick(['A']);
+    run(`displayQuestion();`);   // 触发 sync(模拟勾选后的刷新)
+    run(`(function(){ var q=state.currentQuiz[0]; })()`);
+    run(`syncNextButtonLabel()`);
+    assert.strictEqual(String(btn.textContent), '确认答案', '已勾选应为「确认答案」');
+    assert.ok(btn.classList.contains('confirming'), '已勾选应有 confirming 态(橘色描边)');
+
+    // ③ 取消勾选 → 退回「下一题」
+    noPick();
+    run(`syncNextButtonLabel()`);
+    assert.strictEqual(String(btn.textContent), '下一题', '取消勾选应退回「下一题」');
+    assert.ok(!btn.classList.contains('confirming'));
+
+    // ④ 判分后 → 前进态(不再是确认态)
+    pick(['A', 'C']);
+    run(`syncNextButtonLabel(); advanceNext(); syncNextButtonLabel();`);
+    assert.strictEqual(run('isAnswered'), true, '应已判分');
+    assert.strictEqual(String(btn.textContent), '下一题', '判分后应回到「下一题」');
+    assert.ok(!btn.classList.contains('confirming'), '判分后不应再有 confirming 态');
+
+    // ⑤ 单选不参与该状态机
+    run(`quizMode='immediate'; currentQuiz=[{content:'S',type:'单选',options:{A:'1',B:'2'},answer:'A',analysis:'',explanation:'',confidence:1,raw:''}];
+         questionBank=currentQuiz; currentQuestionIndex=0; isAnswered=false; userAnswers=['']; displayQuestion();`);
+    run(`syncNextButtonLabel()`);
+    assert.strictEqual(String(btn.textContent), '下一题', '单选不应变为「确认答案」');
+    sandbox.document.querySelectorAll = () => [];
 });
