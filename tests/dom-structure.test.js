@@ -410,6 +410,29 @@ test('答题卡三态样式齐备,且未答用虚线框(不只靠颜色区分)',
     assert.ok(!/border\s*:/.test(current[0].replace(/outline[^;]*;/g, '')), '当前题不得覆盖 border(会吃掉三态底色)');
 });
 
+test('手机上题目容器不得被 auto 边距压塌(👤 报的"很窄很突兀")', () => {
+    // 事故:.quiz-container 桌面靠 margin-left/right:auto 居中(配 max-width 640)。
+    // 手机档把它变成 flex 子项后,**flex 子项的 auto 横向边距会吃掉全部剩余空间**:
+    // 元素既不拉伸、又被压到最小内容宽 —— 实测 390px 手机上容器只剩 82px,
+    // 题干与选项全成一条窄柱,且与题干长短无关(每一题都窄)。
+    // 故手机档必须显式把这两条 auto 边距清零。判据要求"同一条规则体内同时出现三者",
+    // 避免只写 flex 而漏掉 margin 这种半修状态。
+    const mediaIdx = cssNoComments.indexOf('max-width: 768px');
+    assert.ok(mediaIdx > -1, '应有手机媒体查询');
+    const mobile = cssNoComments.slice(mediaIdx);
+    const reset = [...mobile.matchAll(/([^{}]+)\{([^}]*)\}/g)].find(m =>
+        /quiz-container/.test(m[1]) &&
+        /display\s*:\s*flex/.test(m[2]) &&
+        /margin-left\s*:\s*0/.test(m[2]) &&
+        /margin-right\s*:\s*0/.test(m[2]));
+    assert.ok(reset, '手机档应有一条同时含 display:flex 与 margin-left/right:0 的 #quiz-container 规则:'
+        + '否则 auto 边距会把容器压成窄柱(实测 82px)');
+    // 结果页同样是该 flex 容器的子项,auto 边距会让它塌成窄条
+    const resultReset = [...mobile.matchAll(/([^{}]+)\{([^}]*)\}/g)].find(m =>
+        /quiz-result/.test(m[1]) && /margin-left\s*:\s*0/.test(m[2]));
+    assert.ok(resultReset, '手机档结果页也要清掉 auto 边距');
+});
+
 test('答题卡样式不得写死像素宽度(宽度走档位令牌)', () => {
     const drawer = cssNoComments.match(/\.answer-card-drawer\s*\{[^}]*\}/)[0];
     assert.ok(!/max-width\s*:\s*\d+px/.test(drawer), '抽屉不得写死 max-width 像素');

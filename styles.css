@@ -2145,8 +2145,20 @@ html[data-theme="dark"] .container {
         display: flex;
         flex-direction: column;
         margin-top: 0;
+        /* 🚨 必须清掉桌面的居中 auto 边距(`.quiz-container` 的 margin-left/right: auto)。
+           本元素在此布局里是 **flex 子项**,而 flex 子项的 auto 横向边距会**吃掉全部剩余空间**,
+           元素既不拉伸、又被压到最小内容宽 —— 实测 390px 手机上容器只剩 82px,
+           题干与选项全成一条窄柱(👤 报的"很窄很突兀",且**与题干长短无关,每一题都窄**)。
+           宽度改由 flex 拉伸决定,故 auto 边距在这里没有任何意义。 */
+        margin-left: 0;
+        margin-right: 0;
         padding: 8px 0 12px;
         background: transparent;
+    }
+    /* 同理:结果页也是同一 flex 容器里的子项,auto 边距会让它塌成窄条 */
+    #quiz-section.active:has(#quiz-result:not(.hidden)) #quiz-result {
+        margin-left: 0;
+        margin-right: 0;
     }
     /* 题干直接贴顶(头部已并到下方操作区) */
     #quiz-section.active:has(#quiz-container:not(.hidden)) .question-content {
