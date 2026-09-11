@@ -46,7 +46,12 @@ export function makeEl() {
         appendChild(child) { this.children.push(child); return child; },
         textContent: '', value: '', innerHTML: '', files: [],
         checked: false, placeholder: '', rows: 0, dataset: {},
-        querySelector: () => makeEl(), querySelectorAll: () => [],
+        // querySelectorAll 默认返回空数组;但**编辑器选项**这类"表单内容即数据来源"的场景
+        // 必须能喂进去(editorCollectOptions 靠它读选项)。用 _setQueryAll 显式注入,
+        // 比在桩里造真实 DOM 树便宜得多,也避免"因为读不到就放宽产品逻辑"这种坏修法。
+        querySelector: () => makeEl(),
+        querySelectorAll: () => [],
+        _setQueryAll(items) { this.querySelectorAll = () => items; return this; },
         type: '', children: [], disabled: false,
         focus() {},
     };

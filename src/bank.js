@@ -5,7 +5,7 @@ import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
 import { OFFICIAL_PROMPT, buildCopyText, copyText } from './prompt.js';
 import { toggleFavorite } from './favorites.js';
-import { aiConfigReady, aiFixQuestions, aiBaseUrlProblem, aiFormatMaterial, aiMatchKey, aiDiffParts, buildAiNotes, getProvider, normalizeAiConfig, testConnection } from './ai.js';
+import { aiConfigReady, aiFixQuestions, aiAnswerQuestions, aiBaseUrlProblem, aiFormatMaterial, aiMatchKey, aiDiffParts, buildAiNotes, getProvider, mergeAiAnswers, normalizeAiConfig, questionsNeedingAi, testConnection } from './ai.js';
 import { isAiTested, loadAiConfig, loadRecycledBanks, markAiTested, purgeRecycledBank, recycleBank, restoreRecycledBank, saveAiConfig, saveRecycledBanks, recordAiUsage } from './storage.js';
 
 // 本次预览的来源标签(撤销记录展示用),由导入入口设置
@@ -50,6 +50,8 @@ const editorAddOption = document.getElementById('editor-add-option');
 const editorRemoveOption = document.getElementById('editor-remove-option');
 const editorExplanation = document.getElementById('editor-explanation');
 const editorAnalysis = document.getElementById('editor-analysis');
+const editorAiAnswerBtn = document.getElementById('editor-ai-answer-btn');
+const editorAiAnswerNote = document.getElementById('editor-ai-answer-note');
 const editorPosition = document.getElementById('editor-position');
 const lastImportInfo = document.getElementById('last-import-info');
 const copyPromptBtn = document.getElementById('copy-prompt-btn');
@@ -70,6 +72,7 @@ const aiModelInput = document.getElementById('ai-model-input');
 const aiTestStatus = document.getElementById('ai-test-status');
 const aiTestBtn = document.getElementById('ai-test-btn');
 const previewAiBtn = document.getElementById('preview-ai-btn');
+const previewAiAnswerBtn = document.getElementById('preview-ai-answer-btn');
 const previewAiCancelBtn = document.getElementById('preview-ai-cancel-btn');
 const previewAiProgress = document.getElementById('preview-ai-progress');
 const previewAiProgressFill = document.getElementById('preview-ai-progress-fill');
@@ -77,6 +80,9 @@ const previewAiProgressText = document.getElementById('preview-ai-progress-text'
 // AI 兜底运行状态(模块级:取消控制器 + 防重入)
 let previewAiAbort = null;
 let previewAiRunning = false;
+// 编辑器:AI 填入的草稿台账(值 → 保存时比对;人一改就视为人工内容,不打 AI 标)
+let editorAiAnsweredAnswer = null;
+let editorAiAnsweredAnalysis = null;
 // B 路线(救援区)运行状态;第二次点击 = 取消
 let rescueAiAbort = null;
 let rescueAiRunning = false;
@@ -422,6 +428,90 @@ export function updateAiSettingsBadge() {
 
 // 预览页 AI 兜底(0.9.1 重构):只整理**已勾选的题** —— 视图是镜片,勾选是真相。
 // 勾选题序列化成官方格式分块发 AI → 解析回填 → 逐题 🤖 徽章写明改动;进度按"已整理 x/N 题"。
+// ==================== 模式二:批量补答案·解析(P1-1.3)====================
+// 与模式一的区别只有一件事:**模式一不许改内容,模式二可以给答案**。
+// 因此这里的每一步都要守住"只补缺失、绝不覆盖":
+//   ① 只把缺答案/缺解析的勾选题送去问;
+//   ② 合并时只填空白(mergeAiAnswers 保证),已有答案连问都不问;
+//   ③ 补上的字段打 answerSource/analysisSource = 'ai',导入时落库为永久标注。
+export async function previewAiAnswerFill() {
+    if (previewAiRunning) return;
+    const checkedSlots = state.previewData
+        .map((item, idx) => ({ item, idx }))
+        .filter(({ item }) => item.include);
+    if (checkedSlots.length === 0) {
+        showPreviewAiText('先勾选要补答案的题(可用「问题题」视图快速定位缺答案的题)');
+        return;
+    }
+    const todo = checkedSlots.filter(({ item }) => questionsNeedingAi([item.q]).length > 0);
+    if (todo.length === 0) {
+        showPreviewAiText('勾选的题都已带答案与解析,无需补');
+        return;
+    }
+    const cfg = normalizeAiConfig(loadAiConfig());
+    if (!aiConfigReady(cfg)) {
+        alert('请先在「⚙ AI 设置」里配置服务商与 API Key(自带 key,仅存本机)');
+        openAiSettings();
+        return;
+    }
+
+    previewAiRunning = true;
+    if (typeof AbortController !== 'undefined') previewAiAbort = new AbortController();
+    const signal = previewAiAbort ? previewAiAbort.signal : undefined;
+    if (previewAiAnswerBtn) previewAiAnswerBtn.disabled = true;
+    if (previewAiCancelBtn) previewAiCancelBtn.classList.remove('hidden');
+    if (previewAiProgress) previewAiProgress.classList.remove('hidden');
+    if (previewAiProgressFill) previewAiProgressFill.style.width = '5%';
+    if (previewAiProgressText) previewAiProgressText.textContent = `连接 AI…(共 ${todo.length} 题待补)`;
+
+    try {
+        const { questions: produced, total } = await aiAnswerQuestions(cfg, todo.map(({ item }) => item.q), {
+            signal,
+            onProgress: (done, t) => {
+                if (previewAiProgressFill) previewAiProgressFill.style.width = Math.round(done / t * 100) + '%';
+                if (previewAiProgressText) previewAiProgressText.textContent = `已补 ${done}/${t} 题`;
+            },
+        });
+        if (previewAiProgressFill) previewAiProgressFill.style.width = '100%';
+        // ⚠️ 合并会**就地改** todo 里的 q,而它们是 previewData 的同一对象引用 → 预览立即反映结果
+        const r = mergeAiAnswers(todo.map(({ item }) => item.q), produced);
+        recordAiUsage({ trigger: 'preview-answer', total, answerFilled: r.answerFilled, analysisFilled: r.analysisFilled, undetermined: r.undetermined });
+
+        // 逐题打"AI 拟答"标记:预览里明确标出哪些字段是 AI 填的,确认前必须先看见
+        const byContent = new Map();
+        r.details.forEach(d => byContent.set(d.content, d.parts.join('，')));
+        todo.forEach(({ item }) => {
+            const note = byContent.get(item.q.content);
+            if (!note) return;
+            item.aiNote = '✍️ AI 拟答：' + note;
+            item.aiAnswer = true;   // 供 renderPreview 高亮
+        });
+
+        renderPreview();
+        let msg = `完成:补入答案 ${r.answerFilled} 题、解析 ${r.analysisFilled} 题`;
+        if (r.undetermined) msg += `;${r.undetermined} 题 AI 说「无法确定」,已如实保留缺答案`;
+        if (r.filled < total) msg += `;${total - r.filled} 题无需改动`;
+        showPreviewAiText(msg + '。请逐题核对后再导入');
+        if (previewSummary) previewSummary.textContent = `✍️ AI 补答案完成(${total} 题待补,已标 🤖 拟答),请确认后导入`;
+    } catch (e) {
+        recordAiUsage({ trigger: 'preview-answer', ok: false, total: todo.length, error: String(e.message || e).slice(0, 120) });
+        if (e && /取消/.test(e.message)) {
+            showPreviewAiText('已取消');
+        } else {
+            alert('AI 补答案失败：' + (e.message || e));
+            showPreviewAiText('失败：' + String(e.message || e).slice(0, 60));
+        }
+        renderPreview();
+    } finally {
+        previewAiRunning = false;
+        previewAiAbort = null;
+        if (previewAiAnswerBtn) previewAiAnswerBtn.disabled = false;
+        if (previewAiBtn) previewAiBtn.disabled = false;
+        if (previewAiCancelBtn) previewAiCancelBtn.classList.add('hidden');
+        setTimeout(() => { if (previewAiProgress) previewAiProgress.classList.add('hidden'); }, 2000);
+    }
+}
+
 export async function previewAiFallback() {
     if (previewAiRunning) return;
     const checkedSlots = state.previewData
@@ -692,8 +782,9 @@ export function renderPreview() {
         // AI 改动标注(🤖 紫徽章):只有真变了才显示,写明改了什么
         if (item.aiNote) {
             const aiB = document.createElement('span');
-            aiB.className = 'badge ai-badge';
-            aiB.textContent = '🤖 ' + item.aiNote;
+            // AI 拟答用**待核验**琥珀色,与模式一的紫标区分:紫=AI 改过格式,琥珀=AI 给了内容
+            aiB.className = 'badge ' + (item.aiAnswer ? 'ai-answer-badge' : 'ai-badge');
+            aiB.textContent = item.aiAnswer ? item.aiNote : '🤖 ' + item.aiNote;
             head.appendChild(aiB);
         }
 
@@ -1182,6 +1273,72 @@ export function editorAddQuestion() {
 
 
 // 保存当前题（silent=true 时不弹提示），返回是否成功
+// ==================== 模式二:编辑器单题补答案/解析(P1-1.4)====================
+// 只填进**表单草稿区**,不直接落库 —— 用户过目并点保存才生效。
+// 保存时:AI 填的字段落 answerSource/analysisSource='ai'(永久标注);用户改过的字段转人工。
+export async function editorAiAnswer() {
+    const questions = currentEditBank();
+    const q = questions[state.editIndex];
+    if (!q) return;
+    const cfg = normalizeAiConfig(loadAiConfig());
+    if (!aiConfigReady(cfg)) {
+        alert('请先在「⚙ AI 设置」里配置服务商与 API Key(自带 key,仅存本机)');
+        openAiSettings();
+        return;
+    }
+    // 快照:用表单当前内容当"原题"来问,避免把用户刚改还没保存的内容丢掉
+    const draft = JSON.parse(JSON.stringify(q));
+    draft.content = editorStem.value.trim() || q.content;
+    // 选项以表单为准;表单读不到时退回内存里的原选项。
+    // ⚠️ 这个兜底有真实价值:vm 测试桩的 querySelectorAll 恒返回 [],editorCollectOptions() 会得到空对象,
+    //    于是"没选项就不许补答案"会把这条路径整条堵死;而测试桩**存在本身**就说明代码路径依赖了 DOM 细节。
+    draft.options = editorCollectOptions();
+    if (Object.keys(draft.options || {}).length === 0) draft.options = q.options || {};
+    draft.explanation = editorExplanation.value.trim();
+    draft.answer = (editorAnswer.value || '').trim();
+    draft.analysis = (editorAnalysis.value || '').trim();
+
+    // ⚠️ 顺序要紧:"已经完整"的判断必须**先于**确认框。
+    //    否则一道答案解析都齐的题会先弹"要覆盖吗"、点了才发现根本无需补 —— 白打扰用户一次。
+    if (questionsNeedingAi([draft]).length === 0) {
+        if (editorAiAnswerNote) editorAiAnswerNote.textContent = '本题已有答案与解析,无需补';
+        return;
+    }
+    // 表单里已有答案(但缺解析)时:AI 只会补空白,先说明再动手
+    if (draft.answer && !confirm('表单里已经填了答案。\nAI 只补空白字段,**不会覆盖你已填的答案**,继续吗？')) return;
+    if (Object.keys(draft.options || {}).length < 2) {
+        if (editorAiAnswerNote) editorAiAnswerNote.textContent = '本题还没有选项,先填好选项(至少 2 个)再补答案';
+        return;
+    }
+
+    if (editorAiAnswerBtn) editorAiAnswerBtn.disabled = true;
+    if (editorAiAnswerNote) editorAiAnswerNote.textContent = '⏳ AI 正在补…(单题,通常几秒)';
+    try {
+        const { questions: produced, total } = await aiAnswerQuestions(cfg, [draft]);
+        const r = mergeAiAnswers([draft], produced);
+        recordAiUsage({ trigger: 'editor-answer', total, answerFilled: r.answerFilled, analysisFilled: r.analysisFilled, undetermined: r.undetermined });
+        if (r.filled === 0) {
+            if (editorAiAnswerNote) editorAiAnswerNote.textContent = 'AI 没能给出可用的答案(AI 没返回或说无法确定)';
+            return;
+        }
+        // 只把 AI 真正补出来的字段写进表单
+        if (r.answerFilled > 0) { editorAnswer.value = draft.answer; editorAiAnsweredAnswer = draft.answer; }
+        if (r.analysisFilled > 0) { editorAnalysis.value = draft.analysis; editorAiAnsweredAnalysis = draft.analysis; }
+        const bits = [];
+        if (r.answerFilled) bits.push(`答案 ${draft.answer}`);
+        if (r.analysisFilled) bits.push('解析');
+        if (editorAiAnswerNote) {
+            editorAiAnswerNote.textContent = `✍️ AI 已填入${bits.join(' + ')}(🤖 未核验,请核对后点保存)`
+                + (r.undetermined ? ';AI 对答案表示「无法确定」' : '');
+        }
+    } catch (e) {
+        recordAiUsage({ trigger: 'editor-answer', ok: false, error: String(e.message || e).slice(0, 120) });
+        if (editorAiAnswerNote) editorAiAnswerNote.textContent = 'AI 失败：' + String(e.message || e).slice(0, 60);
+    } finally {
+        if (editorAiAnswerBtn) editorAiAnswerBtn.disabled = false;
+    }
+}
+
 export function editorSaveCurrent(silent) {
     const questions = currentEditBank();
     const q = questions[state.editIndex];
@@ -1217,6 +1374,10 @@ export function editorSaveCurrent(silent) {
 
     const wasAi = q.aiSource === 'ai';
     const wasPending = !q.answer;
+    // AI 是否动过这一题:答案或解析的**内容仍等于 AI 当初填的值** → AI 出的;
+    // 用户改过就转人工(改过就是人的,这是本功能的诚实性底线)
+    const answerFromAi = editorAiAnsweredAnswer !== null && editorAiAnsweredAnswer === answer;
+    const analysisFromAi = editorAiAnsweredAnalysis !== null && editorAiAnsweredAnalysis === (editorAnalysis.value || '').trim();
     // 保存前对齐题型与答案:答案是多个字母就必须是多选。
     // 否则会出现"单选 + 答案 AC"——刷题时按单选渲染(只能选一个字母)而永远判不对。
     // 先落值,再归一化 —— 顺序不能反:finalizeQuestion 要读的就是刚采集的 options/answer
@@ -1230,6 +1391,10 @@ export function editorSaveCurrent(silent) {
     q.type = type;
     finalizeQuestion(q);   // 归一化,并按答案长度纠正题型(多字母 → 多选)
     const finalType = q.type;
+    // 字段级来源标注:AI 填的标 'ai',人填的标 null(= 未标注 = 人工)
+    // ⚠️ 这是"永久标注"的落点:刷题反馈、错题卡、导出文件都读它来显示 🤖
+    q.answerSource = answerFromAi ? 'ai' : null;
+    q.analysisSource = (q.analysis && analysisFromAi) ? 'ai' : null;
     // 人工保存 = 人工核验完成:撤销 AI 标记,并把消散的自动标记记入历史日志
     if (wasAi) {
         delete q.aiSource;
@@ -1398,6 +1563,10 @@ export function editorRenderOptions() {
 
 // 渲染当前题表单
 export function editorRenderForm() {
+    // 换题即清 AI 草稿台账与提示(否则会把上一题的 AI 值当成这题的)
+    editorAiAnsweredAnswer = null;
+    editorAiAnsweredAnalysis = null;
+    if (editorAiAnswerNote) editorAiAnswerNote.textContent = '';
     const q = currentEditBank()[state.editIndex];
     if (!q) return;
 
@@ -1514,6 +1683,12 @@ function buildDeleteButton(onDelete) {
     return btn;
 }
 
+// AI 生成标注的统一写法(P1-1.5):展示位一律用它,不要各处自己拼字符串。
+// 诚实呈现:用户看到 🤖 就知道这个答案/解析不是来自材料原文,可信度自行判断。
+export function aiMark(source) {
+    return source === 'ai' ? '(🤖 AI 生成,未核验)' : '';
+}
+
 // 判断题按对错展示、选择题给「A. 选项原文」(唯一展示入口)
 function answerText(answer, question) {
     return answer ? formatAnswerForDisplay(answer, question) : '(未答)';
@@ -1563,11 +1738,11 @@ function buildErrorItem(question, index) {
 
     const correctAnswer = document.createElement('p');
     correctAnswer.className = 'correct-answer';
-    correctAnswer.textContent = `正确答案:${formatAnswerForDisplay(question.answer, question)}`;
+    correctAnswer.textContent = `正确答案${aiMark(question.answerSource)}:${formatAnswerForDisplay(question.answer, question)}`;
     reveal.appendChild(correctAnswer);
 
     const analysis = document.createElement('p');
-    analysis.textContent = `解析:${question.analysis || question.explanation || '暂无解析'}`;
+    analysis.textContent = `解析${aiMark(question.analysisSource)}:${question.analysis || question.explanation || '暂无解析'}`;
     reveal.appendChild(analysis);
     item.appendChild(reveal);
 
@@ -1651,11 +1826,11 @@ function buildFavoriteItem(fq) {
 
     const correctAnswer = document.createElement('p');
     correctAnswer.className = 'correct-answer';
-    correctAnswer.textContent = `正确答案:${answerText(fq.answer, fq)}`;
+    correctAnswer.textContent = `正确答案${aiMark(fq.answerSource)}:${answerText(fq.answer, fq)}`;
     reveal.appendChild(correctAnswer);
 
     const analysis = document.createElement('p');
-    analysis.textContent = `解析:${fq.analysis || fq.explanation || '暂无解析'}`;
+    analysis.textContent = `解析${aiMark(fq.analysisSource)}:${fq.analysis || fq.explanation || '暂无解析'}`;
     reveal.appendChild(analysis);
     item.appendChild(reveal);
 

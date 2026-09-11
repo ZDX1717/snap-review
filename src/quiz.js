@@ -152,6 +152,13 @@ export function startQuiz() {
 }
 
 
+// 解析的展示文本:AI 生成的解析要带标注(P1-1.5 展示位统一)
+// —— 用户看到 🤖 才知道这段解析不是材料原文里的,可信度自行判断。
+function analysisText(question) {
+    if (!question.analysis) return '';
+    return (question.analysisSource === 'ai' ? '解析(🤖 AI 生成,未核验):' : '解析:') + question.analysis;
+}
+
 // 显示题目
 export function displayQuestion() {
     const question = state.currentQuiz[state.currentQuestionIndex];
@@ -506,7 +513,7 @@ function restoreGradedAnswer(question, userAnswer) {
             ? '回答正确！'
             : `回答错误！正确答案是：${formatAnswerForDisplay(question.answer, question)}`;
         answerResult.className = isCorrect ? 'correct-answer' : 'wrong-answer';
-        answerExplanation.textContent = question.analysis || '';
+        answerExplanation.textContent = analysisText(question);
     }
     answerFeedback.classList.remove('hidden');
     paintGradedOptions(question, userAnswer, isCorrect);
@@ -665,7 +672,7 @@ export function submitAnswer() {
             : '回答正确！')
         : `回答错误！正确答案是：${formatAnswerForDisplay(question.answer, question)}`;
     answerResult.className = isCorrect ? 'correct-answer' : 'wrong-answer';
-    answerExplanation.textContent = question.analysis || '';
+    answerExplanation.textContent = analysisText(question);
     answerFeedback.classList.remove('hidden');
     // 留档:回看这一题时原样复现(含"已连对 N 次,移出错题本"这类当次提示)
     q_feedback[state.currentQuestionIndex] = {
@@ -900,7 +907,7 @@ export function renderAnswerReview() {
         if (question.analysis) {
             const ana = document.createElement('p');
             ana.className = 'review-analysis';
-            ana.textContent = `解析：${question.analysis}`;
+            ana.textContent = `${question.analysisSource === 'ai' ? '解析(🤖 AI 生成,未核验)' : '解析'}：${question.analysis}`;
             item.appendChild(ana);
         }
         if (question.explanation) {

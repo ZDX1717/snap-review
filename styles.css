@@ -1724,6 +1724,13 @@ h3 {
     color: var(--c-text-faint);
     white-space: nowrap;
 }
+/* AI 拟答(模式二):琥珀色 = "AI 给了内容,请核验",与模式一的紫标(改了格式)区分开 */
+.badge.ai-answer-badge {
+    background: var(--c-warn-bg);
+    color: var(--c-warn-text-deep);
+    border: 1px solid var(--c-warn-border);
+}
+
 .badge.ai-badge {
     background: var(--c-accent-purple-bg);
     color: var(--c-accent-purple-text);

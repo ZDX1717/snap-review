@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=1035">
+    <link rel="stylesheet" href="styles.css?v=1036">
 </head>
 <body>
     <div class="container">
@@ -45,19 +45,19 @@
 
                 <!-- 救援区 A/B：常驻展示，两条路一眼可选 -->
                 <div id="ai-rescue" class="rescue-box">
-                    <p class="rescue-title">解析不出来？让 AI 帮你整理原文（二选一）</p>
+                    <p class="rescue-title">解析不出来？用「AI 格式整理（不改内容）」把原文理顺（二选一）</p>
                     <div class="rescue-grid">
                         <div class="rescue-col">
-                            <h4>A · 手动整理（免费，自行去 AI 操作）</h4>
+                            <h4>A · 手动整理（免费，自行去 AI 操作）—— 只改格式，不动内容</h4>
                             <button id="copy-prompt-btn" class="action-btn">① 📋 复制提示词+题目</button>
                             <p class="rescue-hint">② 粘贴到豆包 / Kimi / DeepSeek 发送<br>③ 把 AI 回复<b>复制回来，粘到上方输入框</b></p>
                             <button type="button" id="prompt-toggle-btn" class="prompt-toggle">查看提示词内容 ▾</button>
                             <pre id="prompt-content" class="prompt-content hidden"></pre>
                         </div>
                         <div class="rescue-col">
-                            <h4>B · 自动整理（配置 Key，现场直接整理）</h4>
-                            <button type="button" id="rescue-ai-btn" class="action-btn">🤖 一键整理并填入输入框</button>
-                            <p class="rescue-hint">配置 Key 后一键整理，结果<b>自动填进输入框</b>（逐题带 🤖 标记）。<br>Key 在右上角 ⚙ AI 设置 里配，仅存本机。</p>
+                            <h4>B · 自动整理（配置 Key，现场直接整理）—— 只改格式，不动内容</h4>
+                            <button type="button" id="rescue-ai-btn" class="action-btn">🤖 AI 格式整理并填入输入框</button>
+                            <p class="rescue-hint">配置 Key 后一键整理，结果<b>自动填进输入框</b>（逐题带 🤖 标记）。<br><b>它不会替你编答案</b>：材料里没有答案的题一律留空。<br>Key 在右上角 ⚙ AI 设置 里配，仅存本机。</p>
                         </div>
                     </div>
                 </div>
@@ -292,7 +292,8 @@ A：选项A  B：选项B
                     </span>
                 </div>
                 <div class="preview-ai-row">
-                    <button type="button" id="preview-ai-btn" class="action-btn secondary preview-tools-btn">🤖 AI 整理勾选题</button>
+                    <button type="button" id="preview-ai-btn" class="action-btn secondary preview-tools-btn" title="只调整格式,不改答案与内容">🤖 AI 格式整理(不改内容)</button>
+                    <button type="button" id="preview-ai-answer-btn" class="action-btn secondary preview-tools-btn" title="只给缺答案/缺解析的题补上,已有的一律不动">✍️ AI 补答案·解析</button>
                     <button type="button" id="preview-ai-cancel-btn" class="action-btn secondary preview-tools-btn hidden">⛔ 取消</button>
                     <div id="preview-ai-progress" class="ai-progress hidden"><div id="preview-ai-progress-fill" class="ai-progress-fill"></div></div>
                     <span id="preview-ai-progress-text" class="ai-progress-text"></span>
@@ -392,6 +393,10 @@ A：选项A  B：选项B
                             <div class="form-group">
                                 <label for="editor-analysis">解析（可选）：</label>
                                 <textarea id="editor-analysis" rows="2"></textarea>
+                                <div class="editor-ai-answer-row">
+                                    <button type="button" id="editor-ai-answer-btn" class="action-btn small secondary">✍️ AI 补答案/解析</button>
+                                    <span id="editor-ai-answer-note" class="meta-note"></span>
+                                </div>
                             </div>
                             <div class="editor-nav-row">
                             <div class="bank-admin">
@@ -453,6 +458,6 @@ A：选项A  B：选项B
         </p>
     </div>
 
-    <script type="module" src="src/main.js?v=1035"></script>
+    <script type="module" src="src/main.js?v=1036"></script>
 </body>
 </html>

@@ -7,7 +7,9 @@ import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, updateErrorStreak } from './errorbook.js';
 import { toggleFavorite } from './favorites.js';
 import { advanceNext, backToQuizOptions, closeAnswerCard, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, isAnswerCardOpen, jumpToQuestion, openAnswerCard, readQuizSource, renderAnswerCard, resetGradingState, shouldAutoNext, shouldConfirmAnswer, syncNextButtonLabel, markEndButtonReady, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleAnswerCard, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
-import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback, cancelPreviewAi, rescueAiOrganize, updateAiSettingsBadge, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, clearPasteInput, editorHistClick, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, togglePromptContent, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks, renderErrorsForBank, renderFavoritesForBank, renderRecycleBin, restoreRecycled, recycleBankEntry, restoreBankVersion } from './bank.js';
+import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback,
+    previewAiAnswerFill,
+    editorAiAnswer, cancelPreviewAi, rescueAiOrganize, updateAiSettingsBadge, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, clearPasteInput, editorHistClick, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, togglePromptContent, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks, renderErrorsForBank, renderFavoritesForBank, renderRecycleBin, restoreRecycled, recycleBankEntry, restoreBankVersion } from './bank.js';
 
 // Zquiz · 期末周刷题 —— 应用装配入口
 // 依赖方向:main → 业务模块(quiz/errorbook/favorites/bank/dom)→ parser/storage/state。
@@ -130,6 +132,8 @@ const editorType = document.getElementById('editor-type');
 const editorAnswer = document.getElementById('editor-answer');
 const editorOptions = document.getElementById('editor-options');
 const editorAddOption = document.getElementById('editor-add-option');
+const previewAiAnswerBtn = document.getElementById('preview-ai-answer-btn');
+const editorAiAnswerBtn = document.getElementById('editor-ai-answer-btn');
 const editorRemoveOption = document.getElementById('editor-remove-option');
 const editorExplanation = document.getElementById('editor-explanation');
 const editorAnalysis = document.getElementById('editor-analysis');
@@ -311,6 +315,7 @@ function setupEventListeners() {
 
     // 题库编辑器
     editorAddBtn.addEventListener('click', editorAddQuestion);
+    editorAiAnswerBtn.addEventListener('click', editorAiAnswer);
     editorSaveBtn.addEventListener('click', () => editorSaveCurrent(false));
     editorCloseBtn.addEventListener('click', editorClose);
     // 库级操作:作用于当前编辑中的题库(编辑器即该库的管理入口)
@@ -373,6 +378,7 @@ function setupEventListeners() {
     aiSaveBtn.addEventListener('click', saveAiSettings);
     aiCancelBtn.addEventListener('click', () => hideModal(aiSettingsModal));
     previewAiBtn.addEventListener('click', previewAiFallback);
+    previewAiAnswerBtn.addEventListener('click', previewAiAnswerFill);
     previewAiCancelBtn.addEventListener('click', cancelPreviewAi);
     previewCancelBtn.addEventListener('click', () => hideModal(importPreviewModal));
 
@@ -595,6 +601,8 @@ if (typeof window === 'undefined') {
         updateErrorStreak,
         renderErrorsForBank,
         renderFavoritesForBank,
+        previewAiAnswerFill,
+        editorAiAnswer,
         restoreRecycled,
         recycleBankEntry,
         restoreBankVersion,

@@ -12,7 +12,10 @@ export const JUDGE_QUESTION_RE = /^判断题\s*[:：]\s*(.*)$/;
 
 export const TITLE_RE = /^#\s*(.*)$/;
 
-export const ANALYSIS_RE = /^(?:答案解析|解析)\s*[:：]\s*(.+)$/;
+// "(AI 生成)" 后缀:导出时给 AI 拟的答案/解析加的来源标记(P1-1.5),
+// 解析器必须认它,否则"导出 → 再导入"会丢答案/解析(自己写的格式自己读不回 = 数据损失)。
+// 捕获组 2 = 'AI 生成' 或 undefined,用于把来源标记一起带回来。
+export const ANALYSIS_RE = /^(?:答案解析|解析)(?:\((AI 生成)\))?\s*[:：]\s*(.+)$/;
 
 export const EXPLAIN_RE = /^(?:题目解释|题干解释)\s*[:：]\s*(.+)$/;
 
@@ -20,7 +23,7 @@ export const TYPE_RE = /^(?:类型|题型)\s*[:：]\s*(.+)$/;
 
 export const QUESTION_FIELD_RE = /^题目\s*[:：]\s*(.*)$/;
 
-export const FULL_ANSWER_RE = /^(?:【?参考答案】?|【?标准答案】?|【?正确答案】?|【?答案】?|答案)\s*[:：]\s*(.+?)\s*[。.]?$/;
+export const FULL_ANSWER_RE = /^(?:【?参考答案】?|【?标准答案】?|【?正确答案】?|【?答案】?|答案)(?:\((AI 生成)\))?\s*[:：]\s*(.+?)\s*[。.]?$/;
 
 export const FULL_ANSWER_SPACED_RE = /^(?:【?参考答案】?|【?标准答案】?|【?正确答案】?|【?答案】?|答案)\s+((?:[A-Ha-h√×对错]+)(?:[\s、,，]+[A-Ha-h√×对错]+)*)\s*[。.]?$/;
 
@@ -279,7 +282,8 @@ export function parseQuestionsText(content) {
         const analysisM = body.match(ANALYSIS_RE);
         if (analysisM) {
             if (!cur) newQuestion();
-            cur.analysis = analysisM[1].trim();
+            cur.analysis = analysisM[2].trim();
+            if (analysisM[1]) cur.analysisSource = 'ai';   // 导出标记带回来的来源
             cur.raw.push(rawLine);
             continue;
         }
@@ -301,10 +305,15 @@ export function parseQuestionsText(content) {
         }
 
         // 3.5 整行答案
-        const fullAnsM = body.match(FULL_ANSWER_RE) || body.match(FULL_ANSWER_SPACED_RE);
-        if (fullAnsM) {
+        // ⚠️ 注意 FULL_ANSWER_RE 的组序:(组1)= 可选的 "(AI 生成)" 标记,(组2)= 答案本体;
+        //    而 FULL_ANSWER_SPACED_RE 没有那个可选组,答案仍是一个组 —— 故按正则分别取值。
+        const fullAnsM = body.match(FULL_ANSWER_RE);
+        const fullAnsSpacedM = fullAnsM ? null : body.match(FULL_ANSWER_SPACED_RE);
+        if (fullAnsM || fullAnsSpacedM) {
             if (!cur) newQuestion();
-            cur.answer = fullAnsM[1].trim();
+            cur.answer = (fullAnsM ? fullAnsM[2] : fullAnsSpacedM[1]).trim();
+            // 导出文件里的 "(AI 生成)" 来源标记要带回来,否则导出再导入会丢掉 AI 标注
+            if (fullAnsM && fullAnsM[1]) cur.answerSource = 'ai';
             cur.raw.push(rawLine);
             continue;
         }
@@ -525,10 +534,12 @@ export function formatQuestionsForExport(questions) {
             text += `${key}：${q.options[key]}\n`;
         });
 
-        text += `答案：${q.answer}\n`;
+        // AI 生成的字段必须在导出文件里**明示来源**(P1-1.5):否则这份 txt 二次传播出去,
+        // 别人会把它当成"原始题库",AI 拟答就被当成权威答案了。
+        text += `${q.answerSource === 'ai' ? '答案(AI 生成)' : '答案'}：${q.answer}\n`;
 
         if (q.explanation) text += `题目解释：${q.explanation}\n`;
-        if (q.analysis) text += `解析：${q.analysis}\n`;
+        if (q.analysis) text += `${q.analysisSource === 'ai' ? '解析(AI 生成)' : '解析'}：${q.analysis}\n`;
         if (q.type) text += `类型：${q.type}\n`;
 
         Object.keys(q.optionExplanations || {}).sort().forEach(key => {

@@ -3,7 +3,7 @@
 // 允许依赖:prompt.js(官方提示词)。禁止:state / storage / DOM(全部经参数注入,vm 测试可跑)。
 // CORS 已实测(2026-09-09):智谱/DeepSeek 回显 Origin 放行,硅基流动 `*` —— 浏览器可直连。
 
-import { OFFICIAL_PROMPT } from './prompt.js';
+import { ANSWER_PROMPT, OFFICIAL_PROMPT } from './prompt.js';
 import { normalizeAnswerString, parseQuestionsText } from './parser.js';
 
 // 厂商预设:按成本排序;baseUrl 均为 OpenAI 兼容根(不含 /chat/completions)
@@ -250,4 +250,106 @@ export async function aiFixQuestions(config, questions, { signal, onProgress, ti
     }
     const parsed = parseQuestionsText(outs.join('\n\n'));
     return { questions: parsed, total };
+}
+
+// ==================== 模式二:生成答案与解析(P1-1.2)====================
+// 与模式一的分界线 = **改不改内容**:这里允许 AI 给答案,但:
+//   ① 只处理**缺答案或缺解析**的题(有的绝不重问、更不覆盖);
+//   ② 答案写成"无法确定"合法,且由调用方原样落库(不硬猜);
+//   ③ 落库时打 answerSource/analysisSource = 'ai' 永久标注,人工一改即转人工(见 bank.js)。
+
+// 待补的题:缺答案 或 缺解析(两者任一为空都算)。这是"补全"的默认口径。
+export function questionsNeedingAi(qs) {
+    return (Array.isArray(qs) ? qs : []).filter(q => q && (!q.answer || !q.analysis));
+}
+
+// 待补答案的题(严格口径):**只挑真正缺答案的**。
+// ⚠️ 为什么还要这个:只缺解析的题虽然"答案不会被覆盖",但它的题干+选项**会被送到第三方服务**,
+//    而送出的文本里带着它已有的答案(见 serializeForAnswer)。若用户只想补答案、不想外传已有答案,
+//    就该用这个严格列表当输入 —— 少发一些内容,少一分暴露。
+export function questionsNeedingAnswer(qs) {
+    return (Array.isArray(qs) ? qs : []).filter(q => q && !q.answer);
+}
+
+// 送 AI 的单题文本:题干 + 选项 + 题干解释(若有)。
+// ⚠️ **刻意不送已有答案**:避免模型看到答案后"顺手改写";也避免把用户的人工答案暴露给第三方服务。
+export function serializeForAnswer(q) {
+    const lines = ['题目：' + (q.content || '')];
+    Object.keys(q.options || {}).sort().forEach(k => lines.push(k + '：' + (q.options[k] || '')));
+    if (q.explanation) lines.push('题目解释：' + q.explanation);
+    return lines.join('\n');
+}
+
+// 判断某题的 AI 产出是否"没能确定"
+export function isUndetermined(answer) {
+    const a = (answer || '').trim();
+    return !a || /无法确定|不确定|未知|无法判断/.test(a);
+}
+
+// 批量补答案与解析:分块送 ANSWER_PROMPT → 交回 parser 解析。
+// 返回 { questions, total };调用方按题号/题干匹配,并且**只填空白字段**。
+export async function aiAnswerQuestions(config, questions, { signal, onProgress, maxChars = 2400, maxPerChunk = 8, timeoutMs, fetchImpl } = {}) {
+    const todo = questionsNeedingAi(questions);
+    if (todo.length === 0) throw new Error('这些题都已带答案与解析,无需补');
+    // 复用模式一的分块器:同样保证原文不丢、不重排(但这里序列化时不含答案)
+    const chunks = groupQuestionChunks(todo, { maxChars, maxPerChunk });
+    const total = todo.length;
+    let done = 0;
+    const outs = [];
+    for (const chunk of chunks) {
+        const batch = todo.slice(chunk.start, chunk.start + chunk.count).map(serializeForAnswer).join('\n\n');
+        const content = await chatCompletion(
+            config,
+            [
+                { role: 'system', content: ANSWER_PROMPT },
+                { role: 'user', content: batch },
+            ],
+            { signal, timeoutMs, fetchImpl }
+        );
+        outs.push(content.trim());
+        done += chunk.count;
+        if (onProgress) onProgress(done, total);
+    }
+    return { questions: parseQuestionsText(outs.join('\n\n')), total };
+}
+
+// 把 AI 产出回填到原题:**只补空白,绝不覆盖已有值**。
+// 返回 { filled: 补了几题, answerFilled, analysisFilled, undetermined: 报"无法确定"的题数, details }
+// details 供预览页展示"AI 拟答"(逐题写明补了什么)。
+export function mergeAiAnswers(originals, produced) {
+    const pool = (produced || []).map(q => ({ q, used: false }));
+    const details = [];
+    let answerFilled = 0, analysisFilled = 0, undetermined = 0;
+    (originals || []).forEach(target => {
+        // 匹配:题干+选项精确 → 仅题干宽松(同模式一的两级匹配)
+        const hit = pool.find(p => !p.used && aiMatchKey(p.q) === aiMatchKey(target))
+            || pool.find(p => !p.used && p.q && aiMatchKey(p.q, true) === aiMatchKey(target, true));
+        if (!hit) return;
+        hit.used = true;
+        const out = hit.q;
+        const parts = [];
+        // ① 答案:只补空缺
+        if (!target.answer && out.answer) {
+            if (isUndetermined(out.answer)) {
+                undetermined++;
+                parts.push('答案无法确定（AI 已说明原因，未落库）');
+            } else {
+                target.answer = out.answer;
+                target.answerSource = 'ai';
+                answerFilled++;
+                parts.push(`拟答 ${out.answer}`);
+            }
+        } else if (target.answer) {
+            parts.push('已有答案，未改动');
+        }
+        // ② 解析:只补空缺(题干自带的 explanation 与解析是两件事,不算已解析)
+        if (!target.analysis && out.analysis) {
+            target.analysis = out.analysis;
+            target.analysisSource = 'ai';
+            analysisFilled++;
+            parts.push('补入解析');
+        }
+        if (parts.length) details.push({ content: target.content, parts });
+    });
+    return { filled: details.length, answerFilled, analysisFilled, undetermined, details };
 }

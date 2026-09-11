@@ -178,7 +178,7 @@ C：蓝
 
 test('previewAiFallback(勾选语义):未勾选题不进请求;内容没变不打徽章', async () => {
     const calls = [];
-    const { run, store } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+    const { run, store, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
         sandboxExtras: {
             fetch: async (url, init) => {
                 calls.push(JSON.parse(init.body).messages[1].content);
@@ -202,7 +202,7 @@ test('previewAiFallback(勾选语义):未勾选题不进请求;内容没变不�
 });
 
 test('previewAiFallback:改动写明差异;AI 未返回的题标注保留原样(不无声消失)', async () => {
-    const { run, store } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+    const { run, store, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
         sandboxExtras: {
             fetch: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: '题目：1+1等于几?\nA：1\nB：二\nC：3\nD：4\n答案：B' } }] }) }),
             AbortController,
@@ -326,7 +326,7 @@ test('预览全选三态:未全勾→点一次全勾;再点→全不选;部分�
 });
 
 test('暗色模式:三档切换打 data-theme、持久化、auto 跟随系统', async () => {
-    const { run, store } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+    const { run, store, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
         sandboxExtras: {
             document: { documentElement: { dataset: {} } },  // 沙箱补 html 元素
             matchMedia: () => ({ matches: true, addEventListener() {} }),  // 系统暗色
@@ -375,7 +375,7 @@ test('导入按钮职责分离回归:选文件即读进框;解析按钮单监听
 });
 
 test('AI 标记持久化:确认导入后 aiSource=ai 写进题库数据(编辑器可见的前提)', async () => {
-    const { run, store } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+    const { run, store, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
         sandboxExtras: {
             fetch: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: AI_TEXT } }] }) }),
             AbortController,
@@ -706,4 +706,166 @@ test('表单侧也走同一套校验(设置面板里填 http 会被拦住)', asy
     elements['ai-base-url'].value = 'https://api.example.com/v1';
     assert.strictEqual(run(`saveAiSettings()`), true, '合法 https 地址应能保存');
     assert.ok(/api\.example\.com/.test(store.get('aiConfig') || ''), '合法地址应落盘');
+});
+
+// ⚠️ `await btn._listeners.click()` **不会**等监听器内部的 async 流程 —— 它返回 undefined,
+//    于是断言在 AI 结果落盘前就跑了(踩过:"填不进去"其实是没等)。故轮询等待条件成立。
+// ⚠️ 等待条件要选"**只会在终态出现**"的信号:editorAiAnswer 会先同步写"⏳ 正在补…",
+//    再异步填值 —— 若等"提示非空",第一帧就满足,等于没等(踩过第二次)。
+// 造一组"表单里的选项输入"喂给桩:editorCollectOptions 靠 querySelectorAll 读它们。
+// 不注入的话它恒返回 {},编辑器保存/补答案都会被判成"没选项" —— 那是桩的限制,不是产品 bug。
+function feedEditorOptions(elements, pairs) {
+    elements['editor-options']._setQueryAll(pairs.map(([letter, value]) => {
+        const inp = { dataset: { letter }, value, disabled: false };
+        return inp;
+    }));
+}
+async function waitFor(fn, { timeoutMs = 2000, label = '条件' } = {}) {
+    const t0 = Date.now();
+    for (;;) {
+        if (fn()) return true;
+        if (Date.now() - t0 > timeoutMs) throw new Error(`等待超时:${label}`);
+        await new Promise(r => setTimeout(r, 5));
+    }
+}
+
+// ==================== P1-1.3 / P1-1.4:两个 UI 入口的编排与落库 ====================
+// 这一层用 vm 桩驱动真实 UI 流程(勾选 → 点按钮 → 合并 → 预览/表单),验证"接线"没问题。
+
+test('P1-1.3 预览「✍️ AI 补答案·解析」:只补缺的题、标 AI 拟答、已有答案不动', async () => {
+    const calls = [];
+    const { run, store, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+        sandboxExtras: {
+            fetch: async (url, init) => {
+                const body = JSON.parse(init.body);
+                calls.push(body.messages);
+                // 回显每题的题干与选项,答案给 ABD
+                const echoed = body.messages[1].content.split('\n\n')
+                    .map(b => b + '\n答案：ABD\n解析：AI 补的解析').join('\n\n');
+                return { ok: true, json: async () => ({ choices: [{ message: { content: echoed } }] }) };
+            },
+            AbortController,
+        },
+    }));
+    store.set('aiConfig', JSON.stringify(CFG));
+    run(`init()`);
+    // 三题:①全缺 ②有答案缺解析 ③全齐
+    // ⚠️ 别用 `const src = ...` 再另起一次 run():run() 的表达式模式带 `return (...)`、
+    //    语句模式又是独立作用域,局部 const 不会跨调用留存(踩过:ReferenceError src is not defined)
+    run(`openImportPreview(parseQuestionsText('题目：甲题 A：x B：y\\n题目：乙题 A：x B：y\\n答案：A\\n题目：丙题 A：x B：y\\n答案：B\\n解析：人工解析'))`);
+    assert.strictEqual(run(`previewData.length`), 3, '应解析出三题');
+    run(`previewData.forEach(i => i.include = true); renderPreview()`);
+
+    elements['preview-ai-answer-btn']._listeners.click();
+    await waitFor(() => run(`previewData[0].q.answer`) === 'ABD', { label: '预览补答案完成' });
+    assert.strictEqual(calls.length, 1, '应发出一次请求(三题一块)');
+    const sent = calls[0][1].content;
+    assert.ok(/无法确定/.test(calls[0][0].content), 'system 必须是模式二提示词(允许给答案)');
+    assert.ok(!sent.includes('答案：A'), '已有答案的题内容不得被送出(避免被改写)');
+    // ① 全缺的题:补上答案与解析,并打 AI 拟答徽章
+    assert.strictEqual(run(`previewData[0].q.answer`), 'ABD');
+    assert.strictEqual(run(`previewData[0].q.answerSource`), 'ai');
+    assert.strictEqual(run(`previewData[0].q.analysisSource`), 'ai');
+    assert.ok(/AI 拟答/.test(run(`previewData[0].aiNote`)), '预览要标出"AI 拟答"');
+    assert.strictEqual(run(`previewData[0].aiAnswer`), true, '供预览高亮用的标记');
+    // ② 有答案缺解析:答案一字不动,只补解析
+    assert.strictEqual(run(`previewData[1].q.answer`), 'A', '已有答案绝不被覆盖');
+    assert.strictEqual(run(`previewData[1].q.answerSource`), undefined, '答案没被 AI 碰过 → 不该有 AI 标');
+    assert.strictEqual(run(`previewData[1].q.analysisSource`), 'ai');
+    // ③ 全齐的题:一点没动
+    assert.strictEqual(run(`previewData[2].q.analysis`), '人工解析');
+    assert.strictEqual(run(`previewData[2].q.analysisSource`), undefined);
+    assert.strictEqual(run(`previewData[2].aiNote`), '', '全齐的题不该被标记');
+});
+
+test('P1-1.3 导入后 AI 来源落库(永久标注的前提)', async () => {
+    const { run, store, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+        sandboxExtras: {
+            fetch: async (url, init) => {
+                const body = JSON.parse(init.body);
+                const echoed = body.messages[1].content.split('\n\n').map(b => b + '\n答案：A\n解析：AI 解析').join('\n\n');
+                return { ok: true, json: async () => ({ choices: [{ message: { content: echoed } }] }) };
+            },
+            AbortController,
+        },
+    }));
+    store.set('aiConfig', JSON.stringify(CFG));
+    run(`init()`);
+    run(`questionBanks = { '目标库': [] }; questionBanks['目标库'] = []`);
+    run(`openImportPreview(parseQuestionsText('题目：待补题 A：x B：y'))`);
+    run(`previewData.forEach(i => i.include = true)`);
+    elements['preview-ai-answer-btn']._listeners.click();
+    await waitFor(() => run(`previewData[0].q.answer`) === 'A', { label: '预览补答案完成(mock 回 A)' });
+    run(`previewTargetBankSelect.value = '目标库'`);
+    run(`commitPreviewImport()`);
+    const saved = JSON.parse(store.get('questionBanks'))['目标库'][0];
+    assert.strictEqual(saved.answer, 'A');
+    assert.strictEqual(saved.answerSource, 'ai', 'AI 拟答必须永久标注(否则下次打开就分不清是谁给的)');
+    assert.strictEqual(saved.analysisSource, 'ai');
+});
+
+test('P1-1.4 编辑器「✍️ 补答案/解析」:填进草稿区并落 AI 标注;人改过则转人工', async () => {
+    const { run, store, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+        sandboxExtras: {
+            fetch: async (url, init) => {
+                const body = JSON.parse(init.body);
+                const echoed = body.messages[1].content + '\n答案：B\n解析：AI 给的理由';
+                return { ok: true, json: async () => ({ choices: [{ message: { content: echoed } }] }) };
+            },
+            AbortController,
+        },
+    }));
+    store.set('aiConfig', JSON.stringify(CFG));
+    run(`init()`);
+    run(`questionBanks['库'] = [{ content: '待补题', type: '单选', options: {A:'x',B:'y'}, answer: '', analysis: '' }]`);
+    run(`state.editBankName = '库'; state.editIndex = 0; renderBankEditor()`);
+    feedEditorOptions(elements, [['A', 'x'], ['B', 'y']]);
+    assert.strictEqual(elements['editor-answer'].value, '', '前置:答案是空的');
+
+    elements['editor-ai-answer-btn']._listeners.click();
+    // 终态信号:提示里出现"AI 已填入"(⏳ 正在补… 是中间态,不能当等待条件)
+    await waitFor(() => /AI 已填入/.test(String(elements['editor-ai-answer-note'].textContent)), { label: '编辑器补答案完成' });
+    assert.strictEqual(elements['editor-answer'].value, 'B', 'AI 答案应填进草稿区(不直接落库)');
+    assert.strictEqual(elements['editor-analysis'].value, 'AI 给的理由');
+    assert.ok(String(elements['editor-ai-answer-note'].textContent).includes('AI'), '要提示"AI 已填入、未核验"');
+    // 未保存 → 数据未变
+    assert.strictEqual(run(`questionBanks['库'][0].answer`), '', '未点保存前不得落库');
+
+    // 保存 → 落 AI 标注
+    const saved = run(`editorSaveCurrent(true)`);
+    assert.strictEqual(run(`questionBanks['库'][0].answer`), 'B');
+    assert.strictEqual(run(`questionBanks['库'][0].answerSource`), 'ai');
+    assert.strictEqual(run(`questionBanks['库'][0].analysisSource`), 'ai');
+
+    // 第二次:AI 再补一题后人工改答案 → 该字段转人工(不打 AI 标)
+    run(`questionBanks['库'].push({ content: '待补题2', type: '单选', options: {A:'x',B:'y'}, answer: '', analysis: '' })`);
+    run(`state.editIndex = 1; renderBankEditor()`);
+    feedEditorOptions(elements, [['A', 'x'], ['B', 'y']]);
+    elements['editor-ai-answer-btn']._listeners.click();
+    // ⚠️ 必须等 AI 流程**整条**结束再改表单:否则人的改动会被随后完成的 AI 回填覆盖,
+    //    测试就会看到 AI 的 'B' 而不是人写的 'A'(踩过 —— 表现为"人改过却没转人工")。
+    await waitFor(() => /AI 已填入/.test(String(elements['editor-ai-answer-note'].textContent)), { label: '第二次补答案完成' });
+    elements['editor-answer'].value = 'A';   // 人把 AI 给的 B 改成 A
+
+    run(`editorSaveCurrent(true)`);
+    assert.strictEqual(run(`questionBanks['库'][1].answer`), 'A');
+    assert.strictEqual(run(`questionBanks['库'][1].answerSource`), null, '人工改过的答案不得标成 AI');
+    assert.strictEqual(run(`questionBanks['库'][1].analysisSource`), 'ai', '解析仍是 AI 给的 → 保留标注');
+});
+
+test('P1-1.4 全齐的题不浪费一次请求', async () => {
+    let called = false;
+    const { run, store, elements } = await import('./helpers/vm-harness.mjs').then(h => h.loadApp({
+        sandboxExtras: { fetch: async () => { called = true; return { ok: true, json: async () => ({ choices: [] }) }; }, AbortController },
+    }));
+    store.set('aiConfig', JSON.stringify(CFG));   // 不种配置的话函数会在"未配置"处就返回,测不到本题意图
+    run(`init()`);
+    run(`questionBanks['库2'] = [{ content: '已齐', type: '单选', options: {A:'x',B:'y'}, answer: 'A', analysis: '有人工解析' }]`);
+    run(`state.editBankName = '库2'; state.editIndex = 0; renderBankEditor()`);
+    elements['editor-ai-answer-btn']._listeners.click();
+    // 等提示出现终态文案(这题有答案有解析,函数会同步写入"无需补"后返回)
+    await waitFor(() => String(elements['editor-ai-answer-note'].textContent).length > 0, { label: '得到提示' });
+    assert.strictEqual(called, false, '已有答案与解析的题不该发请求');
+    assert.ok(String(elements['editor-ai-answer-note'].textContent).includes('无需补'),
+        '应给出可读提示,实际:' + elements['editor-ai-answer-note'].textContent);
 });
