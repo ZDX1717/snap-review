@@ -108,13 +108,15 @@ header {
     color: #fff;
     /* 收窄:标题栏只承载品牌 + 导航 + 主题开关 */
     padding: 8px 12px;
-    /* 桌面把 nav 收进这一行(三栏),否则 nav 会作为独立一条横在标题栏与内容之间,
-       形成"导入题库卡片上方一大块空白"(👤 反馈实测 99px)。
-       手机端 nav 是底部固定 tab 栏,故在媒体查询里恢复为 flex 流式 */
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    /* 品牌 / 导航 / 主题开关同处一条(否则 nav 会作为独立一条横在标题栏与内容之间,
+       形成"导入题库卡片上方一大块空白";👤 反馈实测 99px)。
+       ⚠️ 必须用 flex 而非三栏 grid:手机端 nav 是 position:fixed,会脱离文档流,
+       grid 仍会给它保留中列 → 品牌被挤半行、主题开关卡在中间(排版错乱的根因)。
+       flex 下缺席的子项自动退出排布,两种形态都成立。 */
+    display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: space-between;
+    gap: 12px;
     /* 悬浮:吸顶常驻,长列表滚动时站名与主题开关始终可达(👤 反馈);
        阴影用来与内容分层,否则同一块蓝底会看起来"粘"在内容上 */
     position: sticky;
@@ -145,6 +147,7 @@ h1.brand {
 /* 桌面:nav 是标题栏内的一行(样式由 header 的 grid 定位;此处只做外观) */
 nav {
     display: flex;
+    justify-content: center;   /* 导航按钮组在标题栏中部 */
     background: none;
     border-bottom: none;
     gap: 4px;
@@ -153,6 +156,10 @@ nav {
 .nav-btn {
     flex: none;
     padding: 6px 12px;
+    border: none;              /* 必须显式写:否则浏览器默认按钮边框会露成黑边 */
+    background: none;
+    cursor: pointer;
+    font-family: inherit;
     border-radius: 6px;
     font-size: 14px;
     color: rgba(255, 255, 255, 0.8);

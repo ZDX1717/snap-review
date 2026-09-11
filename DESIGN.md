@@ -182,6 +182,13 @@
   横在标题栏与内容之间 —— 实测那一条占 63px,正是"导入题库卡片上方一大块空白"的主因)。
   手机端 nav 脱离为底部固定 tab 栏(媒体查询里恢复 `position: fixed` 并**显式覆盖**桌面的
   透明背景/白色文字/gap,否则底栏会变透明)。
+- ⚠️ **header 必须用 flex,不能用三栏 grid**。手机端 nav 是 `position: fixed` 会脱离文档流,
+  而 grid 仍会给它保留中列 → 品牌被挤半行、主题开关卡在中间,**整条标题栏排版错乱**
+  (👤 实测反馈)。flex 下缺席的子项自动退出排布,桌面三件同排、手机两件两端对齐,两种形态都成立。
+- ⚠️ **按钮类必须显式声明 `border`**(`border: none` 或自定义边框)。缺声明会露出浏览器
+  默认按钮边框,表现为"按钮周围有黑边"。踩坑:合并重复的 `.nav-btn` 规则时把 `border: none`
+  一起删掉了。`tests/dom-structure.test.js` 有守卫(判据需排除 `border-radius` —— 它含
+  `border` 子串,否则守卫形同虚设)。
 - **品牌块** = `h1.brand`(保留"页面唯一一级标题"语义)内含 `small.brand-tagline`:
   logo `Zquiz` 16px/600,tagline「期末周刷题助手」**10px,紧随 logo 后、落在其右下角**。
   实现要点:`h1.brand` 保持**行内流**(不得用 `flex-direction: column`)—— 小字作为行内

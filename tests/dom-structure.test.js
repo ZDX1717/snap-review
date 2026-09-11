@@ -187,3 +187,23 @@ test('三个页面内容同宽:首页/题库页模块与刷题配置区都走阅
         assert.ok(/max-width\s*:\s*var\(--reading-width\)/.test(cssText.match(re)[1]), `${sel} 应走阅读档`);
     }
 });
+
+test('按钮类必须显式声明 border(否则露出浏览器默认黑边)', () => {
+    // 回归:合并重复的 .nav-btn 规则时漏掉了 border:none,
+    // 结果导航按钮戴上浏览器默认边框,表现为"按钮周围出现黑边"。
+    // 判据:每个"作为按钮用"的类,其规则里必须出现 border 声明(border:none 或自定义边框)。
+    const cssText = String(cssNoComments);
+    const buttonClasses = ['\.nav-btn', '\.action-btn', '\.theme-opt', '\.card-link',
+        '\.prompt-toggle', '\.favorite-btn', '\\.delete-btn', '\.foot-toggle'];
+    const missing = [];
+    for (const cls of buttonClasses) {
+        // 取该类的**基础**规则(选择器末尾就是类名,不含伪类)
+        const re = new RegExp('(?:^|[\\s,])\\s*' + cls + '\\s*\\{([^}]*)\\}', 'm');
+        const m = cssText.match(re);
+        if (!m) continue;                       // 该类可能只在复合选择器里出现
+        // 注意:必须排除 border-radius —— 它含 'border' 子串,会让判据形同虚设
+        const hasBorderDecl = /(^|[;{\s])border(-width|-style|-color|-top|-right|-bottom|-left)?\s*:/.test(m[1]);
+        if (!hasBorderDecl) missing.push(cls.replace('\\', ''));
+    }
+    assert.deepStrictEqual(missing, [], `这些按钮类缺少 border 声明,会露出默认黑边: ${missing.join(', ')}`);
+});
