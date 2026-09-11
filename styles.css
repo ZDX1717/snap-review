@@ -2103,7 +2103,7 @@ html[data-theme="dark"] .container {
         align-items: center;      /* 左区与按钮组中线对齐 */
         gap: 6px;
         margin-top: 0;
-        padding: 4px 8px;         /* 上下各 4:整体压矮(👤 要求) */
+        padding: 6px 8px;         /* 上下各 6:略增高便于点按(👤 要求「增高一点」) */
         background: var(--c-surface);
         border-top: 1px solid var(--c-border);
         box-shadow: 0 -1px 6px rgba(0, 0, 0, 0.05);

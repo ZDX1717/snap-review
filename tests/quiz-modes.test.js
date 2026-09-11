@@ -217,3 +217,43 @@ test('自动下一题按钮:带框按钮的开启态外观 + 套题模式下不�
     run(setupQuiz + ` quizMode = 'exam'; currentQuestionIndex = 0; displayQuestion();`);
     assert.ok(elements['auto-next-toggle'].classList.contains('hidden'), '套题模式应隐藏该按钮');
 });
+
+test('「下一题」即确认答案:未作答的多选会被判分并前进', () => {
+    // 👤 决定:删掉「确认答案」按钮,多选改为"点下一题 / 左滑 = 确认"。
+    const base = `
+        quizMode = 'immediate';
+        currentQuiz = [
+          { content:'M1', type:'多选', options:{A:'1',B:'2',C:'3'}, answer:'AC', analysis:'', explanation:'', confidence:1, raw:'' },
+          { content:'M2', type:'单选', options:{A:'1',B:'2'}, answer:'A', analysis:'', explanation:'', confidence:1, raw:'' },
+        ];
+        questionBank = currentQuiz; questionBanks = { T: currentQuiz }; currentBankName = 'T';
+        currentQuestionIndex = 0; correctCount = 0; wrongCount = 0; isAnswered = false;
+        userAnswers = ['', ''];
+    `;
+    // 勾选 A、C(与标准答案 AC 一致)→ 点下一题应判对并前进
+    const pick = (vals) => {
+        sandbox.document.querySelectorAll = (sel) =>
+            sel.includes('input[name="answer"]:checked') ? vals.map((v) => ({ value: v })) : [];
+    };
+    pick(['A', 'C']);
+    run(base + ` advanceNext();`);
+    assert.strictEqual(run('currentQuestionIndex'), 1, '应前进到第 2 题');
+    assert.strictEqual(run('correctCount'), 1, '未作答的多选应按当前勾选判分(AC 正确)');
+
+    // 勾错(AB)→ 仍判分并前进,不会卡住
+    pick(['A', 'B']);
+    run(base + ` advanceNext();`);
+    assert.strictEqual(run('currentQuestionIndex'), 1, '同样应前进');
+    assert.strictEqual(run('wrongCount'), 1, 'AB 与标准 AC 不符 → 计错');
+
+    // 完全没勾就点下一题:照常前进,但**不判分**(submitAnswer 有防空守卫,避免把空选记成错)
+    pick([]);
+    run(base + ` advanceNext();`);
+    assert.strictEqual(run('currentQuestionIndex'), 1, '空作答也应前进');
+    assert.strictEqual(run('wrongCount'), 0, '空作答不应被记为错');
+    assert.strictEqual(run('correctCount'), 0, '空作答也不计对');
+
+    sandbox.document.querySelectorAll = () => [];
+});
+
+

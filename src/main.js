@@ -6,7 +6,7 @@ import { loadAutoNextSetting, loadCollapsedBanks, loadFromLocalStorage, loadMast
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, toggleAllBanks, updateErrorStreak, updateErrorsList, updateToggleAllBanksLabel } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
-import { backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, readQuizSource, shouldAutoNext, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
+import { advanceNext, backToQuizOptions, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, readQuizSource, shouldAutoNext, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
 import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorDeleteCurrent, editorGuard, editorTogglePendingOnly, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback, cancelPreviewAi, rescueAiOrganize, updateAiSettingsBadge, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, clearPasteInput, editorHistClick, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, togglePromptContent, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks, renderErrorsForBank, renderRecycleBin, restoreRecycled, recycleBankEntry, restoreBankVersion } from './bank.js';
 
 // Zquiz · 期末周刷题 —— 应用装配入口
@@ -52,7 +52,6 @@ const questionNumber = document.getElementById('question-number');
 const questionType = document.getElementById('question-type');
 const questionText = document.getElementById('question-text');
 const questionExplanation = document.getElementById('question-explanation');
-const submitAnswerBtn = document.getElementById('submit-answer-btn');
 const nextQuestionBtn = document.getElementById('next-question-btn');
 const endQuizBtn = document.getElementById('end-quiz-btn');
 const answerFeedback = document.getElementById('answer-feedback');
@@ -281,8 +280,8 @@ function setupEventListeners() {
     
     // 刷题
     startQuizBtn.addEventListener('click', startQuiz);
-    submitAnswerBtn.addEventListener('click', submitAnswer);
-    nextQuestionBtn.addEventListener('click', nextQuestion);
+    // 「下一题」= 确认并前进(逐题模式下未作答的题按确认答案处理,👤 决定)
+    nextQuestionBtn.addEventListener('click', advanceNext);
     endQuizBtn.addEventListener('click', endQuiz);
     backToOptionsBtn.addEventListener('click', backToQuizOptions);
 
@@ -529,6 +528,7 @@ if (typeof window === 'undefined') {
         finishExam,
         getSourcePool,
         shouldAutoNext,
+        advanceNext,
         updateSourceUI,
         readQuizSource,
         formatQuestionsForExport,

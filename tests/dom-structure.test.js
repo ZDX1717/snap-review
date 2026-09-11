@@ -270,3 +270,9 @@ test('刷题元信息并入下方操作区:进度条已移除,手机单行且按
     const shrink = rulesFrom(/flex\s*:\s*0 1 auto/);
     assert.ok(shrink.length > 0, '翻页键应允许压缩(flex:0 1 auto)以保持单行');
 });
+
+test('状态栏按钮:智能切题在,确认答案已删', () => {
+    assert.ok(html.includes('智能切题'), '按钮文案应为「智能切题」');
+    assert.ok(!html.includes('submit-answer-btn'), '「确认答案」按钮元素应已移除');
+    assert.ok(!html.includes('确认答案'), '「确认答案」文案应已移除');
+});

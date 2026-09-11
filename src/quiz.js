@@ -14,7 +14,6 @@ const questionNumber = document.getElementById('question-number');
 const questionType = document.getElementById('question-type');
 const questionText = document.getElementById('question-text');
 const questionExplanation = document.getElementById('question-explanation');
-const submitAnswerBtn = document.getElementById('submit-answer-btn');
 const nextQuestionBtn = document.getElementById('next-question-btn');
 const endQuizBtn = document.getElementById('end-quiz-btn');
 const answerFeedback = document.getElementById('answer-feedback');
@@ -206,6 +205,7 @@ export function displayQuestion() {
                 optionItem.classList.add('selected');
                 if (state.quizMode !== 'exam' && !state.isAnswered) submitAnswer();
             }
+            // 多选:不自动判分 —— 由「下一题」承担"确认答案"的职责(👤 决定)
         });
         
         // 选项解释：仅逐题模式作答时显示
@@ -240,7 +240,6 @@ export function displayQuestion() {
         // 旧版在首题隐藏"上一题"、末题隐藏"下一题",于是按钮会随位置忽隐忽现,
         // 看起来像"上一题和下一题在循环"(👤 反馈的 bug)。
         // 现在改为**始终可见**,只在边界置灰禁用 —— 位置稳定,不会造成误解。
-        submitAnswerBtn.classList.add('hidden');
         // ⚠️ 必须显式 remove('hidden'):该按钮在 HTML 里初始带 hidden,
         // 只设置禁用态会留下 hidden,导致"按钮不见了"(👤 反馈的 bug)。
         prevQuestionBtn.classList.remove('hidden');
@@ -250,13 +249,7 @@ export function displayQuestion() {
     } else {
         // 逐题模式:下一题 | 结束刷题(结束刷题常驻;上一题与逐题模式无关)
         prevQuestionBtn.classList.add('hidden');
-        // 单选/判断点卡片即判分,提交按钮无意义;仅多选需要「确认答案」
-        submitAnswerBtn.textContent = '确认答案';
-        if (question.type === '多选') {
-            submitAnswerBtn.classList.remove('hidden');
-        } else {
-            submitAnswerBtn.classList.add('hidden');
-        }
+        // 单选/判断点卡片即判分;多选勾选后点「下一题」即确认并判分
         nextQuestionBtn.classList.remove('hidden');
         setNavEnabled(nextQuestionBtn, state.currentQuestionIndex < state.currentQuiz.length - 1);
     }
@@ -281,7 +274,7 @@ function setNavEnabled(btn, enabled) {
 //   · 延迟 900ms 再翻,留出看反馈/选项判色动画的时间,避免"闪一下就没了"。
 //   · 最后一题不自动翻(逐题模式交由用户点「结束刷题」;套题模式点「交卷」)。
 //   · 任何手动翻页/结束/离开都会取消待执行的定时器,防止"手点完又被自动带走"。
-const AUTO_NEXT_DELAY_MS = 900;
+const AUTO_NEXT_DELAY_MS = 450;   // 切题要跟手;450ms 足够看清判定色而不拖沓(👤:快点)
 let autoNextTimer = null;
 
 function cancelAutoNext() {
@@ -336,10 +329,9 @@ function bindQuizGestures() {
         const t = e.changedTouches[0];
         const dx = t.clientX - tsX, dy = t.clientY - tsY;
         if (Math.abs(dx) < 60 || Math.abs(dx) <= Math.abs(dy) * 1.5) return;
-        if (dx < 0) { // 左滑:下一题(逐题需已作答;套题末题防误交卷)
-            if (state.quizMode !== 'exam' && !state.isAnswered) return;
+        if (dx < 0) { // 左滑:下一题(逐题模式下未作答的题按"确认答案"处理)
             if (state.quizMode === 'exam' && state.currentQuestionIndex >= state.currentQuiz.length - 1) return;
-            nextQuestion();
+            advanceNext();
         } else if (state.currentQuestionIndex > 0 && state.quizMode === 'exam') {
             prevQuestion(); // 右滑上一题:仅套题
         }
@@ -417,12 +409,20 @@ export function submitAnswer() {
     
     // 更新按钮状态
     state.isAnswered = true;
-    submitAnswerBtn.classList.add('hidden');
     nextQuestionBtn.classList.remove('hidden');
 }
 
 
 // 下一题
+// 「下一题」与左滑手势共用的推进器:逐题模式下**未作答的题按"确认答案"处理**。
+// 背景:多选的「确认答案」按钮已删除(👤 决定),改由"任何切题动作即确认"承担 ——
+// 点「下一题」或左滑都算提交。收在这一处,避免两条入口各写一份判定而漂移。
+export function advanceNext() {
+    if (state.quizMode !== 'exam' && !state.isAnswered) submitAnswer();  // 多选:以当前勾选为准判分
+    cancelAutoNext();   // 判分可能刚安排了自动切题,手动/手势推进优先,取消它
+    nextQuestion();
+}
+
 export function nextQuestion() {
     cancelAutoNext();   // 手动翻页优先,取消待执行的自动翻页
     if (state.quizMode === 'exam') {
