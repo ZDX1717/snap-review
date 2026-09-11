@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { formatAnswerForDisplay, normalizeAnswerString, shuffleArray } from './parser.js';
+import { buildCardCells, formatAnswerForDisplay, normalizeAnswerString, shuffleArray } from './parser.js';
 import { addToErrorBook, updateErrorStreak, updateErrorsList } from './errorbook.js';
 import { toggleFavorite, updateFavoritesList } from './favorites.js';
 import { updateBanksList, updateLastImportInfo, renderRecycleBin } from './bank.js';
@@ -33,6 +33,13 @@ const reviewOnlyWrong = document.getElementById('review-only-wrong');
 const masteryNote = document.getElementById('mastery-note');
 const favoriteBtn = document.getElementById('favorite-btn');
 const autoNextBtn = document.getElementById('auto-next-toggle');
+// 答题卡抽屉(P0-6.1)。⚠️ 全部加 null 守卫:老 DOM 缓存 / 测试桩里可能不存在,缺元素不应炸掉刷题
+const answerCardOpenBtn = document.getElementById('answer-card-open');
+const answerCardDrawer = document.getElementById('answer-card-drawer');
+const answerCardBackdrop = document.getElementById('answer-card-backdrop');
+const answerCardGrid = document.getElementById('answer-card-grid');
+const answerCardSummary = document.getElementById('answer-card-summary');
+const answerCardCloseBtn = document.getElementById('answer-card-close');
 
 // 开始刷题
 // 题源 → 题目池。"复习错题/收藏"不再是独立入口,而是与题库并列的题源;
@@ -54,6 +61,9 @@ export function readQuizSource() {
     const v = el ? el.value : '';
     return QUIZ_SOURCES.includes(v) ? v : 'bank';
 }
+
+// 「一题一格」的答题卡数据由 parser.js 提供(纯函数、零依赖,可脱离 DOM 直接测):
+// buildCardCells —— 见 src/parser.js,quiz.js 只负责渲染与跳题。
 
 // 题源为空时的提示文案(每种来源给出各自的下一步动作指引)
 const EMPTY_SOURCE_HINT = {
@@ -133,6 +143,9 @@ export function startQuiz() {
     quizContainer.classList.remove('hidden');
     quizResult.classList.add('hidden');
     quizSettings.classList.add('hidden');
+    // 每局开始前把答题卡收起来并接好入口(入口按钮是常驻 DOM,重复绑定只会重复调 toggle)
+    bindAnswerCard();
+    closeAnswerCard();
     
     // 显示第一道题
     displayQuestion();
@@ -293,11 +306,118 @@ function setNavEnabled(btn, enabled) {
     btn.disabled = !enabled;
 }
 
+// ==================== 答题卡抽屉(P0-6.1)====================
+// 用途:刷题中一眼看清"哪些做了、哪些错了、哪些还没做",点号直达。
+// 刻意不含题干/答案(防偷看);入口是状态栏里的进度("3/10")本身。
+
+const CARD_STATUS_TEXT = { correct: '答对', wrong: '答错', blank: '未答' };
+
+export function isAnswerCardOpen() {
+    return !!answerCardDrawer && !answerCardDrawer.classList.contains('hidden');
+}
+
+// 渲染格子。每次打开都全量重建:题数在一次刷题内固定,重建成本可忽略,
+// 且避免"增量更新漏掉某格"这类难查的状态漂移(卡片是给人看的,正确性优先)。
+export function renderAnswerCard() {
+    if (!answerCardGrid) return;
+    const { cells, summary } = buildCardCells(
+        state.currentQuiz,
+        state.userAnswers,
+        gradedMap(),
+        state.currentQuestionIndex
+    );
+
+    answerCardGrid.innerHTML = '';
+    cells.forEach(cell => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `answer-card-cell ${cell.status}${cell.current ? ' current' : ''}`;
+        btn.dataset.index = String(cell.index);
+        btn.textContent = String(cell.number);
+        // 读屏与真机长按都能拿到状态;标题同时兜住"格子只有数字"的可理解性
+        btn.setAttribute('aria-label', `第 ${cell.number} 题,${cell.type || '未知题型'},${CARD_STATUS_TEXT[cell.status]}${cell.current ? ',当前题' : ''}`);
+        btn.setAttribute('aria-current', cell.current ? 'true' : 'false');
+        btn.title = `第 ${cell.number} 题 · ${cell.type || ''} · ${CARD_STATUS_TEXT[cell.status]}`;
+        if (cell.typeShort) {
+            const badge = document.createElement('span');
+            badge.className = 'answer-card-type';
+            badge.textContent = cell.typeShort;
+            btn.appendChild(badge);
+        }
+        btn.addEventListener('click', () => jumpToQuestion(cell.index));
+        answerCardGrid.appendChild(btn);
+    });
+
+    if (answerCardSummary) {
+        answerCardSummary.textContent = `共 ${summary.total} 题 · 对 ${summary.correct} · 错 ${summary.wrong} · 未答 ${summary.blank}`;
+    }
+}
+
+export function openAnswerCard() {
+    if (!answerCardDrawer) return;
+    renderAnswerCard();
+    answerCardDrawer.classList.remove('hidden');
+    if (answerCardBackdrop) answerCardBackdrop.classList.remove('hidden');
+    if (answerCardOpenBtn) answerCardOpenBtn.setAttribute('aria-expanded', 'true');
+}
+
+export function closeAnswerCard() {
+    if (!answerCardDrawer) return;
+    answerCardDrawer.classList.add('hidden');
+    if (answerCardBackdrop) answerCardBackdrop.classList.add('hidden');
+    if (answerCardOpenBtn) answerCardOpenBtn.setAttribute('aria-expanded', 'false');
+}
+
+export function toggleAnswerCard() {
+    if (isAnswerCardOpen()) closeAnswerCard(); else openAnswerCard();
+}
+
+// 跳题。与翻页按钮走同一套"当前题"状态,不另设跳题路径 —— 否则索引与判分状态会两处维护。
+// 逐题模式下"有未确认勾选"的当前题不做自动判分:跳题是导航动作,不该悄悄替用户交卷。
+export function jumpToQuestion(index) {
+    const total = state.currentQuiz.length;
+    if (!Number.isInteger(index) || index < 0 || index >= total) return;
+    cancelAutoNext();
+    state.currentQuestionIndex = index;
+    closeAnswerCard();
+    displayQuestion();
+}
+
+// 入口/关闭键只绑一次:startQuiz 每局都会跑,不设闩就会累积监听(多次 toggle 相互抵消 = 点了没反应)
+let answerCardBound = false;
+function bindAnswerCard() {
+    if (answerCardBound) return;
+    answerCardBound = true;
+    if (answerCardOpenBtn) answerCardOpenBtn.addEventListener('click', toggleAnswerCard);
+    if (answerCardCloseBtn) answerCardCloseBtn.addEventListener('click', closeAnswerCard);
+    if (answerCardBackdrop) answerCardBackdrop.addEventListener('click', closeAnswerCard);
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && isAnswerCardOpen()) closeAnswerCard();
+    });
+}
+
 // 每题的"判分反馈"留档(index → {text, cls, explanation}),回看时原样复现。
 // 不重新推导文案:当次可能有"已连对 N 次,移出错题本"等上下文信息,重建会丢。
 const q_feedback = {};
 // 记录"哪几题真的判过分":仅凭 userAnswers 有值无法区分"已判分"与"勾了没确认"
 const q_graded = {};
+
+// 该题是否已判分(答题卡三态的唯一依据):
+//  - 逐题模式:只认 q_graded —— "勾了没确认"的题不算已答(答题卡上必须仍是"未答")
+//  - 套题模式:整卷一次判,存在作答即已判分
+// 对错本身不另存一份:判分口径就是 normalizeAnswerString(userAnswer) === normalizeAnswerString(answer)
+// (与 renderAnswerReview 同口径),另存副本只会在口径变动时漂移。
+function isQuestionGraded(index) {
+    if (state.quizMode === 'exam') return !!state.userAnswers[index];
+    return !!q_graded[index];
+}
+
+// 供 buildCardCells 复用的"已判分"视图(index → bool)
+function gradedMap() {
+    const map = {};
+    state.currentQuiz.forEach((_, i) => { if (isQuestionGraded(i)) map[i] = true; });
+    return map;
+}
 
 // 选项卡片判分标色(对绿/错红/正确项高亮)并禁改。
 // 抽成函数是为了让"回看已判分的题"能复用同一套着色,而不是各写一份。
@@ -809,6 +929,8 @@ export function backToQuizOptions() {
 
 // 显示指定部分
 export function showSection(sectionName) {
+    // 离开刷题页时收起答题卡抽屉:它是刷题页的临时浮层,不该跨页残留
+    closeAnswerCard();
     // 隐藏所有部分
     document.querySelectorAll('.section').forEach(section => {
         section.classList.remove('active');

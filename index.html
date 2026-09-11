@@ -187,7 +187,9 @@ A：选项A  B：选项B
                     <div class="quiz-controls">
                         <div class="quiz-meta">
                             <div class="quiz-status" id="quiz-status-text">
-                                <span id="question-number">1/10</span>
+                                <!-- 进度即答题卡入口(👤 决定):进度条本身就是要跳题时盯着的那个元素,
+                                     在它身上开口,零新增常驻元素、不动已验收的状态栏布局 -->
+                                <button type="button" id="answer-card-open" class="answer-card-open" aria-haspopup="dialog" aria-expanded="false" title="打开答题卡,快速跳到任意一题"><span id="question-number">1/10</span> <span class="answer-card-open-chevron" aria-hidden="true">▾</span></button>
                             </div>
                             <div class="quiz-meta-row">
                                 <button id="favorite-btn" class="favorite-btn" title="收藏本题，可在收藏夹查看">☆ 收藏</button>
@@ -426,6 +428,24 @@ A：选项A  B：选项B
             </div>
         </div>
 
+    </div>
+
+    <!-- 答题卡抽屉(P0-6.1):刷题中快速跳题。
+         ⚠️ 不放进 <main>:抽屉需要 position:fixed 相对视口定位,待在 main 内会受祖先滚动/包含块牵连。
+         内容刻意**不含题干与答案**——只给"做没做、对不对、什么题型",防提前偷看答案。 -->
+    <div id="answer-card-backdrop" class="answer-card-backdrop hidden"></div>
+    <div id="answer-card-drawer" class="answer-card-drawer hidden" role="dialog" aria-modal="true" aria-label="答题卡">
+        <div class="answer-card-head">
+            <p class="answer-card-summary" id="answer-card-summary">共 0 题</p>
+            <button type="button" id="answer-card-close" class="answer-card-close" title="关闭答题卡">✕</button>
+        </div>
+        <div class="answer-card-grid" id="answer-card-grid"></div>
+        <p class="answer-card-legend">
+            <span class="answer-card-legend-item"><i class="answer-card-swatch current"></i>当前</span>
+            <span class="answer-card-legend-item"><i class="answer-card-swatch correct"></i>答对</span>
+            <span class="answer-card-legend-item"><i class="answer-card-swatch wrong"></i>答错</span>
+            <span class="answer-card-legend-item"><i class="answer-card-swatch blank"></i>未答</span>
+        </p>
     </div>
 
     <script type="module" src="src/main.js?v=1026"></script>

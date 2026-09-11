@@ -468,6 +468,45 @@ export function shuffleArray(array) {
     return newArray;
 }
 
+// ==================== 答题卡(刷题中快速跳题,P0-6.1)====================
+// 「一题一格」的数据:**纯函数**(不读 DOM、不读全局 state),谁调用谁传状态 —— 于是能脱离浏览器直接断言。
+// 三态定义(👤 定调):
+//   blank   = 没判过分。逐题模式下包括"勾了但没点确认"的题 —— 在卡上必须仍是未答,不能冒充已答
+//   correct = 判过分且答对
+//   wrong   = 判过分且答错
+// graded:index → bool 的"是否已判分"映射(逐题模式来自 q_graded,套题模式整卷即已判)
+// ⚠️ 刻意**不输出题干与答案**:答题卡只暴露"做没做、对不对、什么题型",防止跳题前偷看答案。
+export const CARD_TYPE_SHORT = { 单选: '单', 多选: '多', 判断: '判' };
+
+export function buildCardCells(questions, userAnswers = [], graded = {}, currentIndex = 0) {
+    const list = Array.isArray(questions) ? questions : [];
+    const cells = list.map((question, index) => {
+        const q = question || {};
+        const userAnswer = userAnswers[index] || '';
+        const isGraded = !!graded[index];
+        const isCorrect = isGraded && !!userAnswer
+            && normalizeAnswerString(userAnswer) === normalizeAnswerString(q.answer || '');
+        return {
+            index,
+            number: index + 1,
+            type: q.type || '',
+            typeShort: CARD_TYPE_SHORT[q.type] || '',
+            status: isGraded ? (isCorrect ? 'correct' : 'wrong') : 'blank',
+            current: index === currentIndex,
+        };
+    });
+
+    return {
+        cells,
+        summary: {
+            total: cells.length,
+            correct: cells.filter(c => c.status === 'correct').length,
+            wrong: cells.filter(c => c.status === 'wrong').length,
+            blank: cells.filter(c => c.status === 'blank').length,
+        },
+    };
+}
+
 // 格式化题目用于导出
 export function formatQuestionsForExport(questions) {
     return questions.map(q => {
