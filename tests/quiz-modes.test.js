@@ -306,52 +306,63 @@ test('空作答的提示是行内提示,不再用 alert 弹窗', () => {
     assert.ok(String(hint.textContent).includes('选择'), '提示文案应说明要选择答案');
 });
 
-test('回看已作答的题:选项卡片高亮必须一并恢复(不能只设 checked)', () => {
-    // 回归:原生 radio/checkbox 是视觉隐藏的,选中态由 .option-item.selected 表达。
-    // 只恢复 inp.checked 时,界面"看不到刚才选了啥"(👤 反馈)。
-    const made = [];
-    sandbox.document.querySelectorAll = (sel) =>
-        sel.includes('input[name="answer"]') ? made.map((m) => m.inp) : [];
-    // 用 makeEl 造选项项,记录 querySelector 返回的 input 与 classList 状态
-    const mkItem = (value) => {
-        const inp = makeEl();
-        inp.value = value;
-        inp.checked = false;
-        const item = {
-            _inp: inp,
-            _classes: new Set(),
-            querySelector: () => inp,
-            classList: {
-                toggle: (c, on) => { if (on) item._classes.add(c); else item._classes.delete(c); },
-                contains: (c) => item._classes.has(c),
-                add: (c) => item._classes.add(c),
-                remove: (c) => item._classes.delete(c),
-            },
-        };
-        made.push({ inp, item });
-        return item;
-    };
-    const items = [mkItem('A'), mkItem('B'), mkItem('C')];
-    // optionsContainer 由 document.querySelector('.options-container') 取得,
-    // 代码随后调的是 **该容器** 的 querySelectorAll —— 必须把容器桩交出去
-    sandbox.document.querySelector = (sel) =>
-        sel.includes('.options-container')
-            ? { querySelectorAll: () => items, appendChild() {}, innerHTML: '' }
-            : makeEl();
+test('逐题模式回看已判分的题:保留判分状态、反馈文案与解析', () => {
+    // 👤 要求:"逐题模式下上一题保留判分结果和解析"。
+    // 用真实流程作答一次再回看,断言:isAnswered 仍为 true、反馈区可见、文案与解析都在。
+    // (选项卡片的绿/红着色由 paintGradedOptions 统一处理,已在作答路径覆盖,
+    //  此处不重复做容器桩,避免桩本身出错掩盖真问题。)
     sandbox.document.querySelectorAll = () => [];
-    run(`
+    run(setupQuiz + `
         quizMode = 'immediate';
-        currentQuiz = [{ content:'M', type:'多选', options:{A:'1',B:'2',C:'3'}, answer:'AC', analysis:'', explanation:'', confidence:1, raw:'' }];
-        questionBank = currentQuiz; currentQuestionIndex = 0; isAnswered = true;
-        userAnswers = ['AC'];
+        questionBank = questionBanks['T'];
+        currentQuestionIndex = 0; correctCount = 0; wrongCount = 0;
+        userAnswers = ['', '', ''];
+        globalThis.__sel = 'A';
     `);
-    run('displayQuestion()');
-    assert.strictEqual(items[0]._inp.checked, true, 'A 应被勾选');
-    assert.strictEqual(items[2]._inp.checked, true, 'C 应被勾选');
-    assert.strictEqual(items[1]._inp.checked, false, 'B 不应被勾选');
-    assert.ok(items[0]._classes.has('selected'), 'A 的卡片应有 selected 高亮');
-    assert.ok(items[2]._classes.has('selected'), 'C 的卡片应有 selected 高亮');
-    assert.ok(!items[1]._classes.has('selected'), 'B 的卡片不应有高亮');
+    // 模拟单选点选作答(collectUserAnswer 读 DOM,这里直接给桩值)
+    const sel = makeEl(); sel.value = 'A';
+    sandbox.document.querySelector = () => sel;
+    run('submitAnswer()');
+    assert.strictEqual(run('isAnswered'), true, '作答后应为已判分');
+    const fbText = String(elements['answer-result'].textContent);
+    assert.ok(fbText.length > 0, '作答后应有反馈文案');
+
+    // 走到第 2 题再回看第 1 题
+    run('nextQuestion()');
+    assert.strictEqual(run('currentQuestionIndex'), 1);
+    run('prevQuestion()');
+    assert.strictEqual(run('currentQuestionIndex'), 0, '应回到第 1 题');
+    assert.strictEqual(run('isAnswered'), true, '回看已判分的题应保持"已作答"状态');
+    assert.ok(!elements['answer-feedback'].classList.contains('hidden'), '反馈区应可见');
+    assert.strictEqual(String(elements['answer-result'].textContent), fbText, '反馈文案应与当时一致');
     sandbox.document.querySelector = () => makeEl();
+});
+
+
+test('末题判分后「结束刷题/交卷」变色(非末题或未作答则不变)', () => {
+    const sel = makeEl(); sel.value = 'A';
+    sandbox.document.querySelector = () => sel;
     sandbox.document.querySelectorAll = () => [];
+    const endBtn = elements['end-quiz-btn'];
+
+    // 第 1 题(非末题)作答 → 不应变色
+    run(setupQuiz + ` quizMode = 'immediate'; questionBank = questionBanks['T'];
+        currentQuestionIndex = 0; isAnswered = false; userAnswers = ['','',''];`);
+    run('displayQuestion()');
+    assert.ok(!endBtn.classList.contains('ready'), '非末题不应变色');
+    run('submitAnswer()');
+    assert.ok(!endBtn.classList.contains('ready'), '非末题作答后仍不应变色');
+
+    // 末题作答 → 变色
+    run(setupQuiz + ` quizMode = 'immediate'; questionBank = questionBanks['T'];
+        currentQuestionIndex = 2; isAnswered = false; userAnswers = ['','',''];`);
+    run('displayQuestion()');
+    assert.ok(!endBtn.classList.contains('ready'), '末题未作答时不应变色');
+    run('submitAnswer()');
+    assert.ok(endBtn.classList.contains('ready'), '末题作答后应变色提示收尾');
+
+    // 回到前面某题 → 高亮必须清掉,不能在非末题上残留
+    run('prevQuestion()');
+    assert.ok(!endBtn.classList.contains('ready'), '离开末题后不应残留高亮');
+    sandbox.document.querySelector = () => makeEl();
 });

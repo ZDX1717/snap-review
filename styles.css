@@ -574,6 +574,25 @@ h3 {
     white-space: nowrap;
 }
 
+/* 末题判分完成 →「结束刷题 / 交卷」变色,提示"可以收尾了"(👤 要求)。
+   用强调色 + 轻微脉冲,与普通次要按钮区分开。 */
+.quiz-actions #end-quiz-btn.ready {
+    background-color: var(--c-primary);
+    color: #fff;
+    font-weight: 600;
+    animation: end-ready-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes end-ready-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+    50%      { box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.18); }
+}
+
+/* 尊重"减少动态效果"偏好 */
+@media (prefers-reduced-motion: reduce) {
+    .quiz-actions #end-quiz-btn.ready { animation: none; }
+}
+
 /* 翻页按钮的禁用态:仍占位(位置稳定),仅弱化。
    用原生 :disabled —— 它能真正阻止程序化 click,并给无障碍正确语义;
    外观在此显式接管,不依赖浏览器默认禁用样式。 */

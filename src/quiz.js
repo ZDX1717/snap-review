@@ -126,6 +126,7 @@ export function startQuiz() {
     endQuizBtn.textContent = state.quizMode === 'exam' ? '交卷' : '结束刷题';
     reviewOnlyWrong.checked = false;
     state.masteryRemovedInSession = 0;
+    Object.keys(q_feedback).forEach(k => delete q_feedback[k]);
     
     // 显示刷题容器
     quizContainer.classList.remove('hidden');
@@ -233,14 +234,19 @@ export function displayQuestion() {
         });
     }
 
+    // 回到这一题时先把"上一题的残留"清掉(反馈区/末尾按钮高亮)
+    answerFeedback.classList.add('hidden');
+    answerResult.textContent = '';
+    answerExplanation.textContent = '';
+    endQuizBtn.classList.remove('ready');
+    state.isAnswered = false;
+
     // 刷新收藏按钮状态
     updateFavoriteButton();
     // 自动下一题按钮只在逐题模式出现(套题模式不支持,见 shouldAutoNext)
     if (autoNextBtn) autoNextBtn.classList.toggle('hidden', state.quizMode === 'exam');
 
     // 重置答题状态与按钮（逐题模式 vs 套题模式）
-    state.isAnswered = false;
-    answerFeedback.classList.add('hidden');
     if (state.quizMode === 'exam') {
         // 套题模式:上一题 / 下一题 / 交卷 **从左到右常驻**。
         // 旧版在首题隐藏"上一题"、末题隐藏"下一题",于是按钮会随位置忽隐忽现,
@@ -259,8 +265,15 @@ export function displayQuestion() {
         // 单选/判断点卡片即判分;多选勾选后点「下一题」即确认并判分
         nextQuestionBtn.classList.remove('hidden');
         setNavEnabled(nextQuestionBtn, state.currentQuestionIndex < state.currentQuiz.length - 1);
+
+        // 逐题模式:回到已判分的题时复现当时的结果(着色/反馈/解析)——👤 要求"保留判分结果和解析"
+        if (state.userAnswers[state.currentQuestionIndex]) {
+            state.isAnswered = true;
+            restoreGradedAnswer(question, state.userAnswers[state.currentQuestionIndex]);
+        }
     }
 
+    markEndButtonReady();
     bindQuizGestures();
 }
 
@@ -271,6 +284,58 @@ export function displayQuestion() {
 function setNavEnabled(btn, enabled) {
     if (!btn) return;
     btn.disabled = !enabled;
+}
+
+// 每题的"判分反馈"留档(index → {text, cls, explanation}),回看时原样复现。
+// 不重新推导文案:当次可能有"已连对 N 次,移出错题本"等上下文信息,重建会丢。
+const q_feedback = {};
+
+// 选项卡片判分标色(对绿/错红/正确项高亮)并禁改。
+// 抽成函数是为了让"回看已判分的题"能复用同一套着色,而不是各写一份。
+function paintGradedOptions(question, userAnswer, isCorrect, optsContainer) {
+    const host = optsContainer || document.querySelector('.options-container');
+    if (!host) return;
+    const correctSet = new Set(normalizeAnswerString(question.answer).split(''));
+    const userSet = new Set(normalizeAnswerString(userAnswer || '').split(''));
+    host.querySelectorAll('.option-item').forEach(item => {
+        const inp = item.querySelector('input[name="answer"]');
+        if (!inp) return;
+        inp.disabled = true;
+        // 判分后的选中态改由 correct/incorrect 承载(绿/红),不再用 .selected 的琥珀底
+        item.classList.remove('selected');
+        if (correctSet.has(inp.value)) item.classList.add('correct-card', 'correct');
+        if (userSet.has(inp.value) && !isCorrect) item.classList.add('wrong-card', 'incorrect');
+    });
+}
+
+// 最后一题的「结束刷题 / 交卷」在判分完成后变色,提示"可以收尾了"(👤 要求)
+function markEndButtonReady() {
+    const isLast = state.currentQuestionIndex >= state.currentQuiz.length - 1;
+    endQuizBtn.classList.toggle('ready', isLast && state.isAnswered);
+}
+
+// 回看已判分的题:把判分着色、反馈文案与解析一并恢复(👤 要求)
+// ⚠️ 逐题模式下这一题已经判过分,回看是"复现当时的结果",不是让用户重答。
+function restoreGradedAnswer(question, userAnswer) {
+    if (!userAnswer) return;
+    const isCorrect = normalizeAnswerString(userAnswer) === normalizeAnswerString(question.answer);
+    const saved = q_feedback[state.currentQuestionIndex];
+    if (saved) {
+        // 原样复现当次反馈(文案与样式都照搬)
+        answerResult.textContent = saved.text;
+        answerResult.className = saved.cls;
+        answerExplanation.textContent = saved.explanation;
+    } else {
+        // 无留档(如跨会话/直接跳题):回退到按答案推导
+        answerResult.textContent = isCorrect
+            ? '回答正确！'
+            : `回答错误！正确答案是：${formatAnswerForDisplay(question.answer, question)}`;
+        answerResult.className = isCorrect ? 'correct-answer' : 'wrong-answer';
+        answerExplanation.textContent = question.analysis || '';
+    }
+    answerFeedback.classList.remove('hidden');
+    paintGradedOptions(question, userAnswer, isCorrect);
+    markEndButtonReady();
 }
 
 // ==================== 行内轻提示 ====================
@@ -427,25 +492,20 @@ export function submitAnswer() {
     answerResult.className = isCorrect ? 'correct-answer' : 'wrong-answer';
     answerExplanation.textContent = question.analysis || '';
     answerFeedback.classList.remove('hidden');
+    // 留档:回看这一题时原样复现(含"已连对 N 次,移出错题本"这类当次提示)
+    q_feedback[state.currentQuestionIndex] = {
+        text: answerResult.textContent,
+        cls: answerResult.className,
+        explanation: answerExplanation.textContent,
+    };
 
-    // 方案 A:选项卡片判分标色(对绿/错红/正确项高亮)并禁改
-    const optsContainer = document.querySelector('.options-container');
-    if (optsContainer) {
-        const correctSet = new Set(normalizeAnswerString(question.answer).split(''));
-        const userSet = new Set(normalizeAnswerString(userAnswer).split(''));
-        optsContainer.querySelectorAll('.option-item').forEach(item => {
-            const inp = item.querySelector('input[name="answer"]');
-            if (!inp) return;
-            inp.disabled = true;
-            item.classList.remove('selected');
-            if (correctSet.has(inp.value)) item.classList.add('correct-card', 'correct');
-            if (userSet.has(inp.value) && !isCorrect) item.classList.add('wrong-card', 'incorrect');
-        });
-    }
-    
+    paintGradedOptions(question, userAnswer, isCorrect);
+
     // 更新按钮状态
-    state.isAnswered = true;
+    state.isAnswered = true;   // ⚠️ 必须在 markEndButtonReady 之前:它读的正是这个状态
     nextQuestionBtn.classList.remove('hidden');
+    // 最后一题判分完成后,让「结束刷题 / 交卷」变色提示收尾(👤 要求)
+    markEndButtonReady();
 }
 
 
