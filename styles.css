@@ -464,13 +464,13 @@ h3 {
     margin-top: 12px;
 }
 
-/* 刷题状态栏左区:题目状态指示在上(序号 / 题型两行),收藏按钮在其**下方** */
+/* 刷题状态栏左区:状态指示在上(单行),收藏按钮在下 —— 两行很矮,故状态栏整体不高 */
 .quiz-meta {
     display: flex;
-    flex-direction: column;   /* 状态在上、收藏在下(👤 要求) */
+    flex-direction: column;
     align-items: flex-start;
     justify-content: center;
-    gap: 2px;
+    gap: 1px;
     min-width: 0;
     font-size: 14px;
     color: var(--c-text-muted);
@@ -479,18 +479,21 @@ h3 {
 /* 状态指示:序号与题型**上下两行**(👤 要求) */
 .quiz-status {
     display: flex;
-    flex-direction: column;
-    line-height: 1.15;
+    flex-direction: row;      /* 序号与题型**同一行**(👤 要求;原先上下两行太占高) */
+    align-items: baseline;
+    gap: 6px;
+    line-height: 1.1;
     min-width: 0;
 }
 
 .quiz-status #question-number {
+    font-size: 14px;
     font-weight: 600;
     color: var(--c-text-secondary);
 }
 
 .quiz-status #question-type {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--c-text-faint);
 }
 
@@ -499,8 +502,10 @@ h3 {
 .quiz-meta .favorite-btn {
     margin-left: 0;
     align-self: flex-start;   /* 与状态指示左对齐 */
-    padding: 1px 8px;
-    font-size: 12px;
+    padding: 0 7px;
+    font-size: 11px;
+    line-height: 1.5;
+    border-radius: 999px;
 }
 
 /* ⚠️ 不要给 .quiz-actions 用 margin-left:auto 把它推右 —— 那会让它在 flex 兄弟
@@ -2070,9 +2075,10 @@ html[data-theme="dark"] .container {
         display: flex;
         flex-direction: row;      /* 单行 */
         flex-wrap: nowrap;
+        align-items: center;      /* 左区与按钮组中线对齐 */
         gap: 6px;
         margin-top: 0;
-        padding: 8px 8px;
+        padding: 4px 8px;         /* 上下各 4:整体压矮(👤 要求) */
         background: var(--c-surface);
         border-top: 1px solid var(--c-border);
         box-shadow: 0 -1px 6px rgba(0, 0, 0, 0.05);
@@ -2086,10 +2092,14 @@ html[data-theme="dark"] .container {
         white-space: nowrap;
         overflow: hidden;
     }
+    /* 收藏按钮压到最小:州是左区的第二行,它的高度直接决定状态栏总高 */
     .quiz-meta .favorite-btn {
-        padding: 2px 8px;
-        font-size: 12px;
+        padding: 0 6px;
+        font-size: 11px;
+        line-height: 1.45;
     }
+    .quiz-status #question-number { font-size: 13px; }
+    .quiz-meta { gap: 0; }
     /* 按钮组:自然宽度,不收缩 —— 保证"下一题/结束刷题"始终可点 */
     .quiz-actions {
         flex: 0 0 auto;
@@ -2109,8 +2119,10 @@ html[data-theme="dark"] .container {
         flex: 0 0 auto;
         width: auto;
         margin: 0;
-        padding: 6px 10px;
+        /* 加高便于点按(约 34px);左右收窄以维持单行(👤 要求:增高、收窄) */
+        padding: 9px 10px;
         font-size: 13px;
+        line-height: 1.15;
     }
     /* 单行放不下时优先压缩较宽的"上一题/下一题",保证三个按钮都在一行 */
     .quiz-actions #prev-question-btn,
@@ -2119,8 +2131,8 @@ html[data-theme="dark"] .container {
         min-width: 0;
     }
     #quiz-container {
-        /* 预留:单行操作条(约 48) + 底部 tab 安全区 */
-        padding-bottom: calc(60px + env(safe-area-inset-bottom));
+        /* 预留:状态栏(约 42) + 底部 tab 安全区 */
+        padding-bottom: calc(56px + env(safe-area-inset-bottom));
     }
 }
 
