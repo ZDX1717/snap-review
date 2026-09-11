@@ -50,6 +50,21 @@
     --c-ai-connected-text: #1e7e46;  /* AI 已连接文字 */
     --c-ai-connected-bg: #e9f7ef;    /* AI 已连接底 */
     --c-border-hairline: #eef0f3;    /* 极浅分隔边框(救援区) */
+    /* ===== 题库卡配色(👤 2026-09-11 选定的 5 色 + 默认灰)=====
+       每色一对:--c-bank-<名字> = 底色,--c-bank-<名字>-border = 边框。
+       ⚠️ 成对出现、只在这里定义;卡片靠 [data-color] 取值(见 .bank-item[data-color=...])。
+       底色刻意压到"低饱和":卡片里还要放徽章与按钮,底色一浓就抢内容。
+       蓝/绿/红/琥珀的底色复用了既有的用途令牌,边框为卡片新加。 */
+    --c-bank-blue: var(--c-info-bg);
+    --c-bank-blue-border: #b9c6dd;
+    --c-bank-green: var(--c-success-soft);
+    --c-bank-green-border: #a7e0c1;
+    --c-bank-red: var(--c-danger-soft);
+    --c-bank-red-border: #f3c0c6;
+    --c-bank-amber: var(--c-warn-bg-soft);
+    --c-bank-amber-border: #ecd39a;
+    --c-bank-teal: #eef7f8;
+    --c-bank-teal-border: #a9cfd6;
     /* ===== 内容区内边距(统一,三页共用;改动只改这两行) ===== */
     --pad-x: 24px;                   /* 左右留白 */
     --pad-top: 16px;                 /* 标题栏与首模块之间的呼吸位 */
@@ -932,15 +947,34 @@ h3 {
     overflow-y: auto;
 }
 
+/* 题库卡(👤 2026-09-11 定稿):**去掉左侧蓝装饰条**,改为"低饱和底色 + 同色系边框"。
+   - 默认(不设色 / 设「灰」)= 白底 + 普通边框,与站内其它卡片完全一致;
+   - 选了色 → 卡片带上 data-color,底色与边框从成对令牌取(见 :root 的 --c-bank-*)。
+   ⚠️ 卡片里还要放状态徽章与底部按钮,所以底色必须低饱和;不要把饱和度往上调。 */
 .bank-item {
     background-color: var(--c-surface);
+    border: 1px solid var(--c-border);
     border-radius: 6px;
     padding: 16px;
     margin-bottom: 16px;
-    border-left: 4px solid var(--c-primary);
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+.bank-item[data-color="blue"]  { background-color: var(--c-bank-blue);  border-color: var(--c-bank-blue-border); }
+.bank-item[data-color="green"] { background-color: var(--c-bank-green); border-color: var(--c-bank-green-border); }
+.bank-item[data-color="red"]   { background-color: var(--c-bank-red);   border-color: var(--c-bank-red-border); }
+.bank-item[data-color="amber"] { background-color: var(--c-bank-amber); border-color: var(--c-bank-amber-border); }
+.bank-item[data-color="teal"]  { background-color: var(--c-bank-teal);  border-color: var(--c-bank-teal-border); }
+/* 「灰」是显式的一档,同时也是缺省表现 —— 无需额外规则,写在这里只为说明它存在 */
+
+/* 卡片内的控件改成"半透明白",跟着卡片底色自动适配 ——
+   写死 --c-panel-bg 会在彩色底上突兀,而每个色配一套按钮色是维护地狱。 */
+.bank-item[data-color] .bank-card-foot .foot-toggle {
+    background: rgba(255, 255, 255, 0.62);
+}
+html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .bank-info h3 {
@@ -2151,6 +2185,17 @@ html[data-theme="dark"] {
     --c-selected-text-strong: #b9ccec;
     --c-selected-bg-strong: #26313f;
     --c-accent-purple-tint: #2a2440;
+    /* 题库卡配色 · 暗色:同色相同样低饱和,但整体压暗(浅底直接套用会刺眼) */
+    --c-bank-blue: #1b2430;
+    --c-bank-blue-border: #33465e;
+    --c-bank-green: #16281f;
+    --c-bank-green-border: #2f5140;
+    --c-bank-red: #2b1d21;
+    --c-bank-red-border: #573039;
+    --c-bank-amber: #2a2418;
+    --c-bank-amber-border: #55482a;
+    --c-bank-teal: #17262a;
+    --c-bank-teal-border: #2e4c53;
 }
 html[data-theme="dark"] {
     color-scheme: dark;
@@ -2480,6 +2525,56 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     padding: 12px;
     margin: -6px 0 8px;
 }
+/* 题库卡配色色板(编辑器内):每个色块直接用**卡片同款**底+框,所见即所得 */
+.bank-color-row {
+    align-items: center;
+    gap: 8px;
+}
+.bank-color-label {
+    font-size: 13px;
+    color: var(--c-text-secondary);
+}
+.bank-color-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.bank-color-swatch {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: var(--c-surface);
+    color: var(--c-text-secondary);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+/* 色块本体:与卡片同一对令牌,保证"色板上看到的 = 卡片上的" */
+.bank-color-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 1px solid var(--c-border);
+    background: var(--c-surface);
+}
+.bank-color-swatch[data-color="blue"]  .bank-color-dot { background: var(--c-bank-blue);  border-color: var(--c-bank-blue-border); }
+.bank-color-swatch[data-color="green"] .bank-color-dot { background: var(--c-bank-green); border-color: var(--c-bank-green-border); }
+.bank-color-swatch[data-color="red"]   .bank-color-dot { background: var(--c-bank-red);   border-color: var(--c-bank-red-border); }
+.bank-color-swatch[data-color="amber"] .bank-color-dot { background: var(--c-bank-amber); border-color: var(--c-bank-amber-border); }
+.bank-color-swatch[data-color="teal"]  .bank-color-dot { background: var(--c-bank-teal);  border-color: var(--c-bank-teal-border); }
+/* 选中态:主色描边 + 加粗(不只靠颜色区分选中) */
+.bank-color-swatch.active {
+    border-color: var(--c-primary);
+    color: var(--c-primary);
+    font-weight: 600;
+    background: var(--c-info-bg);
+}
+
 /* 编辑器内:题库设置与管理区 */
 .bank-admin {
     border-top: 1px solid var(--c-border-light);

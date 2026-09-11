@@ -5,6 +5,8 @@
 export const state = {
     // 题库
     questionBanks: {},
+    // 题库卡配色(👤 定稿):库名 → 'blue'|'green'|'red'|'amber'|'teal';缺省即灰,不存在此表里
+    bankColors: {},
     questionBank: [],
     currentBankName: '默认题库',
     isAllBanksView: false,

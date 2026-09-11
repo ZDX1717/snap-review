@@ -478,6 +478,20 @@ test('错题/收藏的渲染只有一处(库卡内嵌面板),不得再有独立�
     }
 });
 
+test('题库卡不得再出现左侧主色装饰条(👤 2026-09-11 改成配色底)', () => {
+    // 历史:库卡曾是 `border-left: 4px solid var(--c-primary)`,👤 要求改成"低饱和彩色底+框"。
+    // 这条守卫防止旧样式被顺手恢复 —— 那种 4px 主色竖条是上一代的视觉语言。
+    const rule = cssNoComments.match(/\.bank-item\s*\{([^}]*)\}/);
+    assert.ok(rule, '应有 .bank-item 规则');
+    assert.ok(!/border-left\s*:/.test(rule[1]), '.bank-item 不得再有 border-left 装饰条');
+    assert.ok(/border\s*:\s*1px\s*solid/.test(rule[1]), '应改为 1px 整圈边框');
+    // 配色必须走 data-color + 成对令牌(而不是内联样式或硬编码颜色)
+    for (const c of ['blue', 'green', 'red', 'amber', 'teal']) {
+        assert.ok(new RegExp(`\\.bank-item\\[data-color="${c}"\\]`).test(cssNoComments),
+            `缺 .bank-item[data-color="${c}"] 配色规则`);
+    }
+});
+
 test('答题卡抽屉在 <main> 之外(公理:浮层不受 section 显隐牵连)', () => {
     const mainEnd = html.indexOf('</main>');
     const pos = html.indexOf('id="answer-card-drawer"');

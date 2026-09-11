@@ -51,6 +51,8 @@ const editorRemoveOption = document.getElementById('editor-remove-option');
 const editorExplanation = document.getElementById('editor-explanation');
 const editorAnalysis = document.getElementById('editor-analysis');
 const editorAiAnswerBtn = document.getElementById('editor-ai-answer-btn');
+const bankColorPicker = document.getElementById('bank-color-picker');
+const bankColorNote = document.getElementById('bank-color-note');
 const editorAiAnswerNote = document.getElementById('editor-ai-answer-note');
 const editorPosition = document.getElementById('editor-position');
 const lastImportInfo = document.getElementById('last-import-info');
@@ -1111,6 +1113,11 @@ export function renameBank() {
     const oldName = state.currentRenameBank;
     state.errorQuestions.forEach(q => { if (q.bankName === oldName) q.bankName = newName; });
     state.favoriteQuestions.forEach(q => { if (q.bankName === oldName) q.bankName = newName; });
+    // 卡片配色同样跟着走(它按库名存;不迁就会"改个名颜色就丢了")
+    if (state.bankColors && state.bankColors[oldName]) {
+        state.bankColors[newName] = state.bankColors[oldName];
+        delete state.bankColors[oldName];
+    }
 
     if (state.currentBankName === state.currentRenameBank) {
         state.currentBankName = newName;
@@ -1129,6 +1136,11 @@ export function renameBank() {
 
 // 删除题库
 export function deleteBank(bankName) {
+    // 库删了,配色也要跟着清 —— 否则将来重建同名库会莫名其妙带上旧颜色
+    if (state.bankColors && state.bankColors[bankName]) {
+        delete state.bankColors[bankName];
+        saveToLocalStorage();
+    }
     if (!confirm(`确定删除题库"${bankName}"吗？\n该库的错题与收藏将一并移入回收站,可随时恢复。`)) {
         return;
     }
@@ -1567,6 +1579,8 @@ export function editorRenderForm() {
     editorAiAnsweredAnswer = null;
     editorAiAnsweredAnalysis = null;
     if (editorAiAnswerNote) editorAiAnswerNote.textContent = '';
+    if (bankColorNote) bankColorNote.textContent = '';
+    renderBankColorPicker();
     const q = currentEditBank()[state.editIndex];
     if (!q) return;
 
@@ -1631,6 +1645,63 @@ export function refreshQuestionBankView() {
 // 👤 定调 2026-09-11:错题卡与收藏卡**统一设计**,且题型/收藏/删除一律放在**题干上方一行**。
 // 结构:`.q-card > .q-card-tags(题型 + 状态徽章 + 收藏 + 删除) + 题干 + 选项 + details(答案/解析)`。
 // 与刷题页的 `.question-tags` 同一条规矩:标签行在题干之上、自成一行,不影响题干宽度。
+
+// 题库卡配色(👤 2026-09-11 选定):'grey' = 缺省(白底,与其他卡片一致)。
+// ⚠️ 这里的 value 必须与 styles.css 的 .bank-item[data-color="..."] 一一对应。
+export const BANK_COLORS = [
+    { value: 'grey', name: '灰(默认)' },
+    { value: 'blue', name: '蓝' },
+    { value: 'green', name: '绿' },
+    { value: 'red', name: '红' },
+    { value: 'amber', name: '琥珀' },
+    { value: 'teal', name: '青' },
+];
+export const BANK_COLOR_VALUES = BANK_COLORS.map(c => c.value);
+
+// 取某库的配色(非法/缺省 → grey)
+export function bankColorOf(bankName) {
+    const v = state.bankColors && state.bankColors[bankName];
+    return BANK_COLOR_VALUES.includes(v) ? v : 'grey';
+}
+
+// 设置某库配色并落盘
+export function setBankColor(bankName, color) {
+    if (!BANK_COLOR_VALUES.includes(color)) return false;
+    state.bankColors = state.bankColors || {};
+    if (color === 'grey') delete state.bankColors[bankName];   // 缺省即灰,不留冗余字段
+    else state.bankColors[bankName] = color;
+    saveToLocalStorage();
+    return true;
+}
+
+// 渲染配色色板(编辑器内)。每个色块 = 一个按钮,点一下即改并立即落盘 ——
+// 配色是"看一眼就想调"的东西,不值得为它走一遍保存流程。
+export function renderBankColorPicker() {
+    if (!bankColorPicker) return;
+    const current = bankColorOf(state.editBankName);
+    bankColorPicker.innerHTML = '';
+    BANK_COLORS.forEach(c => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'bank-color-swatch' + (c.value === current ? ' active' : '');
+        btn.dataset.color = c.value;
+        btn.setAttribute('aria-pressed', c.value === current ? 'true' : 'false');
+        btn.title = c.value === 'grey' ? '与其它卡片一致的默认样式' : `把本库卡片染成${c.name}`;
+        const dot = document.createElement('span');
+        dot.className = 'bank-color-dot';
+        btn.appendChild(dot);
+        const label = document.createElement('span');
+        label.textContent = c.name;
+        btn.appendChild(label);
+        btn.addEventListener('click', () => {
+            if (!setBankColor(state.editBankName, c.value)) return;
+            renderBankColorPicker();
+            updateBanksList();   // 库卡上的颜色立刻跟着变
+            if (bankColorNote) bankColorNote.textContent = c.value === 'grey' ? '已恢复默认' : `已设为${c.name}`;
+        });
+        bankColorPicker.appendChild(btn);
+    });
+}
 
 // 题干上方那一行。返回元素,调用方自行 append 到卡片最前。
 function buildCardTagRow(question, opts = {}) {
@@ -1855,6 +1926,8 @@ export function updateBanksList() {
 
         const bankItem = document.createElement('div');
         bankItem.className = 'bank-item';
+        const color = bankColorOf(bankName);
+        if (color !== 'grey') bankItem.setAttribute('data-color', color);   // 灰色是缺省,不写属性
 
         // 标题行:库名 + 状态徽章
         // 左上:库名 + 状态徽章
@@ -2124,6 +2197,7 @@ export function editorHistClick(e) {
 }
 
 export function renderBankEditor() {
+    renderBankColorPicker();
     const questions = currentEditBank();
     const pendingOnly = !!state.editorPendingOnly;
 

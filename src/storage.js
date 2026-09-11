@@ -7,6 +7,12 @@ import { state } from './state.js';
 export function loadFromLocalStorage() {
     // 容错：存储数据损坏时重置对应部分，而不是让整个应用崩溃
     try {
+        // 题库卡配色(与题库同期加载;损坏则退回空表 = 全灰)
+        try {
+            const rawColors = JSON.parse(localStorage.getItem('bankColors') || '{}');
+            state.bankColors = (rawColors && typeof rawColors === 'object' && !Array.isArray(rawColors)) ? rawColors : {};
+        } catch (e) { state.bankColors = {}; }
+
         const savedBanks = localStorage.getItem('questionBanks');
         if (savedBanks) {
             const parsed = JSON.parse(savedBanks);
@@ -75,6 +81,11 @@ export function saveToLocalStorage() {
         state.questionBanks[state.currentBankName] = state.questionBank;
     }
     localStorage.setItem('questionBanks', JSON.stringify(state.questionBanks));
+    if (state.bankColors && Object.keys(state.bankColors).length) {
+        localStorage.setItem('bankColors', JSON.stringify(state.bankColors));
+    } else {
+        localStorage.removeItem('bankColors');   // 全灰就不留空表
+    }
     localStorage.setItem('errorQuestions', JSON.stringify(state.errorQuestions));
     localStorage.setItem('favoriteQuestions', JSON.stringify(state.favoriteQuestions));
 }

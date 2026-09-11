@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=1036">
+    <link rel="stylesheet" href="styles.css?v=1037">
 </head>
 <body>
     <div class="container">
@@ -401,6 +401,11 @@ A：选项A  B：选项B
                             <div class="editor-nav-row">
                             <div class="bank-admin">
                                 <h4>题库设置与管理</h4>
+                                <div class="bank-admin-row bank-color-row">
+                                    <span class="bank-color-label">卡片配色</span>
+                                    <div id="bank-color-picker" class="bank-color-picker" role="group" aria-label="题库卡配色"></div>
+                                    <span id="bank-color-note" class="meta-note"></span>
+                                </div>
                                 <div class="bank-admin-row">
                                     <button id="bank-rename-btn" class="action-btn small secondary">重命名</button>
                                     <button id="bank-dedup-btn" class="action-btn small secondary">去重</button>
@@ -458,6 +463,6 @@ A：选项A  B：选项B
         </p>
     </div>
 
-    <script type="module" src="src/main.js?v=1036"></script>
+    <script type="module" src="src/main.js?v=1037"></script>
 </body>
 </html>
