@@ -477,13 +477,14 @@ h3 {
     color: var(--c-text-muted);
 }
 
-/* 状态行:答题卡 + 智能切题 并排。
-   flex-wrap: 窄屏上宁可折成两行,也不把按钮压成小方块(按钮是先保证好点,再谈排一行) */
+/* 状态行:左区只剩「智能切题」一个按钮。
+   🚨 这里**必须 nowrap**:折行 = 状态栏变高(👤 报的 bug 就是这个现象)。
+   防折行的根本办法是不往这里放会随内容变宽的东西 —— 见下面「下一题」的固定宽度规则。 */
 .quiz-status {
     display: flex;
     flex-direction: row;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 6px;
     line-height: 1.1;
     min-width: 0;
@@ -495,14 +496,19 @@ h3 {
     color: var(--c-text-secondary);
 }
 
-/* 题型徽章 + 收藏同处一行(👤 定调:收藏放在"题目类型后面")。
-   两者都是"这题是什么 / 我对它做了什么"的标签,同排归位;题干另起一行。 */
+/* 题干上方的标签行:[答题卡(含进度)] [题型] [☆收藏](👤 定调 2026-09-11)。
+   ⚠️ 铁律:这排按钮的宽窄变化**不得影响下面题干的宽度**。
+   做法 = 本行 `nowrap`,且每个子项 `flex: 0 0 auto`(各自按内容占宽、谁也别想靠伸缩挤别人);
+   题干是块级 <h3>、宽度取父容器 100%,与这行里放了几个按钮无关。 */
 .question-tags {
     display: flex;
     align-items: center;
     gap: 8px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;        /* 禁止折行:折行会让本行变高,把题干往下推 */
     margin-bottom: 6px;
+}
+.question-tags > * {
+    flex: 0 0 auto;
 }
 
 /* 题型徽章:置于题干之前(👤 要求),小号弱化,不抢题干视线 */
@@ -579,6 +585,16 @@ h3 {
 .quiz-actions .action-btn {
     flex: 0 0 auto;
     white-space: nowrap;
+}
+
+/* 🚨 「下一题」在两种文案下必须有**相同宽度**(👤 报的 bug):
+   多选未判分时它变成「确认答案」,文案变长 → 按钮变宽 → 左区被挤窄 →
+   左区折行 → 刷题状态栏变高、答题卡与智能切题从左右变上下(👤 实测)。
+   治本 = 预留能装下最长文案的最小宽度,并让文字居中;两种状态宽度一致,左区永远不会被挤。
+   算宽依据:13px 字号下「确认答案」4 字 ≈ 52px + 左右内边距(9px×2)+ 边框 ≈ 72px,取 76px 留余量。 */
+.quiz-actions #next-question-btn {
+    min-width: 76px;
+    text-align: center;
 }
 
 /* 「确认答案」态(👤 方案):多选已勾选、尚未判分时,「下一题」变橘色描边。
@@ -2175,10 +2191,8 @@ html[data-theme="dark"] .container {
         min-width: 0;
         gap: 6px;
         font-size: 12px;
-        white-space: nowrap;
-        overflow: hidden;
     }
-    /* 手机档:左区两个中号按钮收小半档(26px),但仍明确是按钮 ——
+    /* 手机档:状态栏里两个中号按钮收小半档(26px),但仍明确是按钮 ——
        它们与右侧「上一题/下一题/结束刷题」同处一条固定状态栏,不能让左区把按钮组挤走 */
     .answer-card-open,
     .auto-next {
@@ -2186,10 +2200,10 @@ html[data-theme="dark"] .container {
         padding: 0 10px;
         font-size: 12px;
     }
-    /* 状态行允许换行,故必须显式解除 .quiz-meta 的 nowrap:
-       white-space 会被子元素继承,不解除的话 flex-wrap 看似开着、实际永远折不了行 */
-    .quiz-status { gap: 4px; white-space: normal; }
-    .quiz-status #question-number { font-size: 13px; }
+    /* ⚠️ 左区只剩一个按钮,且状态行禁止折行(👤 报的 bug:折行会让状态栏变高、按钮上下排列)。
+       故这里既不设 white-space:nowrap/overflow:hidden(会把按钮文字挤掉),
+       也不加 gap —— 左区只需"一个按钮待在左边"。 */
+    .quiz-status { white-space: normal; }
     .quiz-meta { gap: 0; }
     /* 按钮组:自然宽度,不收缩 —— 保证"下一题/结束刷题"始终可点 */
     .quiz-actions {

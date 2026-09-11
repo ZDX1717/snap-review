@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=1029">
+    <link rel="stylesheet" href="styles.css?v=1030">
 </head>
 <body>
     <div class="container">
@@ -137,9 +137,11 @@ A：选项A  B：选项B
 
                 <div id="quiz-container" class="quiz-container hidden">
                     <div class="question-content">
-                        <!-- 题型徽章 + 收藏同处一行(👤 定调:收藏放在"题目类型后面"),
-                             两者都是"这题是什么/我对它做了什么"的标签,同排归位;题干另起一行。 -->
+                        <!-- 题干上方的标签行:[答题卡(含进度)] [题型] [☆收藏],从左到右一行(👤 定调 2026-09-11)。
+                             它单独成行且禁止换行,故这排按钮的宽窄变化**不影响下面题干的宽度**;
+                             也正因为它不在状态栏里,多选时「下一题」换成那颗确认按钮也不会挤到它(👤 报的 bug)。 -->
                         <div class="question-tags">
+                            <button type="button" id="answer-card-open" class="answer-card-open" aria-haspopup="dialog" aria-expanded="false" title="打开答题卡,快速跳到任意一题"><span id="question-number">1/10</span> <span class="answer-card-open-chevron" aria-hidden="true">▾</span></button>
                             <span id="question-type" class="question-type-badge">单选题</span>
                             <button id="favorite-btn" class="favorite-btn" title="收藏本题，可在收藏夹查看">☆ 收藏</button>
                         </div>
@@ -191,10 +193,9 @@ A：选项A  B：选项B
 
                     <div class="quiz-controls">
                         <div class="quiz-meta">
-                            <div class="quiz-status" id="quiz-status-text">
-                                <!-- 进度即答题卡入口(👤 决定),右邻智能切题:两者都是"控制这一局怎么走"的常驻动作,
-                                     合成一行后按钮才放得开(👤 要求放大到中号) -->
-                                <button type="button" id="answer-card-open" class="answer-card-open" aria-haspopup="dialog" aria-expanded="false" title="打开答题卡,快速跳到任意一题"><span id="question-number">1/10</span> <span class="answer-card-open-chevron" aria-hidden="true">▾</span></button>
+                            <!-- 状态行只剩「智能切题」:进度+答题卡已移到题干上方(👤 定调),
+                                 故此处不再有会随内容变宽的状态文字,状态栏高度也就恒定了 -->
+                            <div class="quiz-status">
                                 <button type="button" id="auto-next-toggle" class="auto-next" aria-pressed="false" title="开启后:答对自动切到下一题;答错停在本题看解析">智能切题</button>
                             </div>
                         </div>
@@ -451,6 +452,6 @@ A：选项A  B：选项B
         </p>
     </div>
 
-    <script type="module" src="src/main.js?v=1029"></script>
+    <script type="module" src="src/main.js?v=1030"></script>
 </body>
 </html>
