@@ -175,3 +175,36 @@ describe('版本记录:可删、不空存、挂在题库设置里(👤 2026-09-1
         assert.strictEqual(run(`document.getElementById('editor-bank-admin') ? 1 : 0`), 1);
     });
 });
+
+describe('删库后回收站立刻更新(👤 反馈的 bug)', () => {
+    let run, store, elements, sandbox;
+    before(async () => {
+        ({ run, store, elements, sandbox } = await loadApp({ confirmResult: true }));
+        run(`init()`);
+    });
+
+    test('删库:进回收站 + 计数与列表当场刷新(不用刷页面)', () => {
+        run(`questionBanks = { '要删的库': [${JSON.stringify(mkQ('D1'))}, ${JSON.stringify(mkQ('D2'))}], '留下的库': [${JSON.stringify(mkQ('K1'))}] }`);
+        run(`bankVersions = {}; bankColors = { '要删的库': 'blue' }`);
+        elements['recycle-count'].textContent = '(0)';   // 先按"空回收站"起跑(不预热,免得依赖未挂钩子的函数)
+        // 记录删库过程中新创建的元素:回收站条目会被重建 → 能观察到 renderRecycleBin 真的跑了
+        const mark = sandbox.__created.length;
+        run(`deleteBank('要删的库')`);
+        const created = sandbox.__created.slice(mark);
+
+        // ① 库里没了
+        assert.ok(!('要删的库' in run(`questionBanks`)), '库应已删除');
+        // ② 回收站里有了(题+错+藏整体打包)
+        const bin = JSON.parse(store.get('recycledBanks'));
+        assert.ok(bin['要删的库'], '应已进回收站');
+        assert.strictEqual(bin['要删的库'].bank.length, 2, '题目应整体打包进回收站');
+        // ③ **当场**刷新:回收站条目被重建 + 计数变了
+        const recycleRows = created.filter(c => String(c.el.className).includes('recycle-item'));
+        assert.ok(recycleRows.length >= 1,
+            '删库后应重建回收站条目(旧实现漏了 renderRecycleBin,要刷页面才更新 —— 👤 反馈的 bug)');
+        assert.strictEqual(elements['recycle-count'].textContent, '(1)', '回收站计数应当场变成 1');
+        // ④ 顺带:配色不残留(库没了,按库名存的颜色也该清掉)
+        assert.strictEqual(run(`Object.prototype.hasOwnProperty.call(bankColors, '要删的库')`), false,
+            '删库应一并清掉它的卡片配色');
+    });
+});

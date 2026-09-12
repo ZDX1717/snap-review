@@ -1039,6 +1039,17 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
     z-index: 1000;
 }
 
+/* 二级弹窗(从另一个弹窗里打开的)必须**压在上面**。
+   ⚠️ 所有 .modal 同为 z-index:1000 时,谁在上面只看 DOM 顺序 ——
+   而「重命名 / 创建题库 / AI 设置」在 HTML 里都排在「题库编辑」之前,
+   于是从编辑器里点重命名,对话框会被编辑器盖住、根本没法操作(👤 反馈的 bug)。
+   分层:二级 1100 > 一级 1000 > 答题卡抽屉 1200(抽屉本就该在最上)。 */
+#rename-bank-modal,
+#create-bank-modal,
+#ai-settings-modal {
+    z-index: 1100;
+}
+
 .modal-content {
     background-color: var(--c-surface);
     border-radius: 12px;

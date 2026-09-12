@@ -1180,6 +1180,9 @@ export function deleteBank(bankName) {
     refreshQuestionBankView();
     updateBankSelect();
     updateBanksList();
+    // ⚠️ 必须一并刷新回收站:它就挂在题库页那一行,不刷新的话计数与列表会停在旧值,
+    //    表现为"删了库要刷页面才看得到"(👤 反馈的 bug)。
+    renderRecycleBin();
 
     alert(`题库"${bankName}"已移入回收站(可恢复)`);
 }

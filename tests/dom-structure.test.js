@@ -701,6 +701,46 @@ test('回收站:在创建按钮右侧,点开是悬浮菜单(👤 2026-09-12)', (
     assert.ok(!/binWrap\.querySelector\('summary'\)\.textContent/.test(bank), '不该再整条重写 summary');
 });
 
+test('二级弹窗必须压在一级之上(👤 反馈:编辑器里重命名点不到)', () => {
+    // 事故:所有 .modal 同为 z-index:1000,谁在上面只看 DOM 顺序 ——
+    // 而「重命名/创建题库/AI 设置」在 HTML 里都排在「题库编辑」之前,
+    // 于是从编辑器里点重命名,对话框被编辑器盖住,根本没法操作。
+    assert.ok(/z-index\s*:\s*1000/.test(cssNoComments.match(/\n\.modal\s*\{([^}]*)\}/)[1]),
+        '一级弹窗应为 1000');
+    // 会被"从编辑器里打开"的三个二级弹窗,必须更高
+    for (const id of ['rename-bank-modal', 'create-bank-modal', 'ai-settings-modal']) {
+        const re = new RegExp(`#${id}[^{]*\\{[^}]*z-index\\s*:\\s*(\\d+)`);
+        const m = cssNoComments.match(re);
+        assert.ok(m, `#${id} 应有更高的 z-index(它是二级弹窗)`);
+        assert.ok(Number(m[1]) > 1000, `#${id} 的 z-index 必须大于一级弹窗,实际 ${m[1]}`);
+    }
+    // 答题卡抽屉仍要压在所有弹窗之上(它是刷题页那一层的)
+    const drawer = cssNoComments.match(/\n\.answer-card-drawer\s*\{([^}]*)\}/)[1];
+    const dz = Number((drawer.match(/z-index\s*:\s*(\d+)/) || [])[1]);
+    assert.ok(dz > 1100, `答题卡抽屉应压在二级弹窗之上,实际 ${dz}`);
+    // 代码里确实存在"编辑器 → 重命名 / AI 设置"这两条嵌套路径(否则这条守卫没意义)
+    const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
+    const editorRegion = bank.slice(bank.indexOf('export function renderBankEditor'), bank.indexOf('export function editorClose'));
+    assert.ok(/showRenameModal|bank-rename-btn/.test(bank), '编辑器里仍会打开重命名');
+    assert.ok(/openAiSettings\(\)/.test(editorRegion) || /openAiSettings\(\)/.test(bank), '编辑器里仍会打开 AI 设置');
+});
+
+test('删库必须当场刷新回收站(👤 反馈:要刷页面才看得到)', () => {
+    const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
+    // ⚠️ 按**下一个函数名**界定范围,不要按注释文本 —— 同一句注释在文件里可能出现多次(踩过)
+    const bodyOf = (name) => {
+        const at = bank.indexOf(`export function ${name}`);
+        const next = bank.indexOf('\nexport function ', at + 2);
+        return bank.slice(at, next === -1 ? bank.length : next);
+    };
+    const del = bodyOf('deleteBank');
+    assert.ok(/renderRecycleBin\(\)/.test(del),
+        '删除题库后必须调用 renderRecycleBin:回收站就挂在题库页那一行,不刷就停在旧值');
+    // 同类操作(恢复)本来就刷新,确认没被改坏
+    const restore = bodyOf('restoreRecycled');
+    assert.ok(/renderRecycleBin\(\)/.test(restore), '恢复也应刷新回收站');
+});
+
 test('答题卡抽屉在 <main> 之外(公理:浮层不受 section 显隐牵连)', () => {
     const mainEnd = html.indexOf('</main>');
     const pos = html.indexOf('id="answer-card-drawer"');
