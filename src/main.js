@@ -140,7 +140,6 @@ const previewAiAnswerBtn = document.getElementById('preview-ai-answer-btn');
 const editorAiAnswerBtn = document.getElementById('editor-ai-answer-btn');
 // 编辑器重构(👤 2026-09-11):头部快捷动作 + 题号列表开合
 const editorHeadCloseBtn = document.getElementById('editor-head-close-btn');
-const editorSaveBtn = document.getElementById('editor-save-btn');
 const editorTabQuestion = document.getElementById('editor-tab-question');
 const editorTabBank = document.getElementById('editor-tab-bank');
 const editorRemoveOption = document.getElementById('editor-remove-option');
@@ -323,7 +322,8 @@ function setupEventListeners() {
     // 标签页切换(radio 的 change 事件;用 change 而不是 click,键盘也能切)
     editorTabQuestion.addEventListener('change', () => switchEditorTab('question'));
     editorTabBank.addEventListener('change', () => switchEditorTab('bank'));
-    editorSaveBtn.addEventListener('click', () => editorSaveCurrent(false));
+    // 「保存本题」已从动作行搬进列表里选中的那一行(bank.js 逐行渲染并绑事件),
+    // 这里不再有全局保存键可绑。editorSaveCurrent 仍由预览/快捷键等路径调用。
     // 关闭键在标题栏(原底栏那颗已随底栏取消)
     editorHeadCloseBtn.addEventListener('click', editorClose);
     // 库级操作:作用于当前编辑中的题库(编辑器即该库的管理入口)

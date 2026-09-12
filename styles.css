@@ -1504,12 +1504,16 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
     background: var(--c-info-bg);
 }
 
-/* 题号列表项:左边正文可点选,右边一个小 ✕ 直接删(👤 要求:能增能减) */
+/* 题号列表行:正文居中可点选;**选中那一行**左边 ✕(删)、右边「保存」(👤 要求)。
+   两颗按钮在**每一行都真实占位**,非选中行只是 visibility:hidden —— 行宽恒定:
+   换一道题时文字不重排,按钮也不会在手指底下挪窝。 */
 .editor-list-row {
     display: flex;
     align-items: stretch;
     gap: 2px;
 }
+.editor-row-btn { visibility: hidden; }
+.editor-list-row.selected .editor-row-btn { visibility: visible; }
 .editor-list-del {
     flex: 0 0 auto;
     border: none;               /* 必须显式声明,否则露出默认黑边 */
@@ -1523,6 +1527,22 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
 .editor-list-del:hover {
     background: var(--c-danger-bg);
     color: var(--c-danger-text);
+}
+/* 保存:整行里唯一"正向/留下"的动作,给它实底色,与左边那个"丢掉"一眼分得开 */
+.editor-row-save {
+    flex: 0 0 auto;
+    border: none;
+    background: var(--c-primary);
+    color: white;
+    margin: 2px 0 2px 4px;
+    padding: 0 12px;
+    font-family: inherit;
+    font-size: 13px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.editor-row-save:hover {
+    background: var(--c-primary-deep);
 }
 .editor-list-item {
     display: block;
@@ -3241,6 +3261,8 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     /* 零散控件也要够得着:色块、AI 补答案、关闭 ✕、移出规则下拉、复选框 */
     .bank-color-swatch { min-height: 44px; padding: 0 12px; }
     .editor-list-del { min-width: 44px; font-size: 14px; }
+    /* 选中行右端的「保存」也要够得着(👤 定的 44 阈值) */
+    .editor-row-save { min-width: 52px; font-size: 14px; }
     .editor-list-add { min-height: 44px; }
     .version-item .action-btn,
     .version-item .version-del { min-height: 44px; }

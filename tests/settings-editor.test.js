@@ -244,3 +244,93 @@ test('题型与答案一致性:finalizeQuestion 兜底纠正历史坏数据', as
     app.run(`globalThis.__q3 = finalizeQuestion({ content:'x', type:'判断', options:{A:'正确',B:'错误'}, answer:'A' })`);
     assert.strictEqual(app.run('__q3.type'), '判断', '判断题不应被改编');
 });
+
+// ==================== 列表行内的「✕ 删除 / 保存」(👤 要求:只对选中那行现身)====================
+// 行的结构固定为:✕ → 正文 → 保存(左删除、右保存)。两颗按钮在**每一行**都存在,
+// 非选中行只是看不见(占位),故这里断言的是"存在性 + 选中态",不是"有没有被渲染"。
+function listRows(app) {
+    return app.elements['editor-question-list'].children
+        .filter(el => el.classList && el.classList.contains('editor-list-row'));
+}
+function byClass(el, cls) {
+    return (el.children || []).filter(c => c.classList && c.classList.contains(cls));
+}
+
+test('列表行:✕ 在左、正文居中、保存在右,且只有选中那行点亮', async () => {
+    const app = await loadApp();
+    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('第一题', 'A'))}, ${JSON.stringify(Q('第二题', 'A'))}] };
+        editBankName = 'T'; editIndex = 1; renderBankEditor();`);
+    const rows = listRows(app);
+    assert.strictEqual(rows.length, 2, '两道题两行');
+    const [r0, r1] = rows;
+    assert.strictEqual(r0.classList.contains('selected'), false, '未选中的行不该点亮');
+    assert.strictEqual(r1.classList.contains('selected'), true, '选中的行应点亮');
+
+    // 顺序:✕ → 正文 → 保存(左删右存)
+    for (const [i, row] of [[0, r0], [1, r1]]) {
+        const kinds = (row.children || []).map(c => {
+            if (c.classList.contains('editor-list-del')) return 'del';
+            if (c.classList.contains('editor-list-item')) return 'item';
+            if (c.classList.contains('editor-row-save')) return 'save';
+            return '?';
+        });
+        assert.deepStrictEqual(kinds, ['del', 'item', 'save'], `第 ${i + 1} 行的按钮顺序应为 ✕ → 正文 → 保存`);
+    }
+    // 两颗行内按钮都带 editor-row-btn(显隐开关认它):占位但非选中行看不见
+    for (const row of rows) {
+        assert.strictEqual(byClass(row, 'editor-row-btn').length, 2, '每行都该有 ✕ 和保存两颗行内按钮');
+    }
+    // 正文按钮的选中态跟着行一起亮(否则整行只有背景变、字重不变)
+    assert.strictEqual(byClass(r1, 'editor-list-item')[0].classList.contains('selected'), true);
+    assert.strictEqual(byClass(r0, 'editor-list-item')[0].classList.contains('selected'), false);
+    // 选中行上的 ✕/保存 打的是这一题的标(不能串号)
+    assert.ok(byClass(r1, 'editor-list-del')[0].getAttribute('aria-label').includes('第 2 题'));
+    assert.ok(byClass(r1, 'editor-row-save')[0].getAttribute('aria-label').includes('第 2 题'));
+});
+
+test('列表行:「保存」保存的是选中那一题,且点它不会连带切换选中', async () => {
+    const app = await loadApp();
+    // 保存会从 DOM 收选项:桩里必须喂进去,否则答案字母被判无效、保存直接被拒
+    app.elements['editor-options']._setQueryAll([
+        { dataset: { letter: 'A' }, value: '甲', disabled: false },
+        { dataset: { letter: 'B' }, value: '乙', disabled: false },
+    ]);
+    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('第一题', 'A'))}, ${JSON.stringify(Q('第二题', 'A'))}] };
+        editBankName = 'T'; editIndex = 1; renderBankEditor();
+        editorStem.value = '第二题(改过)'; editorType.value = '单选'; editorAnswer.value = 'B';`);
+    const rows = listRows(app);
+    const save = byClass(rows[1], 'editor-row-save')[0];
+    assert.strictEqual(typeof save._listeners.click, 'function', '行内「保存」必须绑了 click');
+    save._listeners.click({ stopPropagation() {} });
+    assert.strictEqual(app.run(`questionBanks['T'][1].content`), '第二题(改过)', '保存应落到选中的第 2 题');
+    assert.strictEqual(app.run(`questionBanks['T'][1].answer`), 'B');
+    assert.strictEqual(app.run(`questionBanks['T'][0].content`), '第一题', '第 1 题不该被顺手改掉');
+    assert.strictEqual(app.run('editIndex'), 1, '保存不该改变当前选中项');
+});
+
+test('列表行:「✕」删的是它自己那一题(不删别的行)', async () => {
+    const app = await loadApp({ confirmResult: true });
+    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('第一题', 'A'))}, ${JSON.stringify(Q('第二题', 'A'))}, ${JSON.stringify(Q('第三题', 'A'))}] };
+        editBankName = 'T'; editIndex = 0; renderBankEditor();`);
+    const rows = listRows(app);
+    byClass(rows[2], 'editor-list-del')[0]._listeners.click({ stopPropagation() {} });
+    assert.strictEqual(app.run(`questionBanks['T'].length`), 2);
+    assert.deepStrictEqual(
+        JSON.parse(app.run(`JSON.stringify(questionBanks['T'].map(q => q.content))`)),
+        ['第一题', '第二题'], '删掉的应是第 3 题');
+});
+
+test('列表行:「只看待补」筛选后,选中态按题目下标对号(不能错行)', async () => {
+    const app = await loadApp();
+    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('待补题', ''))}, ${JSON.stringify(Q('已答一', 'A'))}, ${JSON.stringify(Q('已答二', 'A'))}] };
+        editBankName = 'T'; editIndex = 0; editorPendingOnly = true; renderBankEditor();`);
+    const rows = listRows(app);
+    assert.strictEqual(rows.length, 1, '只看待补时只剩 1 行');
+    assert.strictEqual(rows[0].dataset.idx, '0', '这行承载的是原题库里的第 1 题');
+    assert.strictEqual(rows[0].classList.contains('selected'), true, '选中的就是它,该亮');
+    // 旧实现按 children 下标高亮:选中的题被筛掉时会去点亮"第 N 行"这个不相干的行。钉死正确语义。
+    app.run('editIndex = 1; renderBankEditor();');
+    assert.strictEqual(listRows(app)[0].classList.contains('selected'), false,
+        '选中的是被筛掉的那道题时,可见行不该被误点亮');
+});
+

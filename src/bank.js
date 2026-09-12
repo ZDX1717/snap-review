@@ -50,7 +50,6 @@ const editorAddOption = document.getElementById('editor-add-option');
 const editorRemoveOption = document.getElementById('editor-remove-option');
 const editorExplanation = document.getElementById('editor-explanation');
 const editorAnalysis = document.getElementById('editor-analysis');
-const editorSaveBtn = document.getElementById('editor-save-btn');
 const recycleCount = document.getElementById('recycle-count');
 const editorAiAnswerBtn = document.getElementById('editor-ai-answer-btn');
 const bankColorPicker = document.getElementById('bank-color-picker');
@@ -1621,10 +1620,18 @@ export function editorRenderForm() {
     editorRenderOptions();
     state.editorDirty = false;
 
-    // 列表选中态
-    Array.from(editorQuestionList.children).forEach((el, idx) => {
-        if (idx === state.editIndex) el.classList.add('selected');
-        else el.classList.remove('selected');
+    // 列表选中态:选中行决定"左边 ✕ / 右边 保存"这两颗按钮对谁现身(CSS 认 .selected)。
+    // ⚠️ 这里按 dataset.idx 对号,不能用 children 下标 —— 「只看待补」筛掉的行不占位,
+    //    下标会整体前移,"选中的第 3 题"会亮在第 2 行上(踩过)。
+    Array.from(editorQuestionList.children).forEach(el => {
+        if (!el.classList || !el.classList.contains('editor-list-row')) return;
+        const on = parseInt(el.dataset.idx, 10) === state.editIndex;
+        el.classList.toggle('selected', on);
+        // 行内正文按钮跟着一起亮/灭。用子节点遍历而不是 querySelector:
+        // 测试桩的 querySelector 只返回一个替身元素,类加在替身上等于没加。
+        Array.from(el.children || []).forEach(c => {
+            if (c.classList && c.classList.contains('editor-list-item')) c.classList.toggle('selected', on);
+        });
     });
 }
 
@@ -2293,26 +2300,18 @@ export function renderBankEditor() {
     editorQuestionList.innerHTML = '';
     questions.forEach((q, idx) => {
         if (pendingOnly && q.answer) return; // 只看待补
+        const isCurrent = idx === state.editIndex;
         const row = document.createElement('div');
-        row.className = 'editor-list-row';
-        const item = document.createElement('button');
-        item.type = 'button';
-        // 待修改高亮:缺答案(待补)或选项不足的题,橙底标记;AI 标记:紫条 🤖(与预览同色系)
-        const needsFix = !q.answer || Object.keys(q.options || {}).length < 2;
-        const aiTouched = q.aiSource === 'ai';
-        const hasHist = Array.isArray(q.histMarks) && q.histMarks.length > 0;
-        item.className = 'editor-list-item' + (idx === state.editIndex ? ' selected' : '') + (needsFix ? ' needs-fix' : '') + (aiTouched ? ' ai-gen' : '');
-        item.textContent = `${idx + 1}. ` + (aiTouched ? '🤖 ' : '') + `${(q.content || '（无题干）').slice(0, 22)}` + (!q.answer ? ' ⏳' : (needsFix ? ' ⚠' : '')) + (hasHist ? ' 🕘' : '');
-        item.addEventListener('click', () => {
-            if (!editorGuard()) return;
-            state.editIndex = idx;
-            renderBankEditor();
-        });
-        row.appendChild(item);
-        // 每题一个删除键(👤 要求:按钮可以新增和删减)—— 列表里直接删,比"翻到那题再点删除"快得多
+        // selected 挂在**行**上(不只在正文按钮上):行内那两颗按钮的显隐由它决定
+        row.className = 'editor-list-row' + (isCurrent ? ' selected' : '');
+        row.dataset.idx = String(idx);
+        // 「删除 ✕」在左、「保存」在右,**只对选中的那一道现身**(👤 要求)。
+        // 两颗按钮在每一行都真实存在,只是非选中行 visibility:hidden ——
+        // 这样行宽恒定:换一道题时文字不会重排,手指也不会追着移动的按钮点(踩过"按钮跑掉")。
+        // 删在左、存在右:一个是"丢掉",一个是"留下",分居两端最不容易点错。
         const del = document.createElement('button');
         del.type = 'button';
-        del.className = 'editor-list-del';
+        del.className = 'editor-list-del editor-row-btn';
         del.textContent = '✕';
         del.title = `删除第 ${idx + 1} 题`;
         del.setAttribute('aria-label', `删除第 ${idx + 1} 题`);
@@ -2321,6 +2320,33 @@ export function renderBankEditor() {
             deleteQuestionAt(idx);   // 内部自带确认,避免误删
         });
         row.appendChild(del);
+        const item = document.createElement('button');
+        item.type = 'button';
+        // 待修改高亮:缺答案(待补)或选项不足的题,橙底标记;AI 标记:紫条 🤖(与预览同色系)
+        const needsFix = !q.answer || Object.keys(q.options || {}).length < 2;
+        const aiTouched = q.aiSource === 'ai';
+        const hasHist = Array.isArray(q.histMarks) && q.histMarks.length > 0;
+        item.className = 'editor-list-item' + (isCurrent ? ' selected' : '') + (needsFix ? ' needs-fix' : '') + (aiTouched ? ' ai-gen' : '');
+        item.textContent = `${idx + 1}. ` + (aiTouched ? '🤖 ' : '') + `${(q.content || '（无题干）').slice(0, 22)}` + (!q.answer ? ' ⏳' : (needsFix ? ' ⚠' : '')) + (hasHist ? ' 🕘' : '');
+        item.addEventListener('click', () => {
+            if (!editorGuard()) return;
+            state.editIndex = idx;
+            renderBankEditor();
+        });
+        row.appendChild(item);
+        // 「保存」= 保存**当前选中的这一道**(editorSaveCurrent 读的就是 state.editIndex)。
+        // 它与"改完自动落盘"不冲突:落盘由保存触发,不保存就是还没定稿。
+        const save = document.createElement('button');
+        save.type = 'button';
+        save.className = 'editor-row-save editor-row-btn';
+        save.textContent = '保存';
+        save.title = `保存第 ${idx + 1} 题的修改`;
+        save.setAttribute('aria-label', `保存第 ${idx + 1} 题的修改`);
+        save.addEventListener('click', (e) => {
+            e.stopPropagation();
+            editorSaveCurrent(false);
+        });
+        row.appendChild(save);
         editorQuestionList.appendChild(row);
     });
 
@@ -2344,11 +2370,9 @@ export function renderBankEditor() {
     if (questions.length === 0 || !questions[state.editIndex]) {
         editorForm.classList.add('hidden');
         editorEmpty.classList.remove('hidden');
-        // 没有可编辑的题时「保存本题」不该还在(点了只会报错)
-        if (editorSaveBtn) editorSaveBtn.classList.add('hidden');
+        // 没有可编辑的题时列表里只有「＋」,"保存"随选中行一起不存在(无题可存)
         return;
     }
-    if (editorSaveBtn) editorSaveBtn.classList.remove('hidden');
     editorForm.classList.remove('hidden');
     editorEmpty.classList.add('hidden');
     const cur = questions[state.editIndex];

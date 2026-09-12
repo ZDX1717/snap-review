@@ -498,7 +498,8 @@ test('编辑器:题目级操作与题库级操作彻底分开', () => {
     // 底栏已取消(👤 要求),保存键改到题目列表**上面**的动作行里
     assert.ok(!modal.includes('editor-foot'), '底栏应已取消');
     const actionRow = modal.slice(modal.indexOf('editor-action-row'), modal.indexOf('editor-list-block'));
-    assert.ok(actionRow.includes('editor-save-btn'), '「保存本题」应在题目列表上方的动作行里');
+    // 「保存本题」已搬进列表里选中的那一行(👤 要求):动作行里不该再有它
+    assert.ok(!actionRow.includes('editor-save-btn'), '「保存本题」不应再留在动作行');
     assert.ok(actionRow.includes('editor-pending-only'), '「只看待补答案」也在这行');
     // 去重从「题库设置」搬到了题目列表上方(👤 要求:它作用于整库,但要在改题时随手可用)
     assert.ok(actionRow.includes('editor-dedup-btn'), '「去重」应在题目列表上方的动作行里');
@@ -564,17 +565,33 @@ test('编辑器:两个标签页的显隐由 CSS 的 data-tab 控制', () => {
     assert.ok(!/padding\s*:\s*12px 16px/.test(head), '头部不该还留 12px 的上下内边距');
 });
 
-test('编辑器:题目列表里每题都能直接删(👤 要求按钮可增减)', () => {
+test('编辑器:列表行里的删除/保存只对选中那行现身(👤 要求)', () => {
     const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
-    assert.ok(/editor-list-del/.test(bank), '列表项应有删除键');
+    assert.ok(/editor-list-del/.test(bank), '列表行应有删除键');
     assert.ok(/export function deleteQuestionAt/.test(bank), '应有按下标删题的函数');
     assert.ok(/questionBanks|splice/.test(bank));
     // 删除必须带确认(列表里的小 ✕ 太容易误点)
     const fn = bank.slice(bank.indexOf('export function deleteQuestionAt'));
     assert.ok(/confirm\(/.test(fn.slice(0, 400)), '列表内删除必须二次确认');
+    // 「保存」现在长在列表行里(行右侧),不再有全局的 #editor-save-btn
+    assert.ok(/editor-row-save/.test(bank), '列表行右端应渲染「保存」');
+    assert.ok(/editorSaveCurrent\(false\)/.test(bank), '行内「保存」应走与原来同一套保存逻辑');
+    assert.ok(!html.includes('editor-save-btn'), '动作行里的「保存本题」应已移除');
+    assert.ok(!/\beditor-save-btn\b/.test(readFileSync(path.join(root, 'src', 'main.js'), 'utf8')),
+        'main.js 不该再绑一个已不存在的保存键');
+    // 显隐由 CSS 表达:非选中行的两颗按钮只是 visibility:hidden(**占位**),
+    // 行宽恒定 —— 换题时文字不重排,按钮也不会在手指底下挪窝。
+    assert.ok(/\.editor-row-btn\s*\{\s*visibility\s*:\s*hidden/.test(cssNoComments),
+        '非选中行的行内按钮应 visibility:hidden(占位但不显)');
+    assert.ok(/\.editor-list-row\.selected\s+\.editor-row-btn\s*\{\s*visibility\s*:\s*visible/.test(cssNoComments),
+        '选中行的行内按钮应显形');
+    // ✕ 在左、保存在右:删除是"丢掉"、保存是"留下",分居两端最不容易点错
+    const rowCss = cssNoComments.match(/\.editor-list-row\s*\{([^}]*)\}/)[1];
+    assert.ok(/display\s*:\s*flex/.test(rowCss), '行布局应为 flex');
     // 手机上删除键也要够大
     const media = cssNoComments.slice(cssNoComments.indexOf('max-width: 768px'));
     assert.ok(/\.editor-list-del/.test(media), '手机档应给列表删除键放大触达');
+    assert.ok(/\.editor-row-save/.test(media), '手机档应给行内「保存」放大触达');
 });
 
 test('编辑器:题干/题型/选项/解释解析合成一个部分,且没有折叠', () => {
