@@ -646,6 +646,28 @@ test('编辑器表单:文案在输入框左边,且判断题为 A/B 口径(👤 �
     assert.ok(!/判断题填「对」/.test(note), '不该再让用户填「对/错」');
 });
 
+test('版本记录住在「题库设置」里,且每条都能删(👤 2026-09-11)', () => {
+    const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
+    // ① 库卡手风琴里不得再有版本区(它已移到题库设置)
+    const cardRegion = bank.slice(bank.indexOf('export function updateBanksList'), bank.indexOf('export function renderVersionsForBank'));
+    assert.ok(!/renderVersionsForBank/.test(cardRegion), '库卡渲染里不该再挂版本面板');
+    // ② 版本面板要有删除(👤 反馈的缺口:原来只能存不能删)
+    assert.ok(/export function renderVersionsForBank/.test(bank), '应有版本面板渲染');
+    const panel = bank.slice(bank.indexOf('export function renderVersionsForBank'));
+    assert.ok(/version-del/.test(panel.slice(0, 3000)), '每条版本都要有删除键');
+    assert.ok(/deleteBankVersion/.test(panel.slice(0, 3000)), '删除键要调用 deleteBankVersion');
+    assert.ok(/confirm\(/.test(panel.slice(0, 3000)), '删版本要二次确认');
+    // ③ 恢复与删除都按**原数组下标**定位,不是显示顺序(列表是倒序渲染的)
+    assert.ok(/map\(\(v, i\) => \(\{ v, i \}\)\)\.reverse\(\)/.test(panel), '倒序渲染时必须保留原下标');
+    // ④ 去重只在"真有重复"时才存版本(别让无意义的安全网占满 3 个槽)
+    const dedup = bank.slice(bank.indexOf('export function dedupBank'), bank.indexOf('export function editBank'));
+    const pushIdx = dedup.indexOf('pushBankVersion');
+    const zeroIdx = dedup.indexOf("removed === 0");
+    assert.ok(pushIdx > zeroIdx, 'pushBankVersion 必须在"确认有重复"之后(否则空点一次也存版)');
+    // ⑤ 设置页里挂载(而不是库卡)
+    assert.ok(/#editor-bank-admin|editor-bank-admin/.test(bank), '版本面板应挂在题库设置容器里');
+});
+
 test('答题卡抽屉在 <main> 之外(公理:浮层不受 section 显隐牵连)', () => {
     const mainEnd = html.indexOf('</main>');
     const pos = html.indexOf('id="answer-card-drawer"');

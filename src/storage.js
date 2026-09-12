@@ -309,7 +309,24 @@ export function saveBankVersions(obj) {
     } catch (e) { /* 超容量:版本不入盘 */ }
 }
 
-// 存版:每库保留 3 版;全站超 10 版时按时间 LRU 淘汰最旧
+// 存版:每库保留 3 版;全站超 10 版时按时间 LRU 淘汰最旧。
+// ⚠️ 调用纪律(2026-09-11 理顺):
+//   ① **只在真的会改动题目的操作之前存**(去重空点、库为空这类"本来就没得改"的情况不要存,
+//      否则每库只有 3 个槽,几下就被无意义的安全网占满);
+//   ② 恢复前**必须**存一份当前状态 —— 恢复本身也要可逆(否则"恢复"成了不可撤销的破坏性操作)。
+export function deleteBankVersion(name, index) {
+    const all = loadBankVersions();
+    const list = all[name] || [];
+    if (!list[index]) return false;
+    list.splice(index, 1);
+    // 删空了就把这个库的键一起清掉,别留空数组(与 setBankColor 的"缺省不留冗余"一致)
+    if (list.length === 0) delete all[name];
+    else all[name] = list;
+    saveBankVersions(all);
+    return true;
+}
+
+
 export function pushBankVersion(name, action, questions) {
     const all = loadBankVersions();
     const time = new Date().toISOString();

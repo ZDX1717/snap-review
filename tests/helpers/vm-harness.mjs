@@ -44,6 +44,19 @@ export function makeEl() {
         // 原先要求"测试只断数据层",但卡片结构本身就是产品要求,不记子节点就无法断言。
         style: {},
         appendChild(child) { this.children.push(child); return child; },
+        // remove / removeChild:标准 DOM 方法,**桩里必须有** ——
+        // 否则产品代码里再正常不过的"摘掉旧节点"会在测试里 TypeError,
+        // 而单元测试是唯一能覆盖这类逻辑的地方(踩过:版本面板重建时 remove/removeChild 都缺)。
+        removeChild(child) {
+            const i = this.children.indexOf(child);
+            if (i !== -1) this.children.splice(i, 1);
+            child.parentNode = null;
+            return child;
+        },
+        remove() {
+            if (this.parentNode && typeof this.parentNode.removeChild === 'function') this.parentNode.removeChild(this);
+            return undefined;
+        },
         textContent: '', value: '', innerHTML: '', files: [],
         checked: false, placeholder: '', rows: 0, dataset: {},
         // querySelectorAll 默认返回空数组;但**编辑器选项**这类"表单内容即数据来源"的场景

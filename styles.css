@@ -2589,6 +2589,39 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     padding: 12px;
     margin: -6px 0 8px;
 }
+/* 版本记录条目(题库设置内):信息占满、右侧两个动作(恢复 / 删除)。
+   信息用 flex:1 而不是固定宽:手机上它会换行,动作按钮仍保持一行可点。 */
+.version-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--c-border-light);
+    font-size: 13px;
+    color: var(--c-text-secondary);
+}
+.version-item:last-child { border-bottom: none; }
+.version-info { flex: 1 1 auto; min-width: 0; }
+/* 删除键做成小巧的方形危险键:与「恢复此版」并排,不能抢主动作 */
+.version-del {
+    flex: 0 0 auto;
+    border: 1px solid var(--c-border);   /* 必须显式声明 border,否则露出默认黑边 */
+    background: none;
+    border-radius: 6px;
+    padding: 4px 8px;
+    color: var(--c-text-muted);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.4;
+}
+.version-del:hover {
+    border-color: var(--c-danger);
+    background: var(--c-danger-bg);
+    color: var(--c-danger-text);
+}
+
 /* 题库卡配色色板(编辑器内):每个色块直接用**卡片同款**底+框,所见即所得 */
 .bank-color-row {
     align-items: center;
@@ -3135,6 +3168,9 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     .bank-color-swatch { min-height: 44px; padding: 0 12px; }
     .editor-list-del { min-width: 44px; font-size: 14px; }
     .editor-list-add { min-height: 44px; }
+    .version-item .action-btn,
+    .version-item .version-del { min-height: 44px; }
+    .version-item .version-del { min-width: 44px; }
     .editor-tab { min-height: 44px; }
     .editor-list-toggle { min-height: 44px; font-size: 14px; }
     /* 左标签在手机上收窄一档:文案仍完整,字段能多出一列字的宽度 */

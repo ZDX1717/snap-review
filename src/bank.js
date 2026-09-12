@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { finalizeQuestion, formatAnswerForDisplay, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey } from './parser.js';
-import { saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportBatch, loadOverwriteSnapshot, clearOverwriteSnapshot, loadBankVersions, pushBankVersion, loadCollapsedBanks, saveCollapsedBanks } from './storage.js';
+import { deleteBankVersion, saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportBatch, loadOverwriteSnapshot, clearOverwriteSnapshot, loadBankVersions, pushBankVersion, loadCollapsedBanks, saveCollapsedBanks } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
 import { OFFICIAL_PROMPT, buildCopyText, copyText } from './prompt.js';
@@ -1235,7 +1235,8 @@ export function exportAllBanks() {
 // 题库一键去重：按"题干+选项"指纹清理重复题（保留最早导入的版本）
 export function dedupBank(bankName) {
     const questions = state.questionBanks[bankName] || [];
-    pushBankVersion(bankName, '去重前', questions);
+    // ⚠️ 顺序要紧:先算出**到底有没有重复**,没有就什么都不做。
+    //    旧实现一进来就存版,空点一次也留一条「去重前」;每库只有 3 个槽,几下就被无意义的安全网占满。
     const seen = new Set();
     const kept = [];
     questions.forEach(q => {
@@ -1249,9 +1250,10 @@ export function dedupBank(bankName) {
         alert('该题库没有重复题目');
         return;
     }
-    if (!confirm(`发现 ${removed} 道重复题目（按题干+选项判断，保留最早导入的版本），确定清理吗？`)) {
+    if (!confirm(`发现 ${removed} 道重复题目（按题干+选项判断，保留最早导入的版本），确定清理吗？\n当前内容会先存为一版，可随时恢复。`)) {
         return;
     }
+    pushBankVersion(bankName, '去重前', questions);   // 确认真的会改,才值得占一个版本槽
     state.questionBanks[bankName] = kept;
     if (state.currentBankName === bankName) {
         state.questionBank = kept;
@@ -1593,8 +1595,17 @@ export function editorRenderForm() {
     if (bankColorNote) bankColorNote.textContent = '';
     renderBankColorPicker();
     // 换题时收起「题库设置」:它和"改这一道题"不是一回事,展开着最容易误点删除题库
-    const bankDetails = document.querySelector('.editor-bank-details');
-    if (bankDetails) bankDetails.open = false;
+    // 版本记录挂在「题库设置」里(👤 定调):它与配色/重命名一样属于整库设置,不属于某一道题
+    const bankAdmin = document.getElementById('editor-bank-admin');
+    const bankName = state.editBankName;
+    if (bankAdmin && bankName) {
+        // ⚠️ 用 removeChild 而不是 el.remove():vm 测试桩的元素桩没有 remove 方法,
+        //    用它会直接 TypeError(踩过)。这里只摘掉上一次渲染的版本面板,其余兄弟节点保留。
+        const prev = bankAdmin.querySelector('.bank-versions-panel');
+        if (prev) bankAdmin.removeChild(prev);
+        const verPanel = renderVersionsForBank(state.editBankName);
+        if (verPanel) bankAdmin.appendChild(verPanel);
+    }
     const q = currentEditBank()[state.editIndex];
     if (!q) return;
 
@@ -1713,7 +1724,11 @@ export function deleteQuestionAt(index) {
 // 配色是"看一眼就想调"的东西,不值得为它走一遍保存流程。
 export function renderBankColorPicker() {
     if (!bankColorPicker) return;
-    const current = bankColorOf(state.editBankName);
+    // ⚠️ 取一次库名并守卫:editorClose() 会把 editBankName 置 null,
+    //    关闭动画期间的重绘不该去读一个已失效的库名(否则渲染出空壳,看着像"功能坏了")
+    const bankName = state.editBankName;
+    if (!bankName) { bankColorPicker.innerHTML = ''; return; }
+    const current = bankColorOf(bankName);
     bankColorPicker.innerHTML = '';
     BANK_COLORS.forEach(c => {
         const btn = document.createElement('button');
@@ -2045,8 +2060,7 @@ export function updateBanksList() {
                 banksList.appendChild(empty);
             }
         }
-        const verPanel = renderVersionsForBank(bankName);
-        if (verPanel) banksList.appendChild(verPanel);
+
     });
 
     // 杂项兜底:错题/收藏的 bankName 已不在题库列表(库被删等)
@@ -2082,37 +2096,68 @@ export function updateBanksList() {
         document.addEventListener('zquiz:embeds-dirty', () => updateBanksList());
     }
 }// ==================== 库级版本快照 UI(P0-1.11) ====================
-
-function renderVersionsForBank(bankName) {
-    const versions = (loadBankVersions()[bankName] || []).slice().reverse();  // 新的在上
-    if (versions.length === 0) return null;
+// ==================== 库级版本快照 UI(P0-1.11) ====================
+// 逻辑:破坏性操作**之前**自动存一份(覆盖导入 / 去重 / 恢复前);每库 3 版、全站 10 版,超出按时间淘汰。
+// 它是**自动安全网、不是备份系统** —— 所以每条都必须能单独删掉(👤 反馈的缺口):
+// 存错了、不想留了就得立刻清掉,否则只能干等它被淘汰。
+// ==================== 库级版本快照 UI(P0-1.11) ====================
+export function renderVersionsForBank(bankName) {
+    const versions = (bankName ? loadBankVersions()[bankName] : []) || [];
     const wrap = document.createElement('div');
     wrap.className = 'bank-versions-panel';
-    const head = document.createElement('h4');
-    head.className = 'bank-panel-title';
-    head.textContent = `🕘 版本(${versions.length})`;
+
+    const head = document.createElement('p');
+    head.className = 'editor-panel-title';
+    head.textContent = `版本记录（${versions.length}）`;
     wrap.appendChild(head);
-    versions.forEach(v => {
+
+    const note = document.createElement('p');
+    note.className = 'meta-note';
+    note.textContent = versions.length
+        ? '覆盖导入 / 去重 / 恢复前会自动存一份;每库保留最近 3 版。'
+        : '暂无版本。覆盖导入、去重、恢复等操作会自动存一份,可随时回退。';
+    wrap.appendChild(note);
+    if (versions.length === 0) return wrap;
+
+    // 新的在上。⚠️ 闭包里用的是**原数组下标**(恢复/删除都按它定位),不是显示顺序 —— 别改成 forEach 的序号。
+    versions.map((v, i) => ({ v, i })).reverse().forEach(({ v, i }) => {
+        const when = new Date(v.time);
+        const pad = (n) => String(n).padStart(2, '0');
+        const label = `${v.action} · ${when.getMonth() + 1}/${when.getDate()} ${pad(when.getHours())}:${pad(when.getMinutes())} · ${(v.questions || []).length} 题`;
+
         const item = document.createElement('div');
         item.className = 'version-item';
-        const when = new Date(v.time);
+
         const info = document.createElement('span');
-        info.textContent = `${v.action} · ${when.getMonth() + 1}/${when.getDate()} ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')} · ${(v.questions || []).length} 题`;
+        info.className = 'version-info';
+        info.textContent = label;
         item.appendChild(info);
+
         const restoreBtn = document.createElement('button');
+        restoreBtn.type = 'button';
         restoreBtn.className = 'action-btn small';
         restoreBtn.textContent = '恢复此版';
         restoreBtn.addEventListener('click', () => {
-            const current = state.questionBanks[bankName] || [];
-            if (confirm(`将"${bankName}"恢复到「${v.action}」版本?当前内容会先自动存为新版本。`)) {
-                pushBankVersion(bankName, '恢复前自动存', current);
-                state.questionBanks[bankName] = JSON.parse(JSON.stringify(v.questions));
-                saveToLocalStorage();
-                refreshQuestionBankView();
-                updateBanksList();
+            if (confirm(`把「${bankName}」恢复到这一版？\n（${label}）\n当前内容会先自动存为一版,可再回退。`)) {
+                restoreBankVersion(bankName, i);
+                renderBankEditor();
             }
         });
         item.appendChild(restoreBtn);
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'delete-btn version-del';
+        delBtn.textContent = '✕';
+        delBtn.title = '删除这条版本';
+        delBtn.setAttribute('aria-label', `删除版本：${label}`);
+        delBtn.addEventListener('click', () => {
+            if (!confirm(`删除这条版本记录？\n（${label}）`)) return;
+            deleteBankVersion(bankName, i);
+            renderBankEditor();
+        });
+        item.appendChild(delBtn);
+
         wrap.appendChild(item);
     });
     return wrap;

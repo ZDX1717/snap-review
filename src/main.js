@@ -2,7 +2,7 @@ import { buildAiNotes } from './ai.js';
 import { state } from './state.js';
 import { applyTheme, initTheme, setThemeSetting } from './theme.js';
 import { buildCardCells, finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey, shuffleArray, splitInlineOptions } from './parser.js';
-import { loadAutoNextSetting, loadCollapsedBanks, loadFromLocalStorage, loadMasterySetting, saveAutoNextSetting, saveCollapsedBanks, saveMasterySetting, saveToLocalStorage, recordImportBatch } from './storage.js';
+import { deleteBankVersion, loadAutoNextSetting, loadBankVersions, loadCollapsedBanks, loadFromLocalStorage, loadMasterySetting, pushBankVersion, saveAutoNextSetting, saveCollapsedBanks, saveMasterySetting, saveToLocalStorage, recordImportBatch } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, updateErrorStreak } from './errorbook.js';
 import { toggleFavorite } from './favorites.js';
@@ -610,6 +610,10 @@ if (typeof window === 'undefined') {
         deleteQuestionAt,
         setBankColor,
         renderBankColorPicker,
+        pushBankVersion,
+        loadBankVersions,
+        deleteBankVersion,
+        dedupBank,
         previewAiAnswerFill,
         editorAiAnswer,
         restoreRecycled,

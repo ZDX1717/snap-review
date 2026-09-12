@@ -116,3 +116,62 @@ describe('预览防呆', () => {
         assert.strictEqual(run('previewData[1].include'), false);
     });
 });
+
+describe('版本记录:可删、不空存、挂在题库设置里(👤 2026-09-11)', () => {
+    let run, store, sandbox, elements;
+    before(async () => {
+        ({ run, store, sandbox, elements } = await loadApp({ confirmResult: true }));
+        run(`init()`);
+    });
+
+    test('删版本:列表少一条并落盘;删空了连键一起清掉', () => {
+        run(`bankVersions = {}; questionBanks = { '甲库': [${JSON.stringify(mkQ('A'))}] }`);
+        run(`pushBankVersion('甲库', '覆盖导入前', [${JSON.stringify(mkQ('X'))}])`);
+        run(`pushBankVersion('甲库', '去重前', [${JSON.stringify(mkQ('Y'))}])`);
+        assert.strictEqual(run(`loadBankVersions()['甲库'].length`), 2);
+        // 删第 0 条(较早的那条)
+        assert.strictEqual(run(`deleteBankVersion('甲库', 0)`), true);
+        assert.strictEqual(run(`loadBankVersions()['甲库'].length`), 1);
+        assert.strictEqual(run(`loadBankVersions()['甲库'][0].action`), '去重前', '删掉的应是指定下标那条');
+        assert.strictEqual(JSON.parse(store.get('bankVersions'))['甲库'].length, 1, '应落盘');
+        // 删掉最后一条 → 键一起清掉(不留空数组)
+        run(`deleteBankVersion('甲库', 0)`);
+        assert.ok(!('甲库' in run(`loadBankVersions()`)), '删空后不应留下空数组');
+        // 越界与不存在的库:安全返回 false
+        assert.strictEqual(run(`deleteBankVersion('甲库', 0)`), false);
+        assert.strictEqual(run(`deleteBankVersion('没这库', 0)`), false);
+    });
+
+    test('去重:没有重复时不存版本(别让无意义的安全网占满 3 个槽)', () => {
+        run(`bankVersions = {}`);
+        run(`questionBanks = { '乙库': [${JSON.stringify(mkQ('P1'))}, ${JSON.stringify(mkQ('P2'))}] }`);
+        run(`dedupBank('乙库')`);
+        assert.strictEqual(run(`loadBankVersions()['乙库']`), undefined,
+            '没有重复就不该产生版本(旧实现一进来就存版,空点一次也留一条)');
+        // 真有重复时才存
+        run(`questionBanks['乙库'].push(${JSON.stringify(mkQ('P1'))})`);
+        run(`dedupBank('乙库')`);
+        assert.strictEqual(run(`loadBankVersions()['乙库'].length`), 1);
+        assert.strictEqual(run(`loadBankVersions()['乙库'][0].action`), '去重前');
+    });
+
+    test('版本面板在「题库设置」里渲染,每条都带恢复与删除', () => {
+        run(`bankVersions = {}`);
+        run(`questionBanks = { '丙库': [${JSON.stringify(mkQ('Q1'))}] }`);
+        run(`pushBankVersion('丙库', '覆盖导入前', [${JSON.stringify(mkQ('Z1'))}])`);
+        run(`state.editBankName = '丙库'; state.editIndex = 0; renderBankEditor()`);
+        const mark = sandbox.__created.length;
+        run(`renderBankEditor()`);
+        const created = sandbox.__created.slice(mark);
+        const rows = created.filter(c => String(c.el.className).includes('version-item'));
+        assert.ok(rows.length >= 1, '版本面板应渲染出条目');
+        const btns = created.filter(c => c.tag === 'BUTTON' && String(c.el.className).includes('version-del'));
+        assert.ok(btns.length >= 1, '每条版本都要有删除键(👤 反馈的缺口)');
+        const restore = created.filter(c => c.tag === 'BUTTON' && String(c.el.textContent).includes('恢复此版'));
+        assert.ok(restore.length >= 1, '每条版本都要有恢复键');
+        // 面板必须挂在题库设置容器里,而不是库卡上
+        const admin = created.filter(c => String(c.el.className).includes('bank-versions-panel'));
+        assert.ok(admin.length >= 1, '版本面板应渲染');
+        assert.strictEqual(run(`document.getElementById('editor-bank-admin') ? 1 : 0`), 1);
+    });
+});
