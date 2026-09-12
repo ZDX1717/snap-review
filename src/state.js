@@ -33,6 +33,16 @@ export const state = {
     editBankName: null,
     editIndex: 0,
     editorDirty: false,
+    // 「只看待补答案」= editorFilter.status 里有 'pending' 的**派生值**(老代码/老测试仍读它)
     editorPendingOnly: false,
+    // 多选:存的是**题目对象本身**,不是下标 —— 删/筛/去重都会让下标移位,
+    // 存下标就会出现"删了第 2 题,第 3 题莫名被选中/删掉"(踩过同类坑)
+    editorSelected: [],
+    // 题目列表筛选(👤 2026-09-12):组内**任一**、组间**同时**。
+    //   status: pending(待补答案) / noAnalysis(缺解析) / noExplanation(缺解释) / fewOptions(选项不足)
+    //   ai    : touched(AI 整理过) / answer(答案来自 AI) / analysis(解析来自 AI)
+    //   marks : hist(有历史标记)
+    //   type  : '单选' | '多选' | '判断'
+    editorFilter: { type: [], status: [], ai: [], marks: [] },
     currentRenameBank: null,
 };

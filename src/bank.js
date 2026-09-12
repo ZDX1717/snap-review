@@ -59,6 +59,18 @@ const editorBody = document.querySelector('.editor-body');
 const editorTabQuestion = document.getElementById('editor-tab-question');
 const editorTabBank = document.getElementById('editor-tab-bank');
 const editorTabQuestionCount = document.getElementById('editor-tab-question-count');
+// 题目列表重构(👤 2026-09-12):筛选面板 / 批量操作栏 / 编辑卡片
+const editorFilterToggle = document.getElementById('editor-filter-toggle');
+const editorFilterPanel = document.getElementById('editor-filter-panel');
+const editorFilterCount = document.getElementById('editor-filter-count');
+const editorFilterClear = document.getElementById('editor-filter-clear');
+const editorBulkBar = document.getElementById('editor-bulk-bar');
+const editorBulkCount = document.getElementById('editor-bulk-count');
+const editorBulkEditBtn = document.getElementById('editor-bulk-edit');
+const questionCardModal = document.getElementById('question-card-modal');
+const questionCardTitle = document.getElementById('question-card-title');
+const questionCardPrev = document.getElementById('question-card-prev');
+const questionCardNext = document.getElementById('question-card-next');
 const bankColorNote = document.getElementById('bank-color-note');
 const editorAiAnswerNote = document.getElementById('editor-ai-answer-note');
 const lastImportInfo = document.getElementById('last-import-info');
@@ -1307,12 +1319,20 @@ export function editorAddQuestion() {
         explanation: '', analysis: '', optionExplanations: {}, confidence: 1, raw: ''
     });
     state.editIndex = questions.length - 1;
-    // keepList = true:保持用户当前的列表开合状态(他刚拉开就接着加,不该被合上;
-    // 收起着也不该突然弹开 —— 新题的去向由头部进度 + 提示行说明)
+    // ⚠️ 新增前先清掉筛选:刚加的题很可能不满足当前筛选条件,那样它会"加进去了但列表里看不见",
+    //    用户只会以为没加上。清筛选是一次点击就能恢复的代价,比"看不见"轻得多(👤 反馈过同类困惑)。
+    editorClearFilterSelectionOnly();
     renderBankEditor();
-    state.editorDirty = true;
-    if (editorAiAnswerNote) editorAiAnswerNote.textContent = `已新增第 ${questions.length} 题,填写后点「保存本题」`;
-    editorStem.focus();
+    state.editorDirty = false;   // 空题不算"未保存的修改":它已经在库里了,卡片只负责填
+    if (editorAiAnswerNote) editorAiAnswerNote.textContent = `已新增第 ${questions.length} 题,填好后点「保存本题」`;
+    openQuestionCard(questions.length - 1);
+}
+
+// 清筛选 + 清多选(供"新增题目"这类需要"看得见"的路径复用)
+function editorClearFilterSelectionOnly() {
+    FILTER_GROUPS.forEach(g => { state.editorFilter[g] = []; });
+    syncPendingAlias();
+    state.editorSelected.length = 0;
 }
 
 
@@ -1476,55 +1496,257 @@ export function editorClose() {
     state.editIndex = 0;
     state.editorDirty = false;
     state.editorPendingOnly = false;
+    // 筛选/多选/卡片都是"这一次编辑会话"的东西,关编辑器时一并归零 ——
+    // 否则下次打开会带着上次的筛选,看到空列表还以为题库空了(踩过同类"状态残留"坑)
+    FILTER_GROUPS.forEach(g => { state.editorFilter[g] = []; });
+    state.editorSelected.length = 0;
+    hideModal(questionCardModal);
     hideModal(editBankModal);
     updateBanksList();
 }
 
 
-// 编辑器内切换题目(开启"只看待补"时,在待补题之间跳转)
+// 编辑器/卡片内切换题目:只在**当前筛选下看得见**的题之间走。
+// 「只看待补」因此自动成立(它就是一条筛选),不必再写一套跳过逻辑 ——
+// 而"筛过之后点下一题跳到屏幕外的题上"这种怪事也不会发生。返回是否真的移动了。
 export function editorNavigate(delta) {
-    const questions = currentEditBank();
-    if (state.editorPendingOnly) {
-        let target = state.editIndex + delta;
-        while (target >= 0 && target < questions.length && questions[target].answer) target += delta;
-        if (target < 0 || target >= questions.length) return;
-        if (!editorGuard()) return;
-        state.editIndex = target;
-        renderBankEditor();
-        return;
+    const ids = visibleQuestions().map(v => v.idx);
+    const here = ids.indexOf(state.editIndex);
+    let target;
+    if (here !== -1) {
+        target = ids[here + delta];
+    } else {
+        // 当前题被筛掉了:朝方向找最近的一道可见题
+        target = delta > 0
+            ? ids.find(i => i > state.editIndex)
+            : ids.slice().reverse().find(i => i < state.editIndex);
     }
-    const target = state.editIndex + delta;
-    if (target < 0 || target >= questions.length) return;
-    if (!editorGuard()) return;
+    if (target === undefined) return false;   // 到边界:原地不动(不静默改状态)
+    if (!editorGuard()) return false;
     state.editIndex = target;
     renderBankEditor();
+    return true;
 }
 
-// 切换"只看待补答案"筛选
+// ==================== 题目列表:筛选 / 多选 / 批量操作 / 编辑卡片(👤 2026-09-12 重构)====================
+// 设计要点(为什么是这套):
+//   ① 列表只负责"看与选":每行 = 复选框 + 序号 + 题干 + 标签徽章;点整行即勾选(不用去戳 13px 的小方块)。
+//   ② 动作只在**选中之后**出现(批量操作栏):没选中时界面上就一个多余按钮都没有。
+//   ③ 编辑一律进**卡片**(题干/题型/答案/选项/解释/解析)—— 列表不再兼任编辑器,一屏只干一件事。
+const FILTER_GROUPS = ['type', 'status', 'ai', 'marks'];
+
+// 筛选项定义(键 → 判定)。新增一个筛选维度 = 在这里加一行 + HTML 里加一个 chip。
+const FILTER_STATUS = {
+    pending: (q) => !q.answer,
+    noAnalysis: (q) => !(q.analysis || '').trim(),
+    noExplanation: (q) => !(q.explanation || '').trim(),
+    fewOptions: (q) => Object.keys(q.options || {}).length < 2,
+};
+const FILTER_AI = {
+    touched: (q) => q.aiSource === 'ai',
+    answer: (q) => q.answerSource === 'ai',
+    analysis: (q) => q.analysisSource === 'ai',
+};
+const FILTER_MARKS = {
+    hist: (q) => Array.isArray(q.histMarks) && q.histMarks.length > 0,
+};
+
+// 单题是否命中筛选(纯函数,便于单测)。语义:**组内任一、组间同时** ——
+//   「题型:单选或多选」+「缺什么:待补」能自然组合;空组 = 不约束。
+export function questionMatchesFilter(q, filter) {
+    const f = filter || {};
+    const hit = (list, table) => {
+        const keys = list || [];
+        return keys.length === 0 || keys.some(k => (table[k] ? table[k](q) : false));
+    };
+    // 题型不是"查表命中",而是直接比较字面值
+    const types = f.type || [];
+    if (types.length && types.indexOf(q.type) === -1) return false;
+    if (!hit(f.status, FILTER_STATUS)) return false;
+    if (!hit(f.ai, FILTER_AI)) return false;
+    if (!hit(f.marks, FILTER_MARKS)) return false;
+    return true;
+}
+
+// 当前生效的筛选条件个数(0 = 没筛)
+export function activeFilterCount() {
+    const f = state.editorFilter || {};
+    return FILTER_GROUPS.reduce((n, g) => n + ((f[g] || []).length), 0);
+}
+
+// 筛选后的可见题目 = [{ q, idx }]。idx 是题库里的**真实下标**(定位/删除都靠它,
+// 列表显示序号也用它 —— 筛过之后仍能让用户对上"这是第几题")。
+export function visibleQuestions() {
+    return currentEditBank()
+        .map((q, idx) => ({ q, idx }))
+        .filter(({ q }) => questionMatchesFilter(q, state.editorFilter));
+}
+
+// 「只看待补答案」= status 里的 pending,保留成独立开关:它同时是"在待补题之间跳"的依据
+function syncPendingAlias() {
+    state.editorPendingOnly = (state.editorFilter.status || []).indexOf('pending') !== -1;
+}
+
+// force 省略 = 反转当前状态(点击 chip 的语义);给了 true/false = 直接置位
+function setFilterValue(group, value, force) {
+    const f = state.editorFilter;
+    if (FILTER_GROUPS.indexOf(group) === -1) return false;
+    const list = f[group] || (f[group] = []);
+    const at = list.indexOf(value);
+    const on = force === undefined ? at === -1 : !!force;
+    if (on && at === -1) list.push(value);
+    if (!on && at !== -1) list.splice(at, 1);
+    syncPendingAlias();
+    return on;
+}
+
+// 切一个筛选条件(force 给定时 = 直接置位)
+export function editorToggleFilter(group, value, force) {
+    const on = setFilterValue(group, value, force);
+    afterFilterChange();
+    return on;
+}
+
+export function editorClearFilter() {
+    FILTER_GROUPS.forEach(g => { state.editorFilter[g] = []; });
+    syncPendingAlias();
+    afterFilterChange();
+}
+
+// 筛选一变:① 清空多选 —— 绝不让"看不见的题"留在选中集里(否则批量删除会删掉屏幕外的东西);
+//          ② 把当前题收窄到还看得见的那一道,编辑卡片不会停在"筛没了"的题上。
+function afterFilterChange() {
+    state.editorSelected.length = 0;
+    const vis = visibleQuestions();
+    if (!vis.some(v => v.idx === state.editIndex)) state.editIndex = vis.length ? vis[0].idx : 0;
+    renderBankEditor();
+}
+
+// 切换"只看待补答案"(保留老接口:HTML 里的旧复选框/老测试都还能用)
 export function editorTogglePendingOnly(checked) {
-    state.editorPendingOnly = !!checked;
-    const questions = currentEditBank();
-    if (state.editorPendingOnly) {
-        const firstPending = questions.findIndex(q => !q.answer);
-        state.editIndex = firstPending >= 0 ? firstPending : 0;
-    }
+    setFilterValue('status', 'pending', !!checked);
+    afterFilterChange();
+}
+
+// ---- 多选 ----
+export function isSelected(q) {
+    return state.editorSelected.indexOf(q) !== -1;
+}
+
+export function editorToggleSelect(q, force) {
+    const list = state.editorSelected;
+    const at = list.indexOf(q);
+    const on = force === undefined ? at === -1 : !!force;
+    if (on && at === -1) list.push(q);
+    if (!on && at !== -1) list.splice(at, 1);
+    renderBankEditor();
+    return on;
+}
+
+// 全选 = 选中**当前筛选下看得见的**题(不是整个库):"筛出来 → 全选 → 处理"才是这条流水线的本意
+export function editorSelectAllVisible() {
+    visibleQuestions().forEach(({ q }) => { if (!isSelected(q)) state.editorSelected.push(q); });
+    renderBankEditor();
+    return state.editorSelected.length;
+}
+
+export function editorClearSelection() {
+    state.editorSelected.length = 0;
     renderBankEditor();
 }
 
+// 选中集里已经被删/被去重掉的题,渲染时顺手剔除(存的是题目对象,不是下标 —— 不会串号)
+function pruneSelection() {
+    const alive = new Set(currentEditBank());
+    const kept = state.editorSelected.filter(q => alive.has(q));
+    state.editorSelected.length = 0;
+    state.editorSelected.push(...kept);
+}
 
-// 删除当前题
-export function editorDeleteCurrent() {
+// ---- 批量动作 ----
+// 编辑:只有**恰好选中 1 道**才有意义。多选时按钮禁用(状态即规则),这里再兜一次并说明原因。
+export function editorBulkEdit() {
+    const sel = state.editorSelected;
+    if (sel.length !== 1) {
+        alert(sel.length > 1 ? '多选时无法编辑:一次只能编辑 1 道题(先「取消选择」再单独勾选)' : '请先选中 1 道题');
+        return false;
+    }
+    const idx = currentEditBank().indexOf(sel[0]);
+    if (idx === -1) return false;
+    return openQuestionCard(idx);
+}
+
+// 批量删除:选中几道删几道。
+// ⚠️ **≥2 道时先存一版**:一次删多道是"一下手就难回头"的操作;单删保留"确认即删"——
+//    每库只有 3 个版本槽,删一道也存一版会把槽位挤爆(与去重的存版纪律一致:只在真会大改时存)。
+export function editorBulkDelete() {
     const questions = currentEditBank();
-    if (questions.length === 0) return;
-    if (state.editorDirty && !confirm('当前题目的修改尚未保存，确定放弃并删除吗？')) return;
-    if (!confirm(`确定删除第 ${state.editIndex + 1} 题吗？此操作不可恢复！`)) return;
-    questions.splice(state.editIndex, 1);
-    saveToLocalStorage();
+    const targets = state.editorSelected.filter(q => questions.indexOf(q) !== -1);
+    if (targets.length === 0) return false;
+    if (state.editorDirty && !confirm('当前题目的修改尚未保存，确定放弃并删除吗？')) return false;
+    if (!confirm(`确定删除选中的 ${targets.length} 道题吗？此操作不可恢复！`)) return false;
+    if (targets.length >= 2) pushBankVersion(state.editBankName, '批量删除前', questions);
+    const kept = questions.filter(q => targets.indexOf(q) === -1);
+    state.questionBanks[state.editBankName] = kept;
+    if (state.currentBankName === state.editBankName) state.questionBank = kept;
+    state.editorSelected.length = 0;
     state.editorDirty = false;
-    if (state.editIndex >= questions.length) state.editIndex = Math.max(0, questions.length - 1);
-    renderBankEditor();
+    if (state.editIndex >= kept.length) state.editIndex = Math.max(0, kept.length - 1);
+    saveToLocalStorage();
+    refreshQuestionBankView();
     updateBanksList();
     updateBankSelect();
+    renderBankEditor();
+    return true;
+}
+
+// ---- 编辑卡片 ----
+export function openQuestionCard(index) {
+    const questions = currentEditBank();
+    if (index !== undefined && index !== null) state.editIndex = index;
+    if (!questions[state.editIndex]) return false;
+    state.editorDirty = false;
+    renderBankEditor();            // 顺带把表单字段按这一题填好(表单就在卡片里)
+    updateQuestionCardHead();
+    showModal(questionCardModal);
+    if (editorStem && typeof editorStem.focus === 'function') editorStem.focus();
+    return true;
+}
+
+// 关闭卡片:有未保存修改时先问一句(复用 editorGuard 的口径)
+export function closeQuestionCard(force) {
+    if (!force && !editorGuard()) return false;
+    if (editorAiAnswerNote) editorAiAnswerNote.textContent = '';
+    hideModal(questionCardModal);
+    return true;
+}
+
+// 保存并关闭(卡片底部那颗「保存本题」)
+export function saveQuestionCard() {
+    if (!editorSaveCurrent(false)) return false;   // 校验失败(题干/答案不合法)时留在卡片里改
+    closeQuestionCard(true);                        // 保存成功 → dirty 已清零,不必再问
+    return true;
+}
+
+// 卡片内上一题/下一题:走既有的 editorNavigate(它会过"未保存"守卫,并在边界处原地不动的)
+export function editorCardNavigate(delta) {
+    const before = state.editIndex;
+    editorNavigate(delta);
+    if (state.editIndex === before) return false;
+    updateQuestionCardHead();
+    return true;
+}
+
+function updateQuestionCardHead() {
+    const questions = currentEditBank();
+    if (questionCardTitle) {
+        questionCardTitle.textContent = questions.length
+            ? `第 ${state.editIndex + 1} / ${questions.length} 题`
+            : '编辑题目';
+    }
+    // 到边界就禁用,不让用户点了没反应(比静默失败诚实)
+    if (questionCardPrev) questionCardPrev.disabled = state.editIndex <= 0;
+    if (questionCardNext) questionCardNext.disabled = state.editIndex >= questions.length - 1;
 }
 
 
@@ -1641,20 +1863,8 @@ export function editorRenderForm() {
     editorAnalysis.value = q.analysis || '';
     editorRenderOptions();
     state.editorDirty = false;
-
-    // 列表选中态:选中行决定"左边 ✕ / 右边 保存"这两颗按钮对谁现身(CSS 认 .selected)。
-    // ⚠️ 这里按 dataset.idx 对号,不能用 children 下标 —— 「只看待补」筛掉的行不占位,
-    //    下标会整体前移,"选中的第 3 题"会亮在第 2 行上(踩过)。
-    Array.from(editorQuestionList.children).forEach(el => {
-        if (!el.classList || !el.classList.contains('editor-list-row')) return;
-        const on = parseInt(el.dataset.idx, 10) === state.editIndex;
-        el.classList.toggle('selected', on);
-        // 行内正文按钮跟着一起亮/灭。用子节点遍历而不是 querySelector:
-        // 测试桩的 querySelector 只返回一个替身元素,类加在替身上等于没加。
-        Array.from(el.children || []).forEach(c => {
-            if (c.classList && c.classList.contains('editor-list-item')) c.classList.toggle('selected', on);
-        });
-    });
+    // 列表的"当前行"高亮由 renderBankEditor 建行时直接给(每行都带 dataset.idx 对号),
+    // 这里不再做二次扫描 —— 旧版那段"按 children 下标点亮"的代码在筛选下会点亮错的题(已删)。
 }
 
 
@@ -1741,18 +1951,6 @@ export function switchEditorTab(tab) {
 }
 
 // 删除某一道题(按下标;题号列表里的 ✕ 用)。与「删除本题」共用同一套语义。
-export function deleteQuestionAt(index) {
-    const questions = currentEditBank();
-    if (!questions[index]) return false;
-    if (!confirm('确定删除这道题吗？')) return false;
-    questions.splice(index, 1);
-    if (state.editIndex >= questions.length) state.editIndex = Math.max(0, questions.length - 1);
-    saveToLocalStorage();
-    state.editorDirty = false;
-    renderBankEditor();
-    return true;
-}
-
 // 渲染配色色板(编辑器内)。每个色块 = 一个按钮,点一下即改并立即落盘 ——
 // 配色是"看一眼就想调"的东西,不值得为它走一遍保存流程。
 export function renderBankColorPicker() {
@@ -2316,64 +2514,45 @@ export function renderBankEditor() {
     // 首次渲染时把标签页定到"编辑题目"(HTML 里也有默认值,这里是双保险 ——
     // 缺了它首屏会出现"两页都隐藏"的空壳,实测踩过)
     if (!editorBody || !editorBody.getAttribute('data-tab')) switchEditorTab('question');
+    pruneSelection();
     const questions = currentEditBank();
-    const pendingOnly = !!state.editorPendingOnly;
+    const visible = visibleQuestions();
+    const filterOn = activeFilterCount() > 0;
 
+    // ---------- 列表:每行 = 复选框 + 序号 + 题干 + 标签徽章,点整行即勾选 ----------
     editorQuestionList.innerHTML = '';
-    questions.forEach((q, idx) => {
-        if (pendingOnly && q.answer) return; // 只看待补
-        const isCurrent = idx === state.editIndex;
-        const row = document.createElement('div');
-        // selected 挂在**行**上(不只在正文按钮上):行内那两颗按钮的显隐由它决定
-        row.className = 'editor-list-row' + (isCurrent ? ' selected' : '');
+    visible.forEach(({ q, idx }) => {
+        // 用 <label> 包住复选框:点行里任何地方都能勾选,不用去戳那个小方块(手机上尤其重要)
+        const row = document.createElement('label');
+        row.className = 'q-row'
+            + (idx === state.editIndex ? ' current' : '')
+            + (isSelected(q) ? ' picked' : '');
         row.dataset.idx = String(idx);
-        // 「删除 ✕」在左、「保存」在右,**只对选中的那一道现身**(👤 要求)。
-        // 两颗按钮在每一行都真实存在,只是非选中行 visibility:hidden ——
-        // 这样行宽恒定:换一道题时文字不会重排,手指也不会追着移动的按钮点(踩过"按钮跑掉")。
-        // 删在左、存在右:一个是"丢掉",一个是"留下",分居两端最不容易点错。
-        const del = document.createElement('button');
-        del.type = 'button';
-        del.className = 'editor-list-del editor-row-btn';
-        del.textContent = '✕';
-        del.title = `删除第 ${idx + 1} 题`;
-        del.setAttribute('aria-label', `删除第 ${idx + 1} 题`);
-        del.addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteQuestionAt(idx);   // 内部自带确认,避免误删
-        });
-        row.appendChild(del);
-        const item = document.createElement('button');
-        item.type = 'button';
-        // 待修改高亮:缺答案(待补)或选项不足的题,橙底标记;AI 标记:紫条 🤖(与预览同色系)
-        const needsFix = !q.answer || Object.keys(q.options || {}).length < 2;
-        const aiTouched = q.aiSource === 'ai';
-        const hasHist = Array.isArray(q.histMarks) && q.histMarks.length > 0;
-        item.className = 'editor-list-item' + (isCurrent ? ' selected' : '') + (needsFix ? ' needs-fix' : '') + (aiTouched ? ' ai-gen' : '');
-        item.textContent = `${idx + 1}. ` + (aiTouched ? '🤖 ' : '') + `${(q.content || '（无题干）').slice(0, 22)}` + (!q.answer ? ' ⏳' : (needsFix ? ' ⚠' : '')) + (hasHist ? ' 🕘' : '');
-        item.addEventListener('click', () => {
-            if (!editorGuard()) return;
-            state.editIndex = idx;
-            renderBankEditor();
-        });
-        row.appendChild(item);
-        // 「保存」= 保存**当前选中的这一道**(editorSaveCurrent 读的就是 state.editIndex)。
-        // 它与"改完自动落盘"不冲突:落盘由保存触发,不保存就是还没定稿。
-        const save = document.createElement('button');
-        save.type = 'button';
-        save.className = 'editor-row-save editor-row-btn';
-        save.textContent = '保存';
-        save.title = `保存第 ${idx + 1} 题的修改`;
-        save.setAttribute('aria-label', `保存第 ${idx + 1} 题的修改`);
-        save.addEventListener('click', (e) => {
-            e.stopPropagation();
-            editorSaveCurrent(false);
-        });
-        row.appendChild(save);
+
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.className = 'q-row-check';
+        box.checked = isSelected(q);
+        box.setAttribute('aria-label', `选择第 ${idx + 1} 题`);
+        // 只认 change:label 的原生行为已经会把点击转成 change,再挂 click 会勾一下又取消(双触发)
+        box.addEventListener('change', () => { editorToggleSelect(q, box.checked); });
+        row.appendChild(box);
+
+        const no = document.createElement('span');
+        no.className = 'q-row-no';
+        no.textContent = String(idx + 1);   // 用**真实下标**+1:筛过之后仍能让用户对上"这是第几题"
+        row.appendChild(no);
+
+        const text = document.createElement('span');
+        text.className = 'q-row-text';
+        text.textContent = (q.content || '（无题干）').slice(0, 48);
+        row.appendChild(text);
+
+        row.appendChild(rowBadges(q));
         editorQuestionList.appendChild(row);
     });
 
-    // 列表末尾的「＋」(👤 要求):新增题目不再是动作行里的按钮,而是列表的最后一行 ——
-    // 位置本身就在说"往这里再加一道"。始终可见,故"只看待补"筛选后也能加题。
+    // 列表末尾的「＋」(👤 要求):新增入口就是列表最后一行 —— 位置本身在说"往这里再加一道"
     const addRow = document.createElement('button');
     addRow.type = 'button';
     addRow.className = 'editor-list-add';
@@ -2383,20 +2562,62 @@ export function renderBankEditor() {
     addRow.addEventListener('click', () => editorAddQuestion());
     editorQuestionList.appendChild(addRow);
 
-    // 头部进度与列表计数(列表常显,进度与计数是"我在第几题"的第一眼线索)
-    const shown = questions.filter(q => !pendingOnly || !q.answer).length;
-    if (editorListCount) editorListCount.textContent = pendingOnly ? `待补 ${shown}` : `共 ${questions.length} 题`;
-    if (editorTabQuestionCount) editorTabQuestionCount.textContent = pendingOnly ? `待补 ${shown}` : `${questions.length}`;
+    // ---------- 工具行计数 + 筛选按钮角标 ----------
+    if (editorListCount) {
+        editorListCount.textContent = filterOn
+            ? `筛出 ${visible.length} / 共 ${questions.length} 题`
+            : `共 ${questions.length} 题`;
+    }
+    if (editorTabQuestionCount) {
+        editorTabQuestionCount.textContent = filterOn ? `${visible.length}/${questions.length}` : `${questions.length}`;
+    }
+    const activeCount = activeFilterCount();
+    if (editorFilterCount) {
+        editorFilterCount.textContent = activeCount ? ` ${activeCount}` : '';
+        editorFilterCount.classList.toggle('hidden', activeCount === 0);
+    }
+    if (editorFilterToggle) editorFilterToggle.classList.toggle('active', activeCount > 0);
+    // chip 的选中态在这里**统一回写**(单一数据源 = state.editorFilter):
+    // 点击只改状态,谁都不许自己加类 —— 否则"点了没用/状态对不上"这类 bug 迟早出现。
+    document.querySelectorAll('.filter-chip').forEach(chip => {
+        const on = (state.editorFilter[chip.dataset.filter] || []).indexOf(chip.dataset.value) !== -1;
+        chip.classList.toggle('active', on);
+        chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
 
-    if (questions.length === 0 || !questions[state.editIndex]) {
+    // ---------- 批量操作栏:没选中就一个按钮都不出现(👤 要求) ----------
+    const selCount = state.editorSelected.length;
+    if (editorBulkBar) editorBulkBar.classList.toggle('hidden', selCount === 0);
+    if (editorBulkCount) editorBulkCount.textContent = selCount ? `已选 ${selCount} 题` : '';
+    // 编辑只能针对 1 道:多选时禁用(按钮状态即规则,比点了再弹提示更早告诉用户)
+    if (editorBulkEditBtn) {
+        editorBulkEditBtn.disabled = selCount !== 1;
+        editorBulkEditBtn.title = selCount === 1 ? '编辑选中的这道题' : '一次只能编辑 1 道题';
+    }
+
+    // ---------- 空态:分两种 —— "库里没题"和"筛没了",说法不同(不然用户以为题目丢了) ----------
+    if (questions.length === 0) {
+        if (editorEmpty) {
+            editorEmpty.textContent = '该题库暂无题目，点列表末尾的「＋」添加';
+            editorEmpty.classList.remove('hidden');
+        }
+    } else if (visible.length === 0) {
+        if (editorEmpty) {
+            editorEmpty.textContent = '没有符合筛选的题目 —— 换个条件,或点「清除筛选」';
+            editorEmpty.classList.remove('hidden');
+        }
+    } else if (editorEmpty) {
+        editorEmpty.classList.add('hidden');
+    }
+
+    // ---------- 当前题(编辑卡片里的表单 + 提示行) ----------
+    updateQuestionCardHead();
+    const cur = questions[state.editIndex];
+    if (!cur) {
         editorForm.classList.add('hidden');
-        editorEmpty.classList.remove('hidden');
-        // 没有可编辑的题时列表里只有「＋」,"保存"随选中行一起不存在(无题可存)
         return;
     }
     editorForm.classList.remove('hidden');
-    editorEmpty.classList.add('hidden');
-    const cur = questions[state.editIndex];
     renderEditorHistRow(cur);
     const aiNoteEl = document.getElementById('editor-ai-note');
     if (aiNoteEl) {
@@ -2412,6 +2633,33 @@ export function renderBankEditor() {
         aiNoteEl.className = lines.length ? 'editor-ai-note stacked' : 'editor-ai-note';
     }
     editorRenderForm();
+}
+
+// 行内标签徽章:让"这道题什么状态"在列表里一眼可见 —— 它同时是筛选面板的视觉词典
+// (筛选项与徽章一一对应,用户看久了就知道 ⏳ 是什么)。最多 4 个,其余进 title 提示,免得行变成横幅。
+function rowBadges(q) {
+    const wrap = document.createElement('span');
+    wrap.className = 'q-row-badges';
+    const all = [];
+    if (q.type) all.push({ text: q.type, cls: 'type' });
+    if (!q.answer) all.push({ text: '⏳ 待补', cls: 'warn', title: '还没有答案' });
+    else if (Object.keys(q.options || {}).length < 2) all.push({ text: '⚠ 选项不足', cls: 'warn', title: '选项少于 2 个' });
+    if (!(q.analysis || '').trim()) all.push({ text: '缺解析', cls: 'dim', title: '还没有解析' });
+    if (q.aiSource === 'ai') all.push({ text: '🤖', cls: 'ai', title: 'AI 整理过' });
+    if (q.answerSource === 'ai') all.push({ text: '✍️ 答案', cls: 'ai', title: '答案是 AI 补的(未核验)' });
+    else if (q.analysisSource === 'ai') all.push({ text: '✍️ 解析', cls: 'ai', title: '解析是 AI 补的(未核验)' });
+    if (Array.isArray(q.histMarks) && q.histMarks.length) {
+        all.push({ text: '🕘', cls: 'dim', title: `有 ${q.histMarks.length} 条历史标记` });
+    }
+    all.slice(0, 4).forEach(b => {
+        const el = document.createElement('span');
+        el.className = 'q-badge' + (b.cls ? ' ' + b.cls : '');
+        el.textContent = b.text;
+        if (b.title) el.title = b.title;
+        wrap.appendChild(el);
+    });
+    if (all.length > 4) wrap.title = all.map(b => b.text).join(' · ');
+    return wrap;
 }
 
 

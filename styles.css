@@ -1462,24 +1462,192 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
     padding: 8px;
 }
 
-/* 列表标题:手机上它是开合按钮;桌面档列表常显,它看起来就是一行标题 */
-.editor-list-toggle {
+/* ---------- 题目列表工具行 + 筛选面板(👤 2026-09-12 重构)----------
+   工具行 = 筛选(点开面板)+ 去重 + 计数。三个都是"小工具",统一做成 32px 描边胶囊:
+   与库卡/内容区的大按钮拉开层级,一眼看出"这是列表的控制器,不是内容"。 */
+.editor-toolbar {
     display: flex;
     align-items: center;
     gap: 6px;
-    width: 100%;
-    min-height: 28px;
-    padding: 0;
-    border: none;              /* 按钮必须显式声明 border,否则露出默认黑边 */
-    background: none;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+.list-tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 32px;
+    padding: 0 11px;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: var(--c-surface);
+    color: var(--c-text-secondary);
     font-family: inherit;
     font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.list-tool:hover { border-color: var(--c-primary); color: var(--c-primary); background: var(--c-info-bg); }
+/* 有筛选生效时按钮自己就带记号(小圆点计数),不用点开也知道"列表被筛过" */
+.list-tool.active {
+    border-color: var(--c-primary);
+    color: var(--c-primary);
+    background: var(--c-info-bg);
     font-weight: 600;
+}
+.list-tool-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--c-primary);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+}
+.list-tool-caret { font-size: 10px; opacity: 0.7; }
+.editor-toolbar-count { margin-left: auto; }   /* 计数贴右:它是"结果",与左边的控制区分开 */
+
+/* 筛选面板:chips 分组(组内任一、组间同时)。展开才占位,收起时列表完整可用 */
+.filter-panel {
+    border: 1px solid var(--c-border-light);
+    border-radius: 8px;
+    background: var(--c-surface-alt);
+    padding: 10px 12px;
+    margin-bottom: 10px;
+}
+.filter-group {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.filter-group:last-of-type { margin-bottom: 0; }
+.filter-group-title {
+    flex: 0 0 3.5em;
+    padding-top: 7px;          /* 与 chip 文字baseline 对齐 */
+    font-size: 12px;
+    color: var(--c-text-faint);
+}
+.filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex: 1 1 auto;
+}
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 10px;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: var(--c-surface);
+    color: var(--c-text-secondary);
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.filter-chip:hover { border-color: var(--c-primary); color: var(--c-primary); }
+/* 选中:实心主色底 —— "已生效的条件"必须一眼数得清(只靠描边色差太弱) */
+.filter-chip.active {
+    border-color: var(--c-primary);
+    background: var(--c-primary);
+    color: #fff;
+    font-weight: 600;
+}
+.filter-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--c-border-light);
+}
+.filter-foot .meta-note { margin: 0; flex: 1 1 auto; }
+.filter-clear {
+    flex: 0 0 auto;
+    min-height: 30px;
+    padding: 0 10px;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: var(--c-surface);
     color: var(--c-text-muted);
-    text-align: left;
+    font-family: inherit;
+    font-size: 12px;
     cursor: pointer;
 }
-.editor-list-caret { display: inline-block; transition: transform 0.15s; }
+.filter-clear:hover { border-color: var(--c-danger); color: var(--c-danger-text); background: var(--c-danger-bg); }
+
+/* ---------- 批量操作栏(选中 ≥1 才出现)----------
+   sticky 贴底:列表再长,选完就能就地点"删除/编辑",不用回头找按钮。 */
+.bulk-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--c-primary);
+    border-radius: 8px;
+    background: var(--c-surface);
+    box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.08);
+}
+.bulk-count {
+    flex: 0 0 auto;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--c-primary);
+}
+.bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-left: auto;      /* 动作贴右,计数贴左 */
+}
+.bulk-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    background: var(--c-surface);
+    color: var(--c-text-secondary);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.bulk-btn:hover { border-color: var(--c-primary); color: var(--c-primary); background: var(--c-info-bg); }
+/* 主键「编辑」:唯一实心(选中即最可能的意图) */
+.bulk-btn.primary {
+    border-color: var(--c-primary);
+    background: var(--c-primary);
+    color: #fff;
+}
+.bulk-btn.primary:hover { background: var(--c-primary-deep); border-color: var(--c-primary-deep); color: #fff; }
+.bulk-btn.primary:disabled {
+    border-color: var(--c-border);
+    background: var(--c-surface-alt);
+    color: var(--c-text-faint);
+    cursor: not-allowed;
+}
+/* 危险键「删除」:描边红,不抢主键的位置 */
+.bulk-btn.danger { border-color: var(--c-danger); color: var(--c-danger-text); }
+.bulk-btn.danger:hover { background: var(--c-danger-bg); }
 
 /* 列表末尾的「＋」:新增题目这一行本身(👤 要求:按钮变成列表末尾的加号) */
 .editor-list-add {
@@ -1504,71 +1672,88 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
     background: var(--c-info-bg);
 }
 
-/* 题号列表行:正文居中可点选;**选中那一行**左边 ✕(删)、右边「保存」(👤 要求)。
-   两颗按钮在**每一行都真实占位**,非选中行只是 visibility:hidden —— 行宽恒定:
-   换一道题时文字不重排,按钮也不会在手指底下挪窝。 */
-.editor-list-row {
+/* 题目列表(👤 2026-09-12 重构):每行 = 复选框 + 序号 + 题干 + 标签徽章。
+   行本身是 <label>:点行里任何地方都等于勾选 —— 手机上不用去戳那个小方块。
+   动作不在行里(渲染 N 行就是 N 份按钮,又吵又难点):选中之后统一出现在批量操作栏。 */
+.q-row {
     display: flex;
-    align-items: stretch;
-    gap: 2px;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;          /* 连点勾选时别把文字选成一片蓝 */
 }
-.editor-row-btn { visibility: hidden; }
-.editor-list-row.selected .editor-row-btn { visibility: visible; }
-.editor-list-del {
+.q-row:hover { background: var(--c-info-bg); }
+/* 待修改:橙色左条(与徽章里的 ⏳/⚠ 同一套语义) */
+.q-row.needs-fix {
+    background: var(--c-warn-bg-soft);
+    box-shadow: inset 3px 0 0 var(--c-warn-icon);
+}
+.q-row.needs-fix .q-row-text { color: var(--c-warn-text-strong); }
+/* AI 整理过的题:紫色左条(与全站 🤖 标记同色系) */
+.q-row.ai-gen { box-shadow: inset 3px 0 0 var(--c-accent-purple); }
+.q-row.ai-gen.needs-fix { box-shadow: inset 3px 0 0 var(--c-accent-purple-overlap); }
+/* 正在编辑卡片里打开的那一道:左侧色条 + 淡底(不只靠颜色:还有加粗) */
+.q-row.current {
+    background: var(--c-selected-bg-strong);
+    box-shadow: inset 3px 0 0 var(--c-primary);
+}
+.q-row.current .q-row-text { font-weight: 600; color: var(--c-selected-text); }
+/* 已勾选:整行淡蓝底,一眼看出"这几道要被处理" */
+.q-row.picked { background: var(--c-info-bg); }
+.q-row.picked .q-row-text { color: var(--c-primary); }
+.q-row-check {
     flex: 0 0 auto;
-    border: none;               /* 必须显式声明,否则露出默认黑边 */
-    background: none;
-    padding: 0 8px;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--c-primary);   /* 勾选态用主色,和全站一致 */
+    cursor: pointer;
+}
+.q-row-no {
+    flex: 0 0 auto;
+    min-width: 1.6em;
+    text-align: right;
     font-size: 12px;
     color: var(--c-text-faint);
-    cursor: pointer;
-    border-radius: 6px;
+    font-variant-numeric: tabular-nums;   /* 序号右对齐且等宽,竖着扫下来是齐的 */
 }
-.editor-list-del:hover {
-    background: var(--c-danger-bg);
-    color: var(--c-danger-text);
-}
-/* 保存:整行里唯一"正向/留下"的动作,给它实底色,与左边那个"丢掉"一眼分得开 */
-.editor-row-save {
-    flex: 0 0 auto;
-    border: none;
-    background: var(--c-primary);
-    color: white;
-    margin: 2px 0 2px 4px;
-    padding: 0 12px;
-    font-family: inherit;
-    font-size: 13px;
-    border-radius: 6px;
-    cursor: pointer;
-}
-.editor-row-save:hover {
-    background: var(--c-primary-deep);
-}
-.editor-list-item {
-    display: block;
-    width: 100%;
-    text-align: left;
+.q-row-text {
     flex: 1 1 auto;
     min-width: 0;
-    background: none;
-    border: none;
-    border-radius: 6px;
-    padding: 8px 8px;
     font-size: 14px;
     color: var(--c-text-secondary);
-    cursor: pointer;
-    font-family: inherit;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;        /* 一行一道题:列表是"扫"的地方,不是"读"的地方 */
 }
-
-.editor-list-item:hover {
-    background: var(--c-info-bg);
+.q-row-badges {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;            /* 窄屏徽章自己换行,不挤题干 */
+    justify-content: flex-end;
 }
-
-.editor-list-item.selected {
-    background: var(--c-selected-bg-strong);
-    color: var(--c-selected-text);
-    font-weight: 600;
+.q-badge {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 999px;
+    border: 1px solid var(--c-border);
+    background: var(--c-surface);
+    color: var(--c-text-muted);
+    font-size: 11px;
+    line-height: 1;
+    white-space: nowrap;
 }
+.q-badge.type { border-color: var(--c-border-light); color: var(--c-text-secondary); }
+.q-badge.warn { border-color: var(--c-warn-border, var(--c-border)); color: var(--c-warn-text, var(--c-text-secondary)); background: var(--c-warn-bg-soft); }
+.q-badge.ai   { border-color: var(--c-ai-border, var(--c-border)); color: var(--c-ai-text, var(--c-text-secondary)); background: var(--c-ai-bg-soft, var(--c-info-bg)); }
+.q-badge.dim  { color: var(--c-text-faint); }
 
 .editor-form-panel {
     min-width: 0;
@@ -2009,26 +2194,7 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
     font-weight: 600;
 }
 
-/* 编辑器待修改题高亮 */
-.editor-list-item.needs-fix {
-    background: var(--c-warn-bg-soft);
-    box-shadow: inset 3px 0 0 var(--c-warn-icon);
-    color: var(--c-warn-text-strong);
-}
-.editor-list-item.needs-fix.selected {
-    background: var(--c-selected-bg-strong);
-    box-shadow: inset 3px 0 0 var(--c-primary);
-    color: var(--c-selected-text-strong);
-}
-
-/* 编辑器:AI 标记题(紫条)与 AI 说明行 */
-.editor-list-item.ai-gen {
-    box-shadow: inset 3px 0 0 var(--c-accent-purple);
-}
-.editor-list-item.ai-gen.needs-fix {
-    box-shadow: inset 3px 0 0 var(--c-accent-purple-overlap);  /* 双重标记时紫橙过渡色 */
-    background: var(--c-accent-purple-faint);
-}
+/* 编辑器说明行:AI 与待修双状态并存时逐行显示 */
 .editor-ai-note {
     margin: 0 0 8px;
     font-size: 0.85em;
@@ -2065,7 +2231,6 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
     font-size: 14px;
     padding: 0;
 }
-.editor-list-item .hist-suffix { color: var(--c-text-faint); }
 
 /* 错题本:收藏/删除操作行 */
 
@@ -2153,7 +2318,7 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
     .preview-stem {
         font-size: 14px;
     }
-    .editor-list-item {
+    .q-row {
         padding: 8px 8px;
         font-size: 14px;
     }
@@ -2481,7 +2646,7 @@ html[data-theme="dark"] .container {
 
 /* ==================== 交互规范(Vercel web-interface-guidelines 精选适配) ==================== */
 /* 触控:去掉双击缩放延迟与安卓点按高亮 */
-button, select, label, .option-item, .bank-toggle, .preview-item, .editor-list-item {
+button, select, label, .option-item, .bank-toggle, .preview-item, .q-row {
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
 }
@@ -3250,6 +3415,69 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     }
 }
 
+/* ---------- 编辑卡片:一道题的完整编辑面(👤 2026-09-12 重构)----------
+   它是**二级弹窗**(1100 > 编辑器 1000,见 §3.8):从题库编辑器里打开,必须压在编辑器之上。
+   三段式:头部(题号 + 上/下一题 + ✕)/ 可滚动主体(六个字段)/ 底部固定(取消 + 保存)。 */
+#question-card-modal { z-index: 1100; }
+.question-card {
+    display: flex;
+    flex-direction: column;
+    width: 94%;
+    max-width: var(--modal-sm);
+    max-height: 88vh;
+    padding: 0;                 /* 卡片自己管三段的内边距,padding 会破坏"底部固定" */
+    overflow: hidden;           /* 滚动只发生在 .card-body */
+}
+.card-head {
+    position: relative;         /* 关闭键绝对定位的参照 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 0 48px 0 8px;      /* 右侧留出 40px 关闭键的位置 */
+    border-bottom: 1px solid var(--c-border-light);
+}
+.card-head h3 {
+    margin: 0;                  /* 基础 .modal-content h3 有 24px 下边距,这里必须归零 */
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--c-text);
+    white-space: nowrap;
+}
+.card-nav {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    background: var(--c-surface);
+    color: var(--c-text-secondary);
+    font-family: inherit;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+.card-nav:hover:not(:disabled) { border-color: var(--c-primary); color: var(--c-primary); background: var(--c-info-bg); }
+.card-nav:disabled { color: var(--c-text-faint); cursor: not-allowed; opacity: 0.6; }
+.card-body {
+    flex: 1 1 auto;
+    min-height: 0;              /* flex 子项要能真的滚,这一行不能少 */
+    overflow-y: auto;
+    padding: 14px 16px 4px;
+}
+.card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex: 0 0 auto;
+    padding: 12px 16px;
+    border-top: 1px solid var(--c-border-light);
+    background: var(--c-surface);
+}
+
 /* ---------- 主体:唯一滚动区 ---------- */
 .editor-panel { min-width: 0; }
 .editor-panel-title {
@@ -3375,22 +3603,24 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
         min-height: 44px;
         padding: 0 14px;
     }
-    .editor-list-item {
-        min-height: 44px;
-        display: flex;
-        align-items: center;
-    }
+    /* 行整行 ≥44px,复选框本身放大到 22px(点行也能勾,所以不必强求 44px 的方块) */
+    .q-row { min-height: 44px; }
+    .q-row-check { width: 22px; height: 22px; }
     /* 零散控件也要够得着:色块、AI 补答案、关闭 ✕、移出规则下拉、复选框 */
     .bank-color-swatch { min-height: 44px; padding: 0 12px; }
     .editor-list-del { min-width: 44px; font-size: 14px; }
     /* 选中行右端的「保存」也要够得着(👤 定的 44 阈值) */
-    .editor-row-save { min-width: 52px; font-size: 14px; }
+    /* 批量操作栏与编辑卡片底部的按钮:手机上都是拇指目标 */
+    .bulk-btn { min-height: 44px; padding: 0 14px; font-size: 14px; }
+    .card-foot .action-btn { min-height: 44px; }
+    .card-nav { width: 40px; height: 40px; }
+    .list-tool { min-height: 44px; }
+    .filter-chip { min-height: 44px; }
     .editor-list-add { min-height: 44px; }
     .version-item .action-btn,
     .version-item .version-del { min-height: 44px; }
     .version-item .version-del { min-width: 44px; }
     .editor-tab { min-height: 44px; }
-    .editor-list-toggle { min-height: 44px; font-size: 14px; }
     /* 左标签在手机上收窄一档:文案仍完整,字段能多出一列字的宽度 */
     .editor-field > label,
     .editor-field > .form-label { width: 4em; font-size: 13px; padding-top: 12px; }
@@ -3436,6 +3666,5 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
 }
 /* 桌面:题号列表常显 —— 隐藏那个开合标题,免得鼠标用户误点收起 */
 @media (min-width: 769px) {
-    .editor-list-toggle { display: none; }
     .editor-list-panel .editor-list-body { display: block; }
 }

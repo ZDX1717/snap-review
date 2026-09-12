@@ -7,11 +7,12 @@ import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, updateErrorStreak } from './errorbook.js';
 import { toggleFavorite } from './favorites.js';
 import { advanceNext, backToQuizOptions, closeAnswerCard, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, isAnswerCardOpen, jumpToQuestion, openAnswerCard, readQuizSource, renderAnswerCard, resetGradingState, shouldAutoNext, shouldConfirmAnswer, syncNextButtonLabel, markEndButtonReady, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleAnswerCard, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
-import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorGuard, editorTogglePendingOnly, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback,
+import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorGuard, editorTogglePendingOnly, editorToggleFilter, editorClearFilter, editorSelectAllVisible, editorClearSelection,
+    editorBulkEdit, editorBulkDelete, openQuestionCard, closeQuestionCard, saveQuestionCard, editorCardNavigate,
+    questionMatchesFilter, visibleQuestions, activeFilterCount, isSelected, editorToggleSelect, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback,
     previewAiAnswerFill,
     bankColorOf,
         switchEditorTab,
-    deleteQuestionAt,
     setBankColor,
     renderBankColorPicker,
     editorAiAnswer, cancelPreviewAi, rescueAiOrganize, updateAiSettingsBadge, editorNavigate, editorRenderForm, editorRenderOptions, editorSaveCurrent, exportAllBanks, exportBank, handleFileSelect, handlePasteEvent, htmlToLines, clearPasteInput, editorHistClick, keepCleanOnly, openImportPreview, parsePastedText, refreshQuestionBankView, togglePromptContent, copyOfficialPrompt, renameBank, renderBankEditor, renderPreview, restoreOverwriteSnapshot, showImportStatus, showRenameModal, togglePreviewSelectAll, undoLastImport, updateBankSelect, updateBanksList, updateLastImportInfo, updatePreviewSummary, updatePreviewTargetBanks, renderErrorsForBank, renderFavoritesForBank, renderRecycleBin, restoreRecycled, recycleBankEntry, restoreBankVersion } from './bank.js';
@@ -145,7 +146,19 @@ const editorTabBank = document.getElementById('editor-tab-bank');
 const editorRemoveOption = document.getElementById('editor-remove-option');
 const editorExplanation = document.getElementById('editor-explanation');
 const editorAnalysis = document.getElementById('editor-analysis');
-const editorPendingOnly = document.getElementById('editor-pending-only');
+// 题目列表重构(👤 2026-09-12):筛选 / 批量操作栏 / 编辑卡片
+const editorFilterToggle = document.getElementById('editor-filter-toggle');
+const editorFilterPanel = document.getElementById('editor-filter-panel');
+const editorFilterClear = document.getElementById('editor-filter-clear');
+const editorBulkAll = document.getElementById('editor-bulk-all');
+const editorBulkClear = document.getElementById('editor-bulk-clear');
+const editorBulkEditBtn = document.getElementById('editor-bulk-edit');
+const editorBulkDeleteBtn = document.getElementById('editor-bulk-delete');
+const editorSaveBtn = document.getElementById('editor-save-btn');
+const questionCardClose = document.getElementById('question-card-close');
+const questionCardCancel = document.getElementById('question-card-cancel');
+const questionCardPrev = document.getElementById('question-card-prev');
+const questionCardNext = document.getElementById('question-card-next');
 const editorHistRow = document.getElementById('editor-hist-row');
 const bankRenameBtn = document.getElementById('bank-rename-btn');
 const bankDedupBtn = document.getElementById('editor-dedup-btn');   // 去重已移到题目列表上方(👤 要求)
@@ -340,8 +353,28 @@ function setupEventListeners() {
             editorClose();
         }
     });
-    editorPendingOnly.addEventListener('change', (e) => editorTogglePendingOnly(e.target.checked));
     editorHistRow.addEventListener('click', editorHistClick);
+
+    // 题目列表重构(👤 2026-09-12):筛选面板 / 批量操作栏 / 编辑卡片
+    // 筛选按钮只负责开合面板;chip 的选中态由 renderBankEditor 统一回写(单一数据源 = state.editorFilter)
+    editorFilterToggle.addEventListener('click', () => {
+        const open = editorFilterPanel.classList.toggle('hidden') === false;
+        editorFilterToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    document.querySelectorAll('.filter-chip').forEach(chip => {
+        chip.addEventListener('click', () => editorToggleFilter(chip.dataset.filter, chip.dataset.value));
+    });
+    editorFilterClear.addEventListener('click', () => editorClearFilter());
+    editorBulkAll.addEventListener('click', () => editorSelectAllVisible());
+    editorBulkClear.addEventListener('click', () => editorClearSelection());
+    editorBulkEditBtn.addEventListener('click', () => editorBulkEdit());
+    editorBulkDeleteBtn.addEventListener('click', () => editorBulkDelete());
+    // 编辑卡片:保存/取消/关闭/上一题/下一题
+    editorSaveBtn.addEventListener('click', () => saveQuestionCard());
+    questionCardCancel.addEventListener('click', () => closeQuestionCard());
+    questionCardClose.addEventListener('click', () => closeQuestionCard());
+    questionCardPrev.addEventListener('click', () => editorCardNavigate(-1));
+    questionCardNext.addEventListener('click', () => editorCardNavigate(1));
     editorAddOption.addEventListener('click', () => editorMutateOptions(1));
     editorRemoveOption.addEventListener('click', () => editorMutateOptions(-1));
     editorType.addEventListener('change', () => { state.editorDirty = true; editorRenderOptions(); });
@@ -607,7 +640,21 @@ if (typeof window === 'undefined') {
         renderFavoritesForBank,
         bankColorOf,
                 switchEditorTab,
-        deleteQuestionAt,
+        editorToggleFilter,
+        editorClearFilter,
+        editorSelectAllVisible,
+        editorClearSelection,
+        editorBulkEdit,
+        editorBulkDelete,
+        openQuestionCard,
+        closeQuestionCard,
+        saveQuestionCard,
+        editorCardNavigate,
+        questionMatchesFilter,
+        visibleQuestions,
+        activeFilterCount,
+        isSelected,
+        editorToggleSelect,
         setBankColor,
         renderBankColorPicker,
         pushBankVersion,

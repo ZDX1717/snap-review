@@ -245,95 +245,224 @@ test('题型与答案一致性:finalizeQuestion 兜底纠正历史坏数据', as
     assert.strictEqual(app.run('__q3.type'), '判断', '判断题不应被改编');
 });
 
-// ==================== 列表行内的「✕ 删除 / 保存」(👤 要求:只对选中那行现身)====================
-// 行的结构固定为:✕ → 正文 → 保存(左删除、右保存)。两颗按钮在**每一行**都存在,
-// 非选中行只是看不见(占位),故这里断言的是"存在性 + 选中态",不是"有没有被渲染"。
+// ==================== 题目列表:复选框 / 筛选 / 批量操作 / 编辑卡片(👤 2026-09-12 重构)====================
+// 行的结构:checkbox + 序号 + 题干 + 徽章。点整行(它是 <label>)即勾选 —— 动作只在选中后出现。
 function listRows(app) {
-    return app.elements['editor-question-list'].children
-        .filter(el => el.classList && el.classList.contains('editor-list-row'));
+    // ⚠️ 测试桩的 innerHTML='' 不会清 children,历史渲染的行都还堆在里面。
+    //    每轮渲染的顺序固定是"若干行 + 末尾的 ＋",故从尾部往回走、遇到上一轮的 ＋ 就停 ——
+    //    这样拿到的**正好是最后一轮渲染的行**(按 idx 去重会留下已被筛掉的旧行,踩过)。
+    const kids = app.elements['editor-question-list'].children;
+    const rows = [];
+    let i = kids.length - 1;
+    if (i >= 0 && kids[i].classList && kids[i].classList.contains('editor-list-add')) i--;
+    for (; i >= 0; i--) {
+        const el = kids[i];
+        if (!el.classList) continue;
+        if (el.classList.contains('editor-list-add')) break;
+        if (el.classList.contains('q-row')) rows.push(el);
+    }
+    return rows.reverse();
 }
 function byClass(el, cls) {
     return (el.children || []).filter(c => c.classList && c.classList.contains(cls));
 }
+function rowCheck(row) {
+    return byClass(row, 'q-row-check')[0];
+}
+// 模拟"点一下复选框":浏览器里 label 会把它转成 change 事件
+function clickCheck(row) {
+    const box = rowCheck(row);
+    box.checked = !box.checked;
+    if (box._listeners && box._listeners.change) box._listeners.change();
+    return box.checked;
+}
 
-test('列表行:✕ 在左、正文居中、保存在右,且只有选中那行点亮', async () => {
+test('列表:每行一个复选框,勾选后批量栏出现(👤 要求:选中才出现删除/编辑)', async () => {
     const app = await loadApp();
-    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('第一题', 'A'))}, ${JSON.stringify(Q('第二题', 'A'))}] };
-        editBankName = 'T'; editIndex = 1; renderBankEditor();`);
+    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('第一题', 'A'))}, ${JSON.stringify(Q('第二题', 'A'))}, ${JSON.stringify(Q('第三题', 'A'))}] };
+        editBankName = 'T'; editIndex = 0; renderBankEditor();`);
     const rows = listRows(app);
-    assert.strictEqual(rows.length, 2, '两道题两行');
-    const [r0, r1] = rows;
-    assert.strictEqual(r0.classList.contains('selected'), false, '未选中的行不该点亮');
-    assert.strictEqual(r1.classList.contains('selected'), true, '选中的行应点亮');
-
-    // 顺序:✕ → 正文 → 保存(左删右存)
-    for (const [i, row] of [[0, r0], [1, r1]]) {
-        const kinds = (row.children || []).map(c => {
-            if (c.classList.contains('editor-list-del')) return 'del';
-            if (c.classList.contains('editor-list-item')) return 'item';
-            if (c.classList.contains('editor-row-save')) return 'save';
-            return '?';
-        });
-        assert.deepStrictEqual(kinds, ['del', 'item', 'save'], `第 ${i + 1} 行的按钮顺序应为 ✕ → 正文 → 保存`);
-    }
-    // 两颗行内按钮都带 editor-row-btn(显隐开关认它):占位但非选中行看不见
+    assert.strictEqual(rows.length, 3, '三道题三行');
     for (const row of rows) {
-        assert.strictEqual(byClass(row, 'editor-row-btn').length, 2, '每行都该有 ✕ 和保存两颗行内按钮');
+        assert.ok(rowCheck(row), '每行都要有复选框');
+        assert.strictEqual(rowCheck(row).type, 'checkbox', '必须是真正的 checkbox');
     }
-    // 正文按钮的选中态跟着行一起亮(否则整行只有背景变、字重不变)
-    assert.strictEqual(byClass(r1, 'editor-list-item')[0].classList.contains('selected'), true);
-    assert.strictEqual(byClass(r0, 'editor-list-item')[0].classList.contains('selected'), false);
-    // 选中行上的 ✕/保存 打的是这一题的标(不能串号)
-    assert.ok(byClass(r1, 'editor-list-del')[0].getAttribute('aria-label').includes('第 2 题'));
-    assert.ok(byClass(r1, 'editor-row-save')[0].getAttribute('aria-label').includes('第 2 题'));
+    // 没选中 → 批量栏隐藏
+    assert.ok(app.elements['editor-bulk-bar'].classList.contains('hidden'), '没选中时批量栏应隐藏');
+    // 勾第一行
+    assert.strictEqual(clickCheck(listRows(app)[0]), true);
+    assert.strictEqual(app.run('editorSelected.length'), 1, '勾选应记进选中集');
+    assert.ok(!app.elements['editor-bulk-bar'].classList.contains('hidden'), '选中后批量栏应出现');
+    assert.strictEqual(app.elements['editor-bulk-count'].textContent, '已选 1 题');
+    // 再勾一行 → 2 题;「编辑」此时禁用(一次只能编辑 1 道)
+    clickCheck(listRows(app)[1]);
+    assert.strictEqual(app.run('editorSelected.length'), 2);
+    assert.strictEqual(app.elements['editor-bulk-edit'].disabled, true, '多选时「编辑」应禁用');
+    assert.strictEqual(app.elements['editor-bulk-count'].textContent, '已选 2 题');
+    // 取消选择 → 批量栏收回
+    app.run('editorClearSelection()');
+    assert.strictEqual(app.run('editorSelected.length'), 0);
+    assert.ok(app.elements['editor-bulk-bar'].classList.contains('hidden'), '清空选择后批量栏应隐藏');
 });
 
-test('列表行:「保存」保存的是选中那一题,且点它不会连带切换选中', async () => {
+test('列表:行内徽章覆盖题型/待补/缺解析/AI/历史(筛选面板的视觉词典)', async () => {
     const app = await loadApp();
-    // 保存会从 DOM 收选项:桩里必须喂进去,否则答案字母被判无效、保存直接被拒
+    app.run(`questionBanks = { 'T': [
+        { content: '缺答案', type: '单选', options: { A: '甲', B: '乙' }, answer: '' },
+        { content: 'AI 补的', type: '多选', options: { A: '甲', B: '乙' }, answer: 'AB', analysis: '因为', analysisSource: 'ai' },
+        { content: '带历史', type: '判断', options: { A: '正确', B: '错误' }, answer: 'A', analysis: '解析', histMarks: [{ action: 'x', time: 't' }] }
+    ] };
+    editBankName = 'T'; editIndex = 0; renderBankEditor();`);
+    const rows = listRows(app);
+    const texts = rows.map(r => byClass(r, 'q-row-badges')[0].children.map(b => b.textContent).join('|'));
+    assert.ok(texts[0].includes('单选') && texts[0].includes('待补'), '第一行应是"单选 + 待补",实际:' + texts[0]);
+    assert.ok(texts[1].includes('多选') && texts[1].includes('✍️'), '第二行应标出 AI 补的解析,实际:' + texts[1]);
+    assert.ok(!texts[1].includes('缺解析'), '有解析的题不该标"缺解析"');
+    assert.ok(texts[2].includes('🕘'), '带历史标记的题应有 🕘,实际:' + texts[2]);
+});
+
+test('筛选:组内任一、组间同时;筛选一变就清空多选(绝不删看不见的题)', async () => {
+    const app = await loadApp();
+    app.run(`questionBanks = { 'T': [
+        { content: '待补单选', type: '单选', options: { A: '甲', B: '乙' }, answer: '' },
+        { content: '待补判断', type: '判断', options: { A: '正确', B: '错误' }, answer: '' },
+        { content: '完整单选', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A', analysis: '因为' },
+        { content: 'AI多选', type: '多选', options: { A: '甲', B: '乙' }, answer: 'AB', analysis: '因为', aiSource: 'ai' }
+    ] };
+    editBankName = 'T'; editIndex = 0; renderBankEditor();`);
+    const shown = () => listRows(app).map(r => r.dataset.idx);
+    assert.deepStrictEqual(shown(), ['0', '1', '2', '3'], '没筛时四道都在');
+    // 组内任一:待补答案 或 缺解析
+    app.run(`editorToggleFilter('status', 'pending')`);
+    assert.deepStrictEqual(shown(), ['0', '1'], '只留待补的两道');
+    assert.strictEqual(app.run('activeFilterCount()'), 1);
+    assert.strictEqual(app.run('editorPendingOnly'), true, '「只看待补」是 pending 这条筛选项的派生值');
+    app.run(`editorToggleFilter('status', 'noAnalysis')`);
+    assert.deepStrictEqual(shown(), ['0', '1'], '同组加一项 = 或,结果不变(这两道本来就缺解析)');
+    // 组间同时:再叠 AI 维度 → 必须同时满足"待补/缺解析"与"AI 整理过"
+    app.run(`editorToggleFilter('ai', 'touched')`);
+    assert.deepStrictEqual(shown(), [], '两组同时满足:没有既是待补又经 AI 整理的题');
+    app.run(`editorClearFilter()`);
+    assert.deepStrictEqual(shown(), ['0', '1', '2', '3'], '清除筛选后全部回来');
+    // 题型筛选(组内任一)
+    app.run(`editorToggleFilter('type', '判断'); editorToggleFilter('type', '多选')`);
+    assert.deepStrictEqual(shown(), ['1', '3'], '单选被排除,判断与多选都在');
+    // 多选遇筛选变化 → 清空:不能让"看不见的题"留在选中集里等着被批量删除
+    app.run('editorClearFilter(); editorSelectAllVisible()');
+    assert.strictEqual(app.run('editorSelected.length'), 4);
+    app.run(`editorToggleFilter('type', '单选')`);
+    assert.strictEqual(app.run('editorSelected.length'), 0, '筛选一变,选中集必须清空');
+    // 筛没了:空态文案要说明"是筛掉了"而不是"库里没题"
+    app.run(`editorClearFilter(); editorToggleFilter('status', 'pending'); editorToggleFilter('ai', 'touched')`);
+    assert.strictEqual(listRows(app).length, 0);
+    assert.ok(/筛选/.test(app.elements['editor-empty'].textContent), '筛没了应提示筛选,而不是"暂无题目"');
+});
+
+test('筛选:questionMatchesFilter 的纯函数口径(空组不约束)', async () => {
+    const app = await loadApp();
+    const q = JSON.stringify({ content: 'x', type: '单选', options: { A: 'a', B: 'b' }, answer: '' });
+    assert.strictEqual(app.run(`questionMatchesFilter(${q}, {})`), true, '空筛选 = 全通过');
+    assert.strictEqual(app.run(`questionMatchesFilter(${q}, { type: ['单选'] })`), true);
+    assert.strictEqual(app.run(`questionMatchesFilter(${q}, { type: ['判断'] })`), false);
+    assert.strictEqual(app.run(`questionMatchesFilter(${q}, { status: ['pending'] })`), true);
+    assert.strictEqual(app.run(`questionMatchesFilter(${q}, { status: ['noExplanation'] })`), true, '缺解释 → 命中');
+    assert.strictEqual(app.run(`questionMatchesFilter(${q}, { status: ['fewOptions'] })`), false, '选项够 2 个 → 不命中');
+    assert.strictEqual(app.run(`questionMatchesFilter(${q}, { ai: ['touched'] })`), false);
+});
+
+test('批量删除:二次确认;删 ≥2 道先存一版,单删不占版本槽', async () => {
+    const app = await loadApp({ confirmResult: true });
+    app.run(`bankVersions = {};
+        questionBanks = { 'T': [${JSON.stringify(Q('甲', 'A'))}, ${JSON.stringify(Q('乙', 'A'))}, ${JSON.stringify(Q('丙', 'A'))}] };
+        editBankName = 'T'; editIndex = 0; renderBankEditor();`);
+    // 单删:不留版本(每库只有 3 个槽,删一道也存一版会把槽挤爆)
+    app.run('editorSelected.push(currentEditBank()[0]); editorBulkDelete()');
+    assert.strictEqual(app.run(`questionBanks['T'].length`), 2);
+    assert.strictEqual(app.run(`(loadBankVersions()['T'] || []).length`), 0, '单删不该留版本');
+    assert.strictEqual(app.run('editorSelected.length'), 0, '删完要清空选中集');
+    // 批量删 2 道:先存一版(可回退)
+    app.run('editorSelectAllVisible(); editorBulkDelete()');
+    assert.strictEqual(app.run(`questionBanks['T'].length`), 0);
+    const vers = JSON.parse(app.run(`JSON.stringify((loadBankVersions()['T'] || []).map(v => v.action))`));
+    assert.deepStrictEqual(vers, ['批量删除前'], '批量删除前应自动存一版');
+    assert.strictEqual(app.run(`(loadBankVersions()['T'][0].questions || []).length`), 2, '存的是删除前的 2 道');
+});
+
+test('批量删除:取消确认则一道不删', async () => {
+    const app = await loadApp({ confirmResult: false });
+    app.run(`bankVersions = {}; questionBanks = { 'T': [${JSON.stringify(Q('甲', 'A'))}, ${JSON.stringify(Q('乙', 'A'))}] };
+        editBankName = 'T'; editIndex = 0; renderBankEditor();
+        editorSelected.push(currentEditBank()[0])`);
+    assert.strictEqual(app.run('editorBulkDelete()'), false);
+    assert.strictEqual(app.run(`questionBanks['T'].length`), 2, '点了取消就不许动数据');
+});
+
+test('批量编辑:只对"恰好选中 1 道"生效;点了就开编辑卡片并把字段填好', async () => {
+    const app = await loadApp();
+    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('第一题', 'A'))}, ${JSON.stringify(Q('第二题', 'B'))}] };
+        editBankName = 'T'; editIndex = 0; renderBankEditor();
+        editorSelected.push(currentEditBank()[0], currentEditBank()[1])`);
+    assert.strictEqual(app.run('editorBulkEdit()'), false, '多选时不该编辑');
+    assert.ok(app.alerts.some(a => /一次只能编辑 1 道/.test(a)), '要给一句人话说明为什么不行');
+    app.run('editorSelected.length = 0; editorSelected.push(currentEditBank()[1])');
+    assert.strictEqual(app.run('editorBulkEdit()'), true);
+    assert.strictEqual(app.run('editIndex'), 1, '卡片应停在选中的那道题上');
+    assert.strictEqual(app.elements['editor-stem'].value, '第二题', '卡片字段应已填入这道的题干');
+    assert.strictEqual(app.elements['editor-answer'].value, 'B');
+    assert.strictEqual(app.elements['question-card-title'].textContent, '第 2 / 2 题');
+});
+
+test('编辑卡片:保存落到正确的那道题;有未保存修改时关闭要先问一句', async () => {
+    const app = await loadApp({ confirmResult: true });
+    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('第一题', 'A'))}, ${JSON.stringify(Q('第二题', 'A'))}] };
+        editBankName = 'T'; editIndex = 0; renderBankEditor();`);
     app.elements['editor-options']._setQueryAll([
         { dataset: { letter: 'A' }, value: '甲', disabled: false },
         { dataset: { letter: 'B' }, value: '乙', disabled: false },
     ]);
-    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('第一题', 'A'))}, ${JSON.stringify(Q('第二题', 'A'))}] };
-        editBankName = 'T'; editIndex = 1; renderBankEditor();
-        editorStem.value = '第二题(改过)'; editorType.value = '单选'; editorAnswer.value = 'B';`);
-    const rows = listRows(app);
-    const save = byClass(rows[1], 'editor-row-save')[0];
-    assert.strictEqual(typeof save._listeners.click, 'function', '行内「保存」必须绑了 click');
-    save._listeners.click({ stopPropagation() {} });
-    assert.strictEqual(app.run(`questionBanks['T'][1].content`), '第二题(改过)', '保存应落到选中的第 2 题');
-    assert.strictEqual(app.run(`questionBanks['T'][1].answer`), 'B');
-    assert.strictEqual(app.run(`questionBanks['T'][0].content`), '第一题', '第 1 题不该被顺手改掉');
-    assert.strictEqual(app.run('editIndex'), 1, '保存不该改变当前选中项');
+    app.run(`openQuestionCard(1)`);
+    assert.strictEqual(app.run('editIndex'), 1);
+    app.run(`editorStem.value = '第二题(卡片里改的)'; editorType.value = '单选'; editorAnswer.value = 'A';`);
+    assert.strictEqual(app.run('saveQuestionCard()'), true);
+    assert.strictEqual(app.run(`questionBanks['T'][1].content`), '第二题(卡片里改的)');
+    assert.strictEqual(app.run(`questionBanks['T'][0].content`), '第一题', '别的题不该被动');
+    // 未保存就关:守卫要拦一下(confirmResult=true → 放弃并关闭)
+    app.run(`openQuestionCard(0); editorStem.value = '改了不保存'`);
+    assert.strictEqual(app.run('closeQuestionCard()'), true);
+    assert.strictEqual(app.run(`questionBanks['T'][0].content`), '第一题', '没保存的内容不该落库');
 });
 
-test('列表行:「✕」删的是它自己那一题(不删别的行)', async () => {
-    const app = await loadApp({ confirmResult: true });
-    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('第一题', 'A'))}, ${JSON.stringify(Q('第二题', 'A'))}, ${JSON.stringify(Q('第三题', 'A'))}] };
-        editBankName = 'T'; editIndex = 0; renderBankEditor();`);
-    const rows = listRows(app);
-    byClass(rows[2], 'editor-list-del')[0]._listeners.click({ stopPropagation() {} });
-    assert.strictEqual(app.run(`questionBanks['T'].length`), 2);
-    assert.deepStrictEqual(
-        JSON.parse(app.run(`JSON.stringify(questionBanks['T'].map(q => q.content))`)),
-        ['第一题', '第二题'], '删掉的应是第 3 题');
-});
-
-test('列表行:「只看待补」筛选后,选中态按题目下标对号(不能错行)', async () => {
+test('编辑卡片:上一题/下一题只在"看得见的题"之间走,到边界原地不动', async () => {
     const app = await loadApp();
-    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('待补题', ''))}, ${JSON.stringify(Q('已答一', 'A'))}, ${JSON.stringify(Q('已答二', 'A'))}] };
-        editBankName = 'T'; editIndex = 0; editorPendingOnly = true; renderBankEditor();`);
-    const rows = listRows(app);
-    assert.strictEqual(rows.length, 1, '只看待补时只剩 1 行');
-    assert.strictEqual(rows[0].dataset.idx, '0', '这行承载的是原题库里的第 1 题');
-    assert.strictEqual(rows[0].classList.contains('selected'), true, '选中的就是它,该亮');
-    // 旧实现按 children 下标高亮:选中的题被筛掉时会去点亮"第 N 行"这个不相干的行。钉死正确语义。
-    app.run('editIndex = 1; renderBankEditor();');
-    assert.strictEqual(listRows(app)[0].classList.contains('selected'), false,
-        '选中的是被筛掉的那道题时,可见行不该被误点亮');
+    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('甲', 'A'))}, ${JSON.stringify(Q('乙', ''))}, ${JSON.stringify(Q('丙', 'A'))}] };
+        editBankName = 'T'; editIndex = 0; renderBankEditor();`);
+    app.run(`openQuestionCard(0)`);
+    assert.strictEqual(app.run('editorCardNavigate(1)'), true);
+    assert.strictEqual(app.run('editIndex'), 1);
+    assert.strictEqual(app.elements['editor-stem'].value, '乙', '卡片字段要跟着换');
+    assert.strictEqual(app.run('editorCardNavigate(-1)'), true);
+    assert.strictEqual(app.run('editIndex'), 0);
+    assert.strictEqual(app.run('editorCardNavigate(-1)'), false, '第一题再往前 → 不动');
+    assert.strictEqual(app.run('editIndex'), 0);
+    // 筛成"只看待补"后,下一题只在待补题之间走
+    app.run(`editorTogglePendingOnly(true)`);
+    assert.strictEqual(app.run('editIndex'), 1, '筛选后当前题收窄到第一道待补');
+    assert.strictEqual(app.run('editorCardNavigate(1)'), false, '后面没有待补了 → 不动');
 });
 
+test('列表:筛后「全选」只选看得见的;新增题目会清掉筛选(否则新题看不见)', async () => {
+    const app = await loadApp();
+    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('待补一', ''))}, ${JSON.stringify(Q('已答', 'A'))}, ${JSON.stringify(Q('待补二', ''))}] };
+        editBankName = 'T'; editIndex = 0; renderBankEditor();`);
+    app.run(`editorToggleFilter('status', 'pending'); editorSelectAllVisible()`);
+    assert.strictEqual(app.run('editorSelected.length'), 2, '全选 = 选当前筛选下看得见的两道');
+    assert.deepStrictEqual(JSON.parse(app.run(`JSON.stringify(editorSelected.map(q => q.content))`)), ['待补一', '待补二']);
+    // 新增题目:清筛选(否则新题不满足条件,列表里根本看不见)
+    app.run('editorClearSelection(); editorAddQuestion()');
+    assert.strictEqual(app.run('activeFilterCount()'), 0, '新增后筛选应被清掉');
+    assert.strictEqual(listRows(app).length, 4, '新题应出现在列表里');
+    assert.strictEqual(app.run('editIndex'), 3, '并直接打开它的编辑卡片');
+});
 
 test('重命名:编辑器正开着这一库时,标题/状态/列表立刻改成新名(bug 2026-09-12)', async () => {
     const app = await loadApp();
@@ -358,7 +487,7 @@ test('重命名:编辑器正开着这一库时,标题/状态/列表立刻改成�
     // 桩的 innerHTML='' 不会清 children,故只断言**最后一次重画**出来的那两行
     const redrawn = listRows(app).slice(-2);
     assert.strictEqual(redrawn.length, 2, '列表应已按新库重画');
-    assert.strictEqual(redrawn[1].classList.contains('selected'), true, '重画后仍停在原来那一题');
+    assert.strictEqual(redrawn[1].classList.contains('current'), true, '重画后仍停在原来那一题');
     assert.strictEqual(app.run(`questionBanks['新库名'].length`), 2);
     assert.ok(app.run(`!questionBanks['旧库名']`), '旧库名不该还在');
     // 改名后继续编辑/保存,必须落到新库名上

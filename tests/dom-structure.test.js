@@ -494,25 +494,25 @@ test('题库卡不得再出现左侧主色装饰条(👤 2026-09-11 改成配色
 
 // ==================== 题库编辑器重构(👤 2026-09-11:手机优先)====================
 test('编辑器:题目级操作与题库级操作彻底分开', () => {
-    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
-    // 底栏已取消(👤 要求),保存键改到题目列表**上面**的动作行里
+    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('id="question-card-modal"'));
     assert.ok(!modal.includes('editor-foot'), '底栏应已取消');
-    const actionRow = modal.slice(modal.indexOf('editor-action-row'), modal.indexOf('editor-list-block'));
-    // 「保存本题」已搬进列表里选中的那一行(👤 要求):动作行里不该再有它
-    assert.ok(!actionRow.includes('editor-save-btn'), '「保存本题」不应再留在动作行');
-    assert.ok(actionRow.includes('editor-pending-only'), '「只看待补答案」也在这行');
-    // 去重从「题库设置」搬到了题目列表上方(👤 要求:它作用于整库,但要在改题时随手可用)
-    assert.ok(actionRow.includes('editor-dedup-btn'), '「去重」应在题目列表上方的动作行里');
+    const toolbar = modal.slice(modal.indexOf('editor-toolbar'), modal.indexOf('editor-list-block'));
+    assert.ok(toolbar.includes('editor-filter-toggle'), '「筛选」应在列表上方的工具行里');
+    // 去重从「题库设置」搬到了列表上方(👤 要求:它作用于整库,但要在改题时随手可用)
+    assert.ok(toolbar.includes('editor-dedup-btn'), '「去重」应在工具行里');
+    assert.ok(toolbar.includes('editor-list-count'), '计数也在这行(筛过之后要看得到"筛出几道/共几道")');
     assert.ok(!modal.includes('bank-dedup-btn'), '「去重」不应再留在题库设置里');
-    // 新增题目不再是动作行的按钮,而是**题号列表末尾的加号**(👤 要求)
-    assert.ok(!actionRow.includes('editor-add-btn'), '「新增题目」按钮应已从动作行移除');
+    // 新增题目不是工具行按钮,而是**列表末尾的加号**(👤 要求)
+    assert.ok(!toolbar.includes('editor-add-btn'), '「新增题目」按钮应已从工具行移除');
     const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
     assert.ok(/editor-list-add/.test(bank), '列表末尾应渲染一个加号按钮');
     assert.ok(/editorQuestionList.appendChild\(addRow\)/.test(bank), '加号必须追加在列表最后');
-    // 删除某一题:只在题号列表里(每行一个 ✕),不再有「删除本题」按钮
-    assert.ok(!modal.includes('editor-delete-btn'), '「删除本题」按钮应已移除(改用列表内删除)');
-    assert.ok(/editor-list-del/.test(bank), '题号列表每行应有删除键');
-    assert.ok(/deleteQuestionAt/.test(bank), '应有按下标删题的函数');
+    // 删除/编辑**只在选中之后**出现(👤 要求):它们不该常驻工具行
+    for (const id of ['editor-bulk-edit', 'editor-bulk-delete', 'editor-bulk-all', 'editor-bulk-clear']) {
+        assert.ok(!toolbar.includes(id), `${id} 不该常驻工具行(选中后才出现在批量栏)`);
+        assert.ok(modal.includes(id), `${id} 应在批量栏里`);
+    }
+    assert.ok(!modal.includes('editor-delete-btn'), '「删除本题」按钮应已移除(改用批量删除)');
     // 题库级动作仍在独立的「题库设置」标签页里,不与单题编辑混排
     const bankPanelStart = modal.indexOf('editor-bank-panel');
     const bankPanel = modal.slice(bankPanelStart, modal.indexOf('</section>', bankPanelStart));
@@ -523,13 +523,12 @@ test('编辑器:题目级操作与题库级操作彻底分开', () => {
     const qPanel = modal.slice(qPanelStart, modal.indexOf('editor-bank-panel'));
     assert.ok(!qPanel.includes('bank-delete-btn'), '「删除题库」不得出现在题目编辑页(防误点)');
     // 👤 要求删掉「当前题库:xxx」那行:库名在编辑器标题栏已经写着,同一屏再挂一遍是噪音
-    // (它原来还是"改名后不刷新"的现场 —— 保留它就等于把旧名字留在屏幕上)
     assert.ok(!html.includes('editor-bank-name-current'), '「当前题库:xxx」那行应已从 HTML 删除');
     assert.ok(!bankPanel.includes('当前题库'), '题库设置页不该再有「当前题库」字样');
 });
 
 test('题库设置:按作用对象分块,「删除题库」独占最底部的危险区(👤 2026-09-12 重新规划)', () => {
-    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
+    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('id="question-card-modal"'));
     const panelStart = modal.indexOf('editor-bank-panel');
     const panel = modal.slice(panelStart, modal.indexOf('</section>', panelStart));
     // ① 结构 = 若干块,每块 = 小标题 + 该块自己的控件;标题连顺序就是这份信息架构。
@@ -603,13 +602,17 @@ test('题库设置:按作用对象分块,「删除题库」独占最底部的危
         '手机档下拉应 44px 且字号 ≥16px(防 iOS 聚焦缩放)');
 });
 
-test('编辑器:题目页的顺序 = 动作行 → 题号列表 → 题目表单(👤 定调)', () => {
-    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
-    const order = ['editor-action-row', 'editor-list-block', 'id="editor-form"']
+test('编辑器:题目页的顺序 = 工具行 → 筛选面板 → 列表 → 批量栏(👤 2026-09-12 重构)', () => {
+    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('id="question-card-modal"'));
+    const order = ['editor-toolbar', 'editor-filter-panel', 'editor-list-block', 'editor-bulk-bar', 'editor-empty']
         .map(k => modal.indexOf(k));
-    assert.ok(order.every(i => i > -1), '三个区块都要存在');
+    assert.ok(order.every(i => i > -1), '五个区块都要存在:' + JSON.stringify(order));
     assert.deepStrictEqual([...order].sort((a, b) => a - b), order,
-        '顺序必须是:动作行 → 题号列表 → 题目表单');
+        '顺序必须是:工具行 → 筛选面板 → 列表 → 批量栏 → 空态');
+    // 题目表单**不在**题目页里了:整块搬进编辑卡片(列表只负责选,编辑只发生在卡片里)
+    assert.ok(!modal.includes('id="editor-form"'), '表单不该还留在题库编辑器里');
+    assert.ok(modal.indexOf('editor-bulk-bar') > modal.indexOf('editor-list-block'),
+        '批量栏跟在列表后面 —— 选完就近操作,不用回头找按钮');
     // 题号导航行与底栏都已取消(👤 要求):列表本身就是导航
     assert.ok(!modal.includes('editor-nav-row'), '「上一题/下一题」导航行应已取消');
     assert.ok(!modal.includes('editor-foot'), '底栏应已取消');
@@ -644,44 +647,60 @@ test('编辑器:两个标签页的显隐由 CSS 的 data-tab 控制', () => {
     assert.ok(!/padding\s*:\s*12px 16px/.test(head), '头部不该还留 12px 的上下内边距');
 });
 
-test('编辑器:列表行里的删除/保存只对选中那行现身(👤 要求)', () => {
+test('编辑器:列表 = 复选框 + 序号 + 题干 + 徽章;动作只在选中后出现(👤 2026-09-12)', () => {
     const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
-    assert.ok(/editor-list-del/.test(bank), '列表行应有删除键');
-    assert.ok(/export function deleteQuestionAt/.test(bank), '应有按下标删题的函数');
-    assert.ok(/questionBanks|splice/.test(bank));
-    // 删除必须带确认(列表里的小 ✕ 太容易误点)
-    const fn = bank.slice(bank.indexOf('export function deleteQuestionAt'));
-    assert.ok(/confirm\(/.test(fn.slice(0, 400)), '列表内删除必须二次确认');
-    // 「保存」现在长在列表行里(行右侧),不再有全局的 #editor-save-btn
-    assert.ok(/editor-row-save/.test(bank), '列表行右端应渲染「保存」');
-    assert.ok(/editorSaveCurrent\(false\)/.test(bank), '行内「保存」应走与原来同一套保存逻辑');
-    assert.ok(!html.includes('editor-save-btn'), '动作行里的「保存本题」应已移除');
-    assert.ok(!/\beditor-save-btn\b/.test(readFileSync(path.join(root, 'src', 'main.js'), 'utf8')),
-        'main.js 不该再绑一个已不存在的保存键');
-    // 显隐由 CSS 表达:非选中行的两颗按钮只是 visibility:hidden(**占位**),
-    // 行宽恒定 —— 换题时文字不重排,按钮也不会在手指底下挪窝。
-    assert.ok(/\.editor-row-btn\s*\{\s*visibility\s*:\s*hidden/.test(cssNoComments),
-        '非选中行的行内按钮应 visibility:hidden(占位但不显)');
-    assert.ok(/\.editor-list-row\.selected\s+\.editor-row-btn\s*\{\s*visibility\s*:\s*visible/.test(cssNoComments),
-        '选中行的行内按钮应显形');
-    // ✕ 在左、保存在右:删除是"丢掉"、保存是"留下",分居两端最不容易点错
-    const rowCss = cssNoComments.match(/\.editor-list-row\s*\{([^}]*)\}/)[1];
-    assert.ok(/display\s*:\s*flex/.test(rowCss), '行布局应为 flex');
-    // 手机上删除键也要够大
+    // ① 每行一个**真正的** checkbox(👤 要求:要有复选框)
+    assert.ok(/box\.type = 'checkbox'/.test(bank), '列表行应有 checkbox 输入');
+    assert.ok(/q-row-check/.test(bank), '复选框要有自己的类(手机档要放大它)');
+    // ② 点整行即勾选:行元素是 <label> 包住复选框(不用去戳 13px 的小方块)
+    assert.ok(/createElement\('label'\)/.test(bank), '行应为 label,点整行即勾选');
+    assert.ok(!/row\.addEventListener\('click'/.test(bank), '别再挂 click —— label 的原生行为已会转成 change(双触发会勾一下又取消)');
+    // ③ 徽章:题型 / 待补 / 缺解析 / AI / 历史(它同时是筛选面板的视觉词典)
+    assert.ok(/function rowBadges/.test(bank), '应有行内徽章渲染');
+    for (const k of ['q-row-badges', 'q-badge']) assert.ok(bank.includes(k), `缺 ${k} 样式类`);
+    // ④ 批量栏:选中才出现;删除有二次确认;删 ≥2 道先存一版
+    assert.ok(/editorBulkBar\.classList\.toggle\('hidden', selCount === 0\)/.test(bank),
+        '批量栏应"选中才出现"');
+    const bulkDel = bank.slice(bank.indexOf('export function editorBulkDelete'));
+    assert.ok(/confirm\(/.test(bulkDel.slice(0, 600)), '批量删除必须二次确认');
+    assert.ok(/pushBankVersion\(state\.editBankName, '批量删除前'/.test(bulkDel.slice(0, 900)),
+        '删 ≥2 道要先存一版(可回退)');
+    assert.ok(/targets\.length >= 2/.test(bulkDel.slice(0, 900)), '单删不占版本槽(每库只有 3 个)');
+    // ⑤ 编辑只对"恰好 1 道"有效
+    const bulkEdit = bank.slice(bank.indexOf('export function editorBulkEdit'));
+    assert.ok(/sel\.length !== 1/.test(bulkEdit.slice(0, 400)), '编辑只对"恰好选中 1 道"生效');
+    // ⑥ 桩里也得有的方法:checkbox 的 change 由测试直接驱动
+    assert.ok(/editorBulkEditBtn\.disabled = selCount !== 1/.test(bank), '多选时「编辑」按钮应禁用(状态即规则)');
+    // ⑦ 手机档:复选框与批量按钮都要够得着
     const media = cssNoComments.slice(cssNoComments.indexOf('max-width: 768px'));
-    assert.ok(/\.editor-list-del/.test(media), '手机档应给列表删除键放大触达');
-    assert.ok(/\.editor-row-save/.test(media), '手机档应给行内「保存」放大触达');
+    assert.ok(/\.q-row-check/.test(media), '手机档应放大行内复选框');
+    assert.ok(/\.bulk-btn/.test(media), '手机档应放大批量栏按钮');
+    assert.ok(/\.card-foot \.action-btn/.test(media), '手机档应放大编辑卡片底部的保存/取消');
+    assert.ok(!/\.editor-list-del/.test(bank), '旧的行内 ✕ 删除应已删除(它已并入批量删除)');
 });
 
-test('编辑器:题干/题型/选项/解释解析合成一个部分,且没有折叠', () => {
-    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
-    const form = modal.slice(modal.indexOf('id="editor-form"'), modal.indexOf('editor-empty'));
+test('编辑器:六个字段整块搬进编辑卡片(题干/题型/答案/选项/解释/解析)', () => {
+    const cardStart = html.indexOf('id="question-card-modal"');
+    assert.ok(cardStart > -1, '应有编辑卡片 #question-card-modal');
+    const card = html.slice(cardStart, html.indexOf('<!-- 答题卡抽屉'));
+    const form = card.slice(card.indexOf('id="editor-form"'), card.indexOf('class="card-foot"'));
     for (const id of ['editor-stem', 'editor-type', 'editor-answer', 'editor-options', 'editor-explanation', 'editor-analysis']) {
-        assert.ok(form.includes(id), `${id} 应在同一个表单区块里`);
+        assert.ok(form.includes(id), `${id} 应在编辑卡片里`);
     }
     // 全部展开:表单里不得再有任何 details/summary 折叠
     assert.ok(!/<details/.test(form), '表单里不得再有折叠(details)');
-    assert.ok(!modal.includes('editor-more'), '「题目解释/解析」的折叠壳应已移除');
+    assert.ok(!card.includes('editor-more'), '「题目解释/解析」的折叠壳应已移除');
+    // 卡片自己的三段:头部(题号 + 上/下一题 + ✕)/ 主体 / 底部(取消 + 保存)
+    const head = card.slice(card.indexOf('class="card-head"'), card.indexOf('class="card-body"'));
+    for (const id of ['question-card-prev', 'question-card-next', 'question-card-title', 'question-card-close']) {
+        assert.ok(head.includes(id), `卡片头部应有 ${id}`);
+    }
+    const foot = card.slice(card.indexOf('class="card-foot"'));
+    assert.ok(foot.includes('editor-save-btn') && foot.includes('question-card-cancel'), '底部应有保存与取消');
+    // 卡片是**二级弹窗**:它从题库编辑器里打开,必须压在编辑器之上(DESIGN §3.8 的 1100 层)
+    assert.ok(/question-card-modal/.test(html) && /question-card/.test(cssNoComments), '卡片要有自己的样式');
+    const cardZ = cssNoComments.match(/#question-card-modal\s*\{[^}]*z-index\s*:\s*(\d+)/);
+    assert.ok(cardZ && Number(cardZ[1]) >= 1100, '编辑卡片应为二级弹窗(z-index ≥ 1100)');
 });
 
 test('编辑器:滚动只发生在主体,头部与底部不被滚走', () => {
@@ -718,15 +737,14 @@ test('编辑器:手机上可点元素达标(≥44px 触达)', () => {
     assert.ok(/#edit-bank-modal \.inline-label/.test(block), '复选框应让 label 整行可点');
 });
 
-test('编辑器表单:文案在输入框左边,且判断题为 A/B 口径(👤 定调)', () => {
-    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
-    const form = modal.slice(modal.indexOf('id="editor-form"'), modal.indexOf('editor-empty'));
+test('编辑卡片表单:文案在输入框左边,且判断题为 A/B 口径(👤 定调)', () => {
+    const card = html.slice(html.indexOf('id="question-card-modal"'), html.indexOf('<!-- 答题卡抽屉'));
+    const form = card.slice(card.indexOf('id="editor-form"'), card.indexOf('class="card-foot"'));
     // ① 每个字段 = 「左文案 + 右字段容器」
-    const fields = [...form.matchAll(/<div class="form-group editor-field[^"]*">([\s\S]*?)(?=<div class="form-group editor-field|<\/div>\s*<p id="editor-empty")/g)];
-    assert.ok(fields.length >= 4, `应至少有 4 个字段组,实际 ${fields.length}`);
-    for (const f of fields) {
-        assert.ok(/editor-field-body/.test(f[1]), '每个字段都要有右字段容器 editor-field-body');
-    }
+    const groups = form.match(/<div class="form-group editor-field/g) || [];
+    assert.ok(groups.length >= 4, `应至少有 4 个字段组,实际 ${groups.length}`);
+    const bodies = form.match(/editor-field-body/g) || [];
+    assert.ok(bodies.length >= groups.length, '每个字段都要有右字段容器 editor-field-body');
     // ② 布局靠 CSS 的 flex 实现(标签定宽 → 文案在左)
     const fieldCss = cssNoComments.match(/\.editor-field\s*\{([^}]*)\}/)[1];
     assert.ok(/display\s*:\s*flex/.test(fieldCss), '字段应为 flex(左文案 + 右字段)');
@@ -815,7 +833,7 @@ test('题库页头部:标题 + 一行三键(导出题库 / ＋ 创建题库 / �
     assert.ok(/\.banks-header-actions \{ gap: 5px/.test(media), '手机档键间距应收到 5px');
     assert.ok(/\.banks-header h3 \{ font-size: 15px/.test(media), '手机档标题应收到 15px');
     // ⑥ 导出题库**离开**了题库设置
-    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
+    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('id="question-card-modal"'));
     assert.ok(!modal.includes('export-all-btn'), '题库设置里不该还有它');
 });
 
