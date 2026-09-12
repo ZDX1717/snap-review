@@ -1696,20 +1696,15 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
     user-select: none;          /* 扫读时别把文字拖成一片蓝 */
 }
 .q-row:hover { background: var(--c-info-bg); }
-/* 待修改:橙色左条(与徽章里的 ⏳/⚠ 同一套语义) */
-.q-row.needs-fix {
-    background: var(--c-warn-bg-soft);
-    box-shadow: inset 3px 0 0 var(--c-warn-icon);
-}
+/* 待修改 / AI 整理过的题:只用**底色 + 徽章**表达,不加左侧色条
+   (👤 2026-09-12:"题目条左边的蓝条…很丑" —— 列表里一排竖条像栅栏,状态交给徽章说) */
+/* 待修改(缺答案 / 选项不足):淡黄底 + 警示色文字。**.q-row.ai-gen 已删** —— 它只负责一根紫色左条,
+   现在 AI 标记由 🤖 徽章表达(不留死 CSS)。 */
+.q-row.needs-fix { background: var(--c-warn-bg-soft); }
 .q-row.needs-fix .q-row-text { color: var(--c-warn-text-strong); }
-/* AI 整理过的题:紫色左条(与全站 🤖 标记同色系) */
-.q-row.ai-gen { box-shadow: inset 3px 0 0 var(--c-accent-purple); }
-.q-row.ai-gen.needs-fix { box-shadow: inset 3px 0 0 var(--c-accent-purple-overlap); }
-/* 正在编辑卡片里打开的那一道:左侧色条 + 淡底(不只靠颜色:还有加粗) */
-.q-row.current {
-    background: var(--c-selected-bg-strong);
-    box-shadow: inset 3px 0 0 var(--c-primary);
-}
+/* 当前题(单击高亮):淡底 + 加粗,**没有左侧色条**(👤 说那根蓝条很丑)。
+   双击才会翻开编辑卡片 —— 高亮本身只是"我正看着这一道"。 */
+.q-row.current { background: var(--c-selected-bg-strong); }
 .q-row.current .q-row-text { font-weight: 600; color: var(--c-selected-text); }
 /* 已勾选:整行淡蓝底,一眼看出"这几道要被处理" */
 .q-row.picked { background: var(--c-info-bg); }
@@ -3423,7 +3418,9 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
    它是**二级弹窗**(1100 > 编辑器 1000,见 §3.8):从题库编辑器里打开,必须压在编辑器之上。
    三段式:头部(题号 + 上/下一题 + ✕)/ 可滚动主体(六个字段)/ 底部固定(取消 + 保存)。 */
 #question-card-modal { z-index: 1100; }
-.question-card {
+/* ⚠️ 容器类名是 .edit-card,**不能**叫 .question-card:那个名字属于错题/收藏卡,
+   它自带 4px 红色左边条 —— 借用它就会让编辑卡片左边凭空长出一道红条(👤 反馈"很丑",已改) */
+.edit-card {
     display: flex;
     flex-direction: column;
     width: 94%;

@@ -680,10 +680,19 @@ test('编辑器:列表 = 复选框 + 序号 + 题干 + 徽章;动作只在选中
     assert.ok(/pushBankVersion\(state\.editBankName, '批量删除前'/.test(bulkDel.slice(0, 900)),
         '删 ≥2 道要先存一版(可回退)');
     assert.ok(/targets\.length >= 2/.test(bulkDel.slice(0, 900)), '单删不占版本槽(每库只有 3 个)');
-    // ⑤ 点题目 = 选中该题并翻开编辑卡片;复选框只负责圈选(两条通道各管一件事)
-    assert.ok(/row\.addEventListener\('click'/.test(rowRegion), '行要能点(点题目即选中该题)');
-    assert.ok(/openQuestionCard\(idx\)/.test(rowRegion), '点题目应直接打开它的编辑卡片');
-    assert.ok(/contains\('q-row-check'\)\) return/.test(rowRegion), '点复选框不算"点题目"(否则勾选会顺手掀开卡片)');
+    // ⑤ 单击 = 高亮(只换高亮,不重画!);双击 = 选中并翻开编辑卡片
+    assert.ok(/row\.addEventListener\('click'/.test(rowRegion), '行要能单击');
+    assert.ok(/row\.addEventListener\('dblclick'/.test(rowRegion), '行要能双击');
+    const clickAt = rowRegion.indexOf("row.addEventListener('click'");
+    const dblAt = rowRegion.indexOf("row.addEventListener('dblclick'");
+    const clickBody = rowRegion.slice(clickAt, dblAt);
+    assert.ok(/highlightCurrentRow\(\)/.test(clickBody), '单击应只换高亮');
+    assert.ok(!/openQuestionCard/.test(clickBody), '单击**不该**开卡片(那是双击的事)');
+    assert.ok(/openQuestionCard\(idx\)/.test(rowRegion.slice(dblAt)), '双击才翻开编辑卡片');
+    // ⚠️ 单击里严禁重画列表:节点被换掉,第二下就落到新节点上,dblclick 永远不触发(实测踩过)
+    assert.ok(!/renderBankEditor\(\)/.test(clickBody), '单击不许重画列表(否则双击失效)');
+    assert.ok(/isRowCheckboxEvent\(e\)/.test(clickBody) && /isRowCheckboxEvent\(e\)/.test(rowRegion.slice(dblAt)),
+        '点复选框不算"点题目"(否则勾选会顺手换高亮/掀卡片)');
     // ⑥ 「只看勾选」= 复选框喂给筛选器的范围条件
     assert.ok(/FILTER_GROUPS = \['type', 'status', 'ai', 'marks', 'scope'\]/.test(bank), '筛选分组应含 scope');
     assert.ok(/focusChecked/.test(bank) && /isSelected\(q\)/.test(bank), 'visibleQuestions 应按"是否勾选"再收一遍');
@@ -715,7 +724,9 @@ test('编辑器:六个字段整块搬进编辑卡片(题干/题型/答案/选项
     const foot = card.slice(card.indexOf('class="card-foot"'));
     assert.ok(foot.includes('editor-save-btn') && foot.includes('question-card-cancel'), '底部应有保存与取消');
     // 卡片是**二级弹窗**:它从题库编辑器里打开,必须压在编辑器之上(DESIGN §3.8 的 1100 层)
-    assert.ok(/question-card-modal/.test(html) && /question-card/.test(cssNoComments), '卡片要有自己的样式');
+    assert.ok(/question-card-modal/.test(html) && /\n\.edit-card\s*\{/.test(cssNoComments), '卡片要有自己的样式');
+    // ⚠️ 容器类名不能叫 .question-card —— 那是错题/收藏卡的类,自带 4px 红条,借来就会在卡片左边长出一道红条
+    assert.ok(!/modal-content question-card/.test(html), '编辑卡片容器不得借用 .question-card 这个类名');
     const cardZ = cssNoComments.match(/#question-card-modal\s*\{[^}]*z-index\s*:\s*(\d+)/);
     assert.ok(cardZ && Number(cardZ[1]) >= 1100, '编辑卡片应为二级弹窗(z-index ≥ 1100)');
 });

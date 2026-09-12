@@ -318,6 +318,10 @@ test('列表:行内徽章覆盖题型/待补/缺解析/AI/历史(筛选面板的
     assert.ok(texts[1].includes('多选') && texts[1].includes('✍️'), '第二行应标出 AI 补的解析,实际:' + texts[1]);
     assert.ok(!texts[1].includes('缺解析'), '有解析的题不该标"缺解析"');
     assert.ok(texts[2].includes('🕘'), '带历史标记的题应有 🕘,实际:' + texts[2]);
+    // 待修改用**底色**表达(不是左侧色条 —— 👤 说那根条很丑),当前题也是底色
+    assert.ok(rows[0].classList.contains('needs-fix'), '缺答案的题应带 needs-fix(淡黄底)');
+    assert.ok(!rows[1].classList.contains('needs-fix'), '完整的题不该带 needs-fix');
+    assert.ok(rows[0].classList.contains('current'), '第一行是当前题 → 带 current(淡主色底)');
 });
 
 test('筛选:组内任一、组间同时;筛选一变就清空多选(绝不删看不见的题)', async () => {
@@ -526,15 +530,22 @@ test('列表:点题目 = 选中并翻开编辑卡片;点复选框 = 圈选(两�
     const app = await loadApp();
     app.run(`questionBanks = { 'T': [${JSON.stringify(Q('第一题', 'A'))}, ${JSON.stringify(Q('第二题', 'A'))}] };
         editBankName = 'T'; editIndex = 0; renderBankEditor();`);
-    // ① 点题目(题干)→ 设为当前题 + 打开编辑卡片
+    // ① 单击题干 → 只高亮(设为当前题),不开卡片、不重画列表
     const card = app.elements['question-card-modal'];
     const row = listRows(app)[1];
-    assert.strictEqual(typeof row._listeners.click, 'function', '行必须绑 click(点题目即选中该题)');
-    row._listeners.click({ target: { classList: { contains: () => false } } });
-    assert.strictEqual(app.run('editIndex'), 1, '点题目应把这道题设为当前题');
+    const plain = { target: { classList: { contains: () => false } } };
+    assert.strictEqual(typeof row._listeners.click, 'function', '行必须绑 click');
+    assert.strictEqual(typeof row._listeners.dblclick, 'function', '行必须绑 dblclick');
+    row._listeners.click(plain);
+    assert.strictEqual(app.run('editIndex'), 1, '单击应把这道题设为当前题');
+    assert.ok(card.classList.contains('hidden'), '单击**不该**开卡片');
+    assert.strictEqual(listRows(app)[1], row, '单击不许重画列表(重画会让双击失效)');
+    assert.strictEqual(row.classList.contains('current'), true, '单击后这一行应高亮');
+    assert.strictEqual(app.run('editorSelected.length'), 0, '单击**不该**顺带圈选(那是复选框的事)');
+    // ①b 双击 → 翻开编辑卡片(字段填的是这一道)
+    row._listeners.dblclick(plain);
     assert.strictEqual(app.elements['editor-stem'].value, '第二题', '卡片字段应填的是这一道');
-    assert.ok(!card.classList.contains('hidden'), '点题目应翻开编辑卡片');
-    assert.strictEqual(app.run('editorSelected.length'), 0, '点题目**不该**顺带圈选(那是复选框的事)');
+    assert.ok(!card.classList.contains('hidden'), '双击应翻开编辑卡片');
     // ② 点复选框 → 只圈选:不改变当前题,也不掀开卡片
     app.run(`editIndex = 0; questionCardModal.classList.add('hidden')`);
     clickCheck(listRows(app)[1]);

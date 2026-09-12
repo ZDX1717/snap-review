@@ -2517,9 +2517,12 @@ export function renderBankEditor() {
         // 早先做成 <label> 包住复选框、点题干也等于勾选 —— 用户明确不要:
         // 扫读题干时手一碰就选上了,想改主意还得再点一次「取消选择」。
         const row = document.createElement('div');
+        // 待修改(缺答案/选项不足)用**淡黄底**标记;当前题淡主色底;**左条一律不加**(👤:"那根蓝条很丑")
+        const needsFix = !q.answer || Object.keys(q.options || {}).length < 2;
         row.className = 'q-row'
             + (idx === state.editIndex ? ' current' : '')
-            + (isSelected(q) ? ' picked' : '');
+            + (isSelected(q) ? ' picked' : '')
+            + (needsFix ? ' needs-fix' : '');
         row.dataset.idx = String(idx);
 
         const box = document.createElement('input');
@@ -2544,13 +2547,22 @@ export function renderBankEditor() {
         row.appendChild(text);
 
         row.appendChild(rowBadges(q));
-        // **点题目 = 选中这道题**(👤 补充逻辑):选中 = 设为当前题 + 直接翻开它的编辑卡片。
+        // **单击 = 高亮(设为当前题),双击 = 选中并翻开编辑卡片**(👤 定调)。
         // 复选框留给"圈选/筛选",两条通道各管一件事:
-        //   点题干 → 我要改这一道(原地进卡片)
+        //   单击 → 我正看着这一道(只高亮,不打扰)
+        //   双击 → 我要改这一道(进卡片)
         //   勾复选框 → 我要圈出一批(只看勾选 / 批量删除)
         row.addEventListener('click', (e) => {
-            const t = e && e.target;
-            if (t && t.classList && t.classList.contains('q-row-check')) return;   // 点复选框不算"点题目"
+            if (isRowCheckboxEvent(e)) return;         // 点复选框不算"点题目"
+            if (state.editIndex === idx) return;
+            // ⚠️ 这里**只换高亮,不重画列表**:重画会把这一行节点换掉,紧接着的第二次点击就落到了
+            //    新节点上 —— 浏览器判定"两次点击不同目标",dblclick 永远不触发(实测踩过)。
+            state.editIndex = idx;
+            highlightCurrentRow();
+            updateQuestionCardHead();
+        });
+        row.addEventListener('dblclick', (e) => {
+            if (isRowCheckboxEvent(e)) return;
             if (!editorGuard()) return;
             openQuestionCard(idx);
         });
@@ -2644,6 +2656,20 @@ export function renderBankEditor() {
         aiNoteEl.className = lines.length ? 'editor-ai-note stacked' : 'editor-ai-note';
     }
     editorRenderForm();
+}
+
+// 点击是否落在该行的复选框上(复选框只负责圈选,不该被当成"点题目")
+function isRowCheckboxEvent(e) {
+    const t = e && e.target;
+    return !!(t && t.classList && t.classList.contains('q-row-check'));
+}
+
+// 只把"当前题"的高亮换掉,不重建列表节点(重建会让双击的第二下落到新节点上 → dblclick 丢失)
+function highlightCurrentRow() {
+    Array.from(editorQuestionList.children).forEach(el => {
+        if (!el.classList || !el.classList.contains('q-row')) return;
+        el.classList.toggle('current', parseInt(el.dataset.idx, 10) === state.editIndex);
+    });
 }
 
 // 行内标签徽章:让"这道题什么状态"在列表里一眼可见 —— 它同时是筛选面板的视觉词典
