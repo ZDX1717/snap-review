@@ -314,6 +314,22 @@ export function saveBankVersions(obj) {
 //   ① **只在真的会改动题目的操作之前存**(去重空点、库为空这类"本来就没得改"的情况不要存,
 //      否则每库只有 3 个槽,几下就被无意义的安全网占满);
 //   ② 恢复前**必须**存一份当前状态 —— 恢复本身也要可逆(否则"恢复"成了不可撤销的破坏性操作)。
+// 题库改名:版本快照按**库名**存,不迁就是孤儿 —— 库里历史还在,面板却显示"暂无记录"。
+// 目标名已有记录时**追加**而不是覆盖(两库合并到一个名字的可能性虽小,丢历史却是真丢)。
+export function renameBankVersions(oldName, newName) {
+    if (!oldName || !newName || oldName === newName) return false;
+    const all = loadBankVersions();
+    if (!all[oldName]) return false;
+    const merged = (all[oldName] || []).concat(all[newName] || []);
+    // 按时间排序后每库只留 3 条(与 pushBankVersion 的上限一致),再清掉旧键
+    merged.sort((a, b) => String(a && a.time).localeCompare(String(b && b.time)));
+    while (merged.length > 3) merged.shift();
+    all[newName] = merged;
+    delete all[oldName];
+    saveBankVersions(all);
+    return true;
+}
+
 export function deleteBankVersion(name, index) {
     const all = loadBankVersions();
     const list = all[name] || [];

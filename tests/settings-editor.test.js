@@ -334,3 +334,51 @@ test('列表行:「只看待补」筛选后,选中态按题目下标对号(不�
         '选中的是被筛掉的那道题时,可见行不该被误点亮');
 });
 
+
+test('重命名:编辑器正开着这一库时,标题/状态/列表立刻改成新名(bug 2026-09-12)', async () => {
+    const app = await loadApp();
+    app.run(`questionBanks = { '旧库名': [${JSON.stringify(Q('题目甲', 'A'))}, ${JSON.stringify(Q('题目乙', 'A'))}] }`);
+    app.run(`editBank('旧库名')`);          // 真实入口:它同时把库名写进标题栏
+    app.run('editIndex = 1; renderBankEditor()');
+    const title0 = String(app.elements['edit-bank-title'].textContent);
+    assert.ok(title0.includes('旧库名'), '打开时标题应是旧名');
+    // 真实顺序:先开对话框(它会把输入框预填成当前名),再改输入框,再确认
+    app.run(`showRenameModal('旧库名')`);
+    app.elements['rename-bank-name'].value = '新库名';
+    app.run('renameBank()');
+    // 症状一:标题还挂旧名
+    const title1 = String(app.elements['edit-bank-title'].textContent);
+    assert.ok(title1.includes('新库名'), '编辑器标题应立刻显示新库名');
+    assert.ok(!title1.includes('旧库名'), '标题不该还挂着旧名');
+    // 症状二(更致命):editBankName 还指着一个已不存在的键 → currentEditBank() 返回空数组,
+    // 表现为"改个名,这库的题全没了",连保存都不知存到哪去
+    assert.strictEqual(app.run('editBankName'), '新库名', '编辑器状态里的库名要跟着改');
+    assert.strictEqual(app.run('currentEditBank().length'), 2, '改名后不该变成"这库没题了"');
+    assert.strictEqual(app.run('editIndex'), 1, '停在第几题不该被重置');
+    // 桩的 innerHTML='' 不会清 children,故只断言**最后一次重画**出来的那两行
+    const redrawn = listRows(app).slice(-2);
+    assert.strictEqual(redrawn.length, 2, '列表应已按新库重画');
+    assert.strictEqual(redrawn[1].classList.contains('selected'), true, '重画后仍停在原来那一题');
+    assert.strictEqual(app.run(`questionBanks['新库名'].length`), 2);
+    assert.ok(app.run(`!questionBanks['旧库名']`), '旧库名不该还在');
+    // 改名后继续编辑/保存,必须落到新库名上
+    app.elements['editor-options']._setQueryAll([
+        { dataset: { letter: 'A' }, value: '甲', disabled: false },
+        { dataset: { letter: 'B' }, value: '乙', disabled: false },
+    ]);
+    app.run(`editorStem.value = '题目乙(改名后改的)'; editorType.value = '单选'; editorAnswer.value = 'A';`);
+    assert.strictEqual(app.run('editorSaveCurrent(true)'), true);
+    assert.strictEqual(app.run(`questionBanks['新库名'][1].content`), '题目乙(改名后改的)');
+});
+
+test('重命名:改的不是编辑器里那一库时,不碰编辑器的状态', async () => {
+    const app = await loadApp();
+    app.run(`questionBanks = { '甲库': [${JSON.stringify(Q('甲题', 'A'))}], '乙库': [${JSON.stringify(Q('乙题', 'A'))}] };
+        editBankName = '甲库'; editIndex = 0; renderBankEditor();`);
+    app.elements['rename-bank-name'].value = '乙库改名';
+    app.run(`state.currentRenameBank = '乙库'; renameBank()`);
+    assert.strictEqual(app.run('editBankName'), '甲库', '编辑器仍应停在甲库');
+    assert.strictEqual(app.run('currentEditBank().length'), 1);
+    assert.strictEqual(app.run(`questionBanks['乙库改名'].length`), 1, '被改的那一库应改名成功');
+    assert.strictEqual(app.run(`currentBankName`), '默认题库', '当前选中的库不是被改名那一库,不该被牵连');
+});

@@ -142,6 +142,35 @@ describe('版本记录:可删、不空存、挂在题库设置里(👤 2026-09-1
         assert.strictEqual(run(`deleteBankVersion('没这库', 0)`), false);
     });
 
+    test('版本随库名迁移(改个名,历史快照不该变成孤儿)', () => {
+        run(`bankVersions = {}; questionBanks = { '旧库': [${JSON.stringify(mkQ('A'))}] }`);
+        run(`pushBankVersion('旧库', '覆盖导入前', [${JSON.stringify(mkQ('X'))}])`);
+        run(`pushBankVersion('旧库', '去重前', [${JSON.stringify(mkQ('Y'))}])`);
+        elements['rename-bank-name'].value = '新库';
+        run(`state.currentRenameBank = '旧库'; renameBank()`);   // 走真实重命名入口
+        assert.strictEqual(run(`(loadBankVersions()['新库'] || []).length`), 2, '历史应跟着新库名走');
+        assert.ok(!('旧库' in run('loadBankVersions()')), '旧键应清掉(不留孤儿)');
+        assert.deepStrictEqual(
+            JSON.parse(run(`JSON.stringify(loadBankVersions()['新库'].map(v => v.action))`)),
+            ['覆盖导入前', '去重前'], '先后顺序按时间保持');
+        assert.deepStrictEqual(
+            JSON.parse(store.get('bankVersions'))['新库'].map(v => v.action),
+            ['覆盖导入前', '去重前'], '应落盘');
+    });
+
+    test('版本迁移:目标库名已有历史则合并(不覆盖),且仍守每库 3 条上限', () => {
+        run(`bankVersions = {}`);
+        run(`pushBankVersion('旧', '旧1', []); pushBankVersion('旧', '旧2', []);`);
+        run(`pushBankVersion('新', '新1', []); pushBankVersion('新', '新2', []);`);
+        run(`questionBanks = { '旧': [${JSON.stringify(mkQ('A'))}] }`);
+        elements['rename-bank-name'].value = '新';
+        run(`state.currentRenameBank = '旧'; renameBank()`);
+        const list = JSON.parse(run(`JSON.stringify((loadBankVersions()['新'] || []).map(v => v.action))`));
+        assert.strictEqual(list.length, 3, '合并后仍只留 3 条(与 pushBankVersion 上限一致)');
+        assert.ok(list.includes('新2') && list.includes('旧2'), '两边的历史都要在');
+        assert.ok(!('旧' in run('loadBankVersions()')), '旧键应清掉');
+    });
+
     test('去重:没有重复时不存版本(别让无意义的安全网占满 3 个槽)', () => {
         run(`bankVersions = {}`);
         run(`questionBanks = { '乙库': [${JSON.stringify(mkQ('P1'))}, ${JSON.stringify(mkQ('P2'))}] }`);

@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { finalizeQuestion, formatAnswerForDisplay, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey } from './parser.js';
-import { deleteBankVersion, saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportBatch, loadOverwriteSnapshot, clearOverwriteSnapshot, loadBankVersions, pushBankVersion, loadCollapsedBanks, saveCollapsedBanks } from './storage.js';
+import { deleteBankVersion, renameBankVersions, saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportBatch, loadOverwriteSnapshot, clearOverwriteSnapshot, loadBankVersions, pushBankVersion, loadCollapsedBanks, saveCollapsedBanks } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
 import { OFFICIAL_PROMPT, buildCopyText, copyText } from './prompt.js';
@@ -1124,16 +1124,29 @@ export function renameBank() {
         state.bankColors[newName] = state.bankColors[oldName];
         delete state.bankColors[oldName];
     }
+    // 版本记录也按库名存:不迁,改个名历史快照就成了孤儿(库里明明有,面板却显示"暂无记录")
+    renameBankVersions(oldName, newName);
 
     if (state.currentBankName === state.currentRenameBank) {
         state.currentBankName = newName;
         state.questionBank = state.questionBanks[state.currentBankName];
     }
 
+    // ⚠️ 编辑器正开着这一库时必须同时改状态里的库名 + 重渲染(bug 2026-09-12:改名后
+    //    编辑器标题还挂着旧名,而旧名在 questionBanks 里已经不存在 —— currentEditBank()
+    //    直接返回空数组,表现为"改个名,这库的题全没了")。改名入口就在编辑器的库里,
+    //    所以这条路径是主线,不是边角。
+    const wasEditing = state.editBankName === oldName;
+    if (wasEditing) {
+        state.editBankName = newName;
+        setEditBankTitle(newName);
+    }
+
     saveToLocalStorage();
     refreshQuestionBankView();
     updateBankSelect();
     updateBanksList();
+    if (wasEditing) renderBankEditor();   // 标题/配色/版本面板一起按新库名重画
 
     hideModal(renameBankModal);
     alert('题库重命名成功');
@@ -1274,9 +1287,14 @@ export function editBank(bankName) {
     state.editBankName = bankName;
     state.editIndex = 0;
     state.editorDirty = false;
-    editBankTitle.textContent = `编辑题库：${bankName}`;
+    setEditBankTitle(bankName);
     renderBankEditor();
     showModal(editBankModal);
+}
+
+// 编辑器标题里的库名(打开时写一次、改名后要跟着改 —— 见 renameBank)
+function setEditBankTitle(bankName) {
+    if (editBankTitle) editBankTitle.textContent = `编辑题库：${bankName}`;
 }
 
 
