@@ -361,6 +361,21 @@ function setupEventListeners() {
         const open = editorFilterPanel.classList.toggle('hidden') === false;
         editorFilterToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
+    // 筛选面板是**悬浮**的:点面板外面就收起(否则它会一直盖着列表)。
+    // ⚠️ 用 within() 而不是 el.contains():测试桩的元素没有 contains 方法,直接调会 TypeError。
+    const within = (el, node) => {
+        if (!el || !node) return false;
+        if (typeof el.contains === 'function') return el.contains(node);
+        let p = node;
+        while (p) { if (p === el) return true; p = p.parentNode; }
+        return false;
+    };
+    document.addEventListener('click', (e) => {
+        if (editorFilterPanel.classList.contains('hidden')) return;
+        if (within(editorFilterToggle, e.target) || within(editorFilterPanel, e.target)) return;
+        editorFilterPanel.classList.add('hidden');
+        editorFilterToggle.setAttribute('aria-expanded', 'false');
+    });
     document.querySelectorAll('.filter-chip').forEach(chip => {
         chip.addEventListener('click', () => editorToggleFilter(chip.dataset.filter, chip.dataset.value));
     });

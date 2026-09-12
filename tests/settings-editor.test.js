@@ -511,3 +511,43 @@ test('重命名:改的不是编辑器里那一库时,不碰编辑器的状态', 
     assert.strictEqual(app.run(`questionBanks['乙库改名'].length`), 1, '被改的那一库应改名成功');
     assert.strictEqual(app.run(`currentBankName`), '默认题库', '当前选中的库不是被改名那一库,不该被牵连');
 });
+
+test('列表:点题干不选中 —— 只有复选框能选中(👤 要求)', async () => {
+    const app = await loadApp();
+    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('第一题', 'A'))}, ${JSON.stringify(Q('第二题', 'A'))}] };
+        editBankName = 'T'; editIndex = 0; renderBankEditor();`);
+    const row = listRows(app)[0];
+    assert.strictEqual(row._listeners.click, undefined, '行本身不许有点击监听(点题干不该选中)');
+    assert.strictEqual(app.run('editorSelected.length'), 0);
+    // 模拟"点题干":在旧实现里它是 <label>,点哪儿都等于勾选;现在必须毫无反应
+    clickCheck(listRows(app)[0]);
+    assert.strictEqual(app.run('editorSelected.length'), 1, '只有点复选框才选中');
+    assert.strictEqual(app.run('editorSelected[0].content'), '第一题', '选中的必须是勾选的那一行');
+});
+
+test('筛选面板:悬浮;点面板外面自动收起,点面板里面不收起', async () => {
+    const app = await loadApp();
+    // ⚠️ 必须先把 main.js 的装配跑起来(绑定发生在 DOMContentLoaded 里)—— 否则文档级监听根本没注册,
+    //    测试会"通过地"什么都没验(踩过同类:桩里的事件通道要先接上)
+    app.run('init()');
+    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('甲', ''))}, ${JSON.stringify(Q('乙', 'A'))}] };
+        editBankName = 'T'; editIndex = 0; renderBankEditor();`);
+    const panel = app.elements['editor-filter-panel'];
+    const toggle = app.elements['editor-filter-toggle'];
+    // 打开(模拟 main.js 里那颗筛选键的行为:切 hidden + 写 aria-expanded)
+    panel.classList.remove('hidden');
+    toggle.setAttribute('aria-expanded', 'true');
+    // 点面板里面(比如某个 chip)→ 不该收起
+    // ⚠️ 测试桩不建真实 DOM 树,父子关系要手动接上,否则"是否在面板内"的判断永远得到 false
+    app.elements['editor-filter-clear'].parentNode = panel;
+    app.sandbox.document.dispatchEvent({ type: 'click', target: app.elements['editor-filter-clear'] });
+    assert.ok(!panel.classList.contains('hidden'), '点面板里的控件不该把面板关掉');
+    // 点面板外面(列表)→ 收起
+    app.sandbox.document.dispatchEvent({ type: 'click', target: app.elements['editor-question-list'] });
+    assert.ok(panel.classList.contains('hidden'), '点面板外面应收起悬浮面板');
+    assert.strictEqual(toggle.getAttribute('aria-expanded'), 'false', 'aria-expanded 要跟着回写');
+    // 点筛选键本身由它自己的 click 负责开合(不能让"点外面"把它顶掉)
+    panel.classList.remove('hidden');
+    app.sandbox.document.dispatchEvent({ type: 'click', target: toggle });
+    assert.ok(!panel.classList.contains('hidden'), '点筛选键本身不该被当成"点外面"');
+});

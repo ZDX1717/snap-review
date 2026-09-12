@@ -1454,7 +1454,7 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
 
 .editor-question-list {
     flex: 1;
-    max-height: 46vh;
+    max-height: 62vh;          /* 表单搬走后列表就是主角,给它更多高度(👤:原来太矮,下面一大片空白) */
     overflow-y: auto;
     border: 1px solid var(--c-border-light);
     border-radius: 6px;
@@ -1466,6 +1466,7 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
    工具行 = 筛选(点开面板)+ 去重 + 计数。三个都是"小工具",统一做成 32px 描边胶囊:
    与库卡/内容区的大按钮拉开层级,一眼看出"这是列表的控制器,不是内容"。 */
 .editor-toolbar {
+    position: relative;         /* 筛选悬浮面板的定位锚 */
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1476,8 +1477,8 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    min-height: 32px;
-    padding: 0 11px;
+    min-height: 24px;          /* 矮一档:它是"控制器",不该和内容抢高度(👤 要求) */
+    padding: 0 9px;
     border: 1px solid var(--c-border);
     border-radius: 999px;
     background: var(--c-surface);
@@ -1512,38 +1513,50 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
 .list-tool-caret { font-size: 10px; opacity: 0.7; }
 .editor-toolbar-count { margin-left: auto; }   /* 计数贴右:它是"结果",与左边的控制区分开 */
 
-/* 筛选面板:chips 分组(组内任一、组间同时)。展开才占位,收起时列表完整可用 */
+/* 筛选面板 = **悬浮卡片**(👤 要求):点开时浮在列表之上,不把列表往下挤。
+   桌面两列排组(4 组 → 2 行),手机一列;整体高度靠"矮 chip + 紧间距"压住。 */
 .filter-panel {
-    border: 1px solid var(--c-border-light);
-    border-radius: 8px;
-    background: var(--c-surface-alt);
+    position: absolute;
+    top: calc(100% + 6px);      /* 贴在工具行正下方 */
+    left: 0;
+    z-index: 60;                /* 压在列表/批量栏之上(与回收站浮层同层) */
+    width: min(440px, 92vw);
+    max-height: 62vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 10px 12px;
-    margin-bottom: 10px;
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    background: var(--c-surface);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+    display: grid;
+    grid-template-columns: 1fr 1fr;   /* 桌面:两组一行,高度直接砍半 */
+    gap: 8px 14px;
+    align-items: start;
 }
 .filter-group {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
-    margin-bottom: 8px;
+    gap: 6px;
+    margin: 0;
 }
-.filter-group:last-of-type { margin-bottom: 0; }
 .filter-group-title {
-    flex: 0 0 3.5em;
-    padding-top: 7px;          /* 与 chip 文字baseline 对齐 */
+    flex: 0 0 3.2em;
+    padding-top: 5px;          /* 与 chip 文字 baseline 对齐 */
     font-size: 12px;
     color: var(--c-text-faint);
 }
 .filter-chips {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 4px;
     flex: 1 1 auto;
 }
 .filter-chip {
     display: inline-flex;
     align-items: center;
-    min-height: 30px;
-    padding: 0 10px;
+    min-height: 22px;          /* 矮 chip:一行放得下更多条件,面板才压得扁(👤 要求) */
+    padding: 0 8px;
     border: 1px solid var(--c-border);
     border-radius: 999px;
     background: var(--c-surface);
@@ -1563,19 +1576,20 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
     font-weight: 600;
 }
 .filter-foot {
+    grid-column: 1 / -1;        /* 跨满两列 */
     display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
-    margin-top: 8px;
+    margin-top: 2px;
     padding-top: 8px;
     border-top: 1px dashed var(--c-border-light);
 }
 .filter-foot .meta-note { margin: 0; flex: 1 1 auto; }
 .filter-clear {
     flex: 0 0 auto;
-    min-height: 30px;
-    padding: 0 10px;
+    min-height: 22px;
+    padding: 0 8px;
     border: 1px solid var(--c-border);
     border-radius: 999px;
     background: var(--c-surface);
@@ -1586,42 +1600,28 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
 }
 .filter-clear:hover { border-color: var(--c-danger); color: var(--c-danger-text); background: var(--c-danger-bg); }
 
-/* ---------- 批量操作栏(选中 ≥1 才出现)----------
-   sticky 贴底:列表再长,选完就能就地点"删除/编辑",不用回头找按钮。 */
+/* ---------- 批量操作栏(选中 ≥1 才出现)—— **就在工具行里**(👤 要求:放到筛选/去重后面)----------
+   不做成底部独立栏:那会再吃掉一条高度,还会把列表挤短;放进工具行后,"控制器"只有一处。 */
 .bulk-bar {
-    position: sticky;
-    bottom: 0;
-    z-index: 5;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-top: 8px;
-    padding: 8px 10px;
-    border: 1px solid var(--c-primary);
-    border-radius: 8px;
-    background: var(--c-surface);
-    box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.08);
-}
-.bulk-count {
-    flex: 0 0 auto;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--c-primary);
-}
-.bulk-actions {
     display: flex;
     align-items: center;
     gap: 6px;
     flex-wrap: wrap;
-    margin-left: auto;      /* 动作贴右,计数贴左 */
+    margin-left: auto;      /* 贴工具行右端:左边是常驻工具,右边是"选中后才出现"的动作 */
+}
+.bulk-count {
+    flex: 0 0 auto;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--c-primary);
+    white-space: nowrap;
 }
 .bulk-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 32px;
-    padding: 0 12px;
+    min-height: 24px;       /* 与工具键同高,整行才齐 */
+    padding: 0 10px;
     border: 1px solid var(--c-border);
     border-radius: 8px;
     background: var(--c-surface);
@@ -1679,11 +1679,11 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
     display: flex;
     align-items: center;
     gap: 8px;
-    min-height: 40px;
-    padding: 6px 8px;
+    min-height: 36px;
+    padding: 5px 8px;
     border-radius: 6px;
-    cursor: pointer;
-    user-select: none;          /* 连点勾选时别把文字选成一片蓝 */
+    cursor: default;            /* 整行不可点(👤 要求:只有复选框能选中) */
+    user-select: none;          /* 扫读时别把文字拖成一片蓝 */
 }
 .q-row:hover { background: var(--c-info-bg); }
 /* 待修改:橙色左条(与徽章里的 ⏳/⚠ 同一套语义) */
@@ -1707,6 +1707,7 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
 .q-row-check {
     flex: 0 0 auto;
     width: 18px;
+    cursor: pointer;            /* 唯一可点的地方,光标要说得明白 */
     height: 18px;
     margin: 0;
     accent-color: var(--c-primary);   /* 勾选态用主色,和全站一致 */
@@ -3405,15 +3406,8 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
 .editor-body[data-tab="question"] > .editor-list-panel,
 .editor-body[data-tab="question"] > .editor-question-panel { display: block; }
 .editor-body[data-tab="bank"] > .editor-bank-panel { display: block; }
-/* 题目页:桌面仍是"左题号列表 + 右表单"两栏 */
-@media (min-width: 769px) {
-    .editor-body[data-tab="question"] {
-        display: grid;
-        grid-template-columns: 220px 1fr;
-        gap: 16px;
-        align-items: start;
-    }
-}
+/* ⚠️ 桌面档**不再**是"左 220px 列表 + 右表单"两栏:表单已搬进编辑卡片,那套 grid 会把
+   整个题目页压进 220px 的窄列(用户实测"瘦高、右边一大片空白")。列表现在吃满整宽。 */
 
 /* ---------- 编辑卡片:一道题的完整编辑面(👤 2026-09-12 重构)----------
    它是**二级弹窗**(1100 > 编辑器 1000,见 §3.8):从题库编辑器里打开,必须压在编辑器之上。
@@ -3571,9 +3565,14 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
         border-radius: 0;
     }
     .editor-body {
-        grid-template-columns: 1fr;
-        gap: 14px;
         padding: 12px 12px 16px;
+    }
+    /* 手机档:列表**取消自己的滚动**(👤 反馈"列表太矮、下面一大片空白")——
+       原来它被卡在 46vh 的小框里,框下留白;现在让 .editor-body 当唯一滚动容器,列表该多长就多长。 */
+    .editor-question-list {
+        max-height: none;
+        overflow: visible;
+        flex: none;
     }
     /* 题号列表:只留标题一行(它只用来跳题),展开后最多 34vh,不挤掉正在编辑的内容 */
     .editor-list-panel .editor-list-body { display: none; }
@@ -3603,19 +3602,21 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
         min-height: 44px;
         padding: 0 14px;
     }
-    /* 行整行 ≥44px,复选框本身放大到 22px(点行也能勾,所以不必强求 44px 的方块) */
+    /* 复选框放大到 24px:现在它是**唯一**的选中入口,必须自己就足够好点 */
     .q-row { min-height: 44px; }
-    .q-row-check { width: 22px; height: 22px; }
+    .q-row-check { width: 24px; height: 24px; }
     /* 零散控件也要够得着:色块、AI 补答案、关闭 ✕、移出规则下拉、复选框 */
     .bank-color-swatch { min-height: 44px; padding: 0 12px; }
     .editor-list-del { min-width: 44px; font-size: 14px; }
     /* 选中行右端的「保存」也要够得着(👤 定的 44 阈值) */
-    /* 批量操作栏与编辑卡片底部的按钮:手机上都是拇指目标 */
-    .bulk-btn { min-height: 44px; padding: 0 14px; font-size: 14px; }
+    /* 控制条(筛选/去重/批量)在手机上矮一档:👤 明确要求"太高占空间"。
+       34px 仍高于误触底线里偏紧的一档,且这些键横向很宽、彼此有间距,实打实好点。 */
+    .bulk-btn { min-height: 34px; padding: 0 12px; font-size: 13px; }
+    .list-tool { min-height: 34px; }
+    .filter-chip { min-height: 30px; }
+    /* 编辑卡片底部的保存/取消是**主要动作**,仍守 44;只有它俩守 */
     .card-foot .action-btn { min-height: 44px; }
-    .card-nav { width: 40px; height: 40px; }
-    .list-tool { min-height: 44px; }
-    .filter-chip { min-height: 44px; }
+    .card-nav { width: 36px; height: 36px; }
     .editor-list-add { min-height: 44px; }
     .version-item .action-btn,
     .version-item .version-del { min-height: 44px; }

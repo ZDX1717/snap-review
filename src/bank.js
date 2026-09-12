@@ -54,7 +54,6 @@ const recycleCount = document.getElementById('recycle-count');
 const editorAiAnswerBtn = document.getElementById('editor-ai-answer-btn');
 const bankColorPicker = document.getElementById('bank-color-picker');
 // 编辑器重构后新增的元素(👤 2026-09-11)
-const editorListCount = document.getElementById('editor-list-count');
 const editorBody = document.querySelector('.editor-body');
 const editorTabQuestion = document.getElementById('editor-tab-question');
 const editorTabBank = document.getElementById('editor-tab-bank');
@@ -2519,11 +2518,13 @@ export function renderBankEditor() {
     const visible = visibleQuestions();
     const filterOn = activeFilterCount() > 0;
 
-    // ---------- 列表:每行 = 复选框 + 序号 + 题干 + 标签徽章,点整行即勾选 ----------
+    // ---------- 列表:每行 = 复选框 + 序号 + 题干 + 标签徽章(只有复选框能选中) ----------
     editorQuestionList.innerHTML = '';
     visible.forEach(({ q, idx }) => {
-        // 用 <label> 包住复选框:点行里任何地方都能勾选,不用去戳那个小方块(手机上尤其重要)
-        const row = document.createElement('label');
+        // 行 = 普通容器,**只有复选框能选中**(👤 要求)。
+        // 早先做成 <label> 包住复选框、点题干也等于勾选 —— 用户明确不要:
+        // 扫读题干时手一碰就选上了,想改主意还得再点一次「取消选择」。
+        const row = document.createElement('div');
         row.className = 'q-row'
             + (idx === state.editIndex ? ' current' : '')
             + (isSelected(q) ? ' picked' : '');
@@ -2534,7 +2535,7 @@ export function renderBankEditor() {
         box.className = 'q-row-check';
         box.checked = isSelected(q);
         box.setAttribute('aria-label', `选择第 ${idx + 1} 题`);
-        // 只认 change:label 的原生行为已经会把点击转成 change,再挂 click 会勾一下又取消(双触发)
+        // 唯一的选中入口。用 change(而不是 click):键盘空格、脚本置位都能走到
         box.addEventListener('change', () => { editorToggleSelect(q, box.checked); });
         row.appendChild(box);
 
@@ -2562,12 +2563,9 @@ export function renderBankEditor() {
     addRow.addEventListener('click', () => editorAddQuestion());
     editorQuestionList.appendChild(addRow);
 
-    // ---------- 工具行计数 + 筛选按钮角标 ----------
-    if (editorListCount) {
-        editorListCount.textContent = filterOn
-            ? `筛出 ${visible.length} / 共 ${questions.length} 题`
-            : `共 ${questions.length} 题`;
-    }
+    // ---------- 标签页角标(唯一的计数处)+ 筛选按钮角标 ----------
+    // ⚠️ 工具行里**不再**有"共 N 题"文案:与标签页的「编辑题目 N」重复(👤 要求删掉)。
+    //    筛选时标签页角标自动变成 "3/28",信息一点没少。
     if (editorTabQuestionCount) {
         editorTabQuestionCount.textContent = filterOn ? `${visible.length}/${questions.length}` : `${questions.length}`;
     }

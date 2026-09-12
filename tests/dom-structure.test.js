@@ -500,18 +500,28 @@ test('编辑器:题目级操作与题库级操作彻底分开', () => {
     assert.ok(toolbar.includes('editor-filter-toggle'), '「筛选」应在列表上方的工具行里');
     // 去重从「题库设置」搬到了列表上方(👤 要求:它作用于整库,但要在改题时随手可用)
     assert.ok(toolbar.includes('editor-dedup-btn'), '「去重」应在工具行里');
-    assert.ok(toolbar.includes('editor-list-count'), '计数也在这行(筛过之后要看得到"筛出几道/共几道")');
+    // 👤 要求删掉工具行里的"共 N 题":标签页的「编辑题目 N」已经写着同一个数(同一屏两处计数是噪音)
+    assert.ok(!toolbar.includes('editor-list-count'), '工具行里不该再有"共 N 题"计数');
+    // (这里的 bank 源码要单独读一次:本用例后半段才声明 const bank,提前引用会 TDZ 报错)
+    const bankSrc = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
+    assert.ok(!html.includes('editor-list-count') && !/editorListCount/.test(bankSrc), '那个计数元素与代码应一并删除');
+    // 计数没有丢:筛选时标签页角标会变成 "3/28"
+    assert.ok(/visible\.length\}\/\$\{questions\.length\}/.test(bankSrc), '标签页角标应在筛选时显示"筛出/总数"');
+    // 👤 要求:选中后的编辑栏放到筛选/去重**后面**(同一行,不再单独占一条底栏)
+    assert.ok(toolbar.includes('editor-bulk-bar'), '批量栏应在工具行里');
+    assert.ok(toolbar.indexOf('editor-bulk-bar') > toolbar.indexOf('editor-dedup-btn'), '批量栏应排在筛选/去重之后');
     assert.ok(!modal.includes('bank-dedup-btn'), '「去重」不应再留在题库设置里');
     // 新增题目不是工具行按钮,而是**列表末尾的加号**(👤 要求)
     assert.ok(!toolbar.includes('editor-add-btn'), '「新增题目」按钮应已从工具行移除');
     const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
     assert.ok(/editor-list-add/.test(bank), '列表末尾应渲染一个加号按钮');
     assert.ok(/editorQuestionList.appendChild\(addRow\)/.test(bank), '加号必须追加在列表最后');
-    // 删除/编辑**只在选中之后**出现(👤 要求):它们不该常驻工具行
+    // 删除/编辑**只在选中之后**出现(👤 要求):它们在批量栏里,而批量栏整条由 .hidden 控制显隐
     for (const id of ['editor-bulk-edit', 'editor-bulk-delete', 'editor-bulk-all', 'editor-bulk-clear']) {
-        assert.ok(!toolbar.includes(id), `${id} 不该常驻工具行(选中后才出现在批量栏)`);
-        assert.ok(modal.includes(id), `${id} 应在批量栏里`);
+        assert.ok(toolbar.includes(id), `${id} 应随批量栏出现在工具行里`);
     }
+    assert.ok(/editorBulkBar\.classList\.toggle\('hidden', selCount === 0\)/.test(bankSrc),
+        '批量栏整条"选中才出现" —— 没选中时这一行一个多余按钮都没有');
     assert.ok(!modal.includes('editor-delete-btn'), '「删除本题」按钮应已移除(改用批量删除)');
     // 题库级动作仍在独立的「题库设置」标签页里,不与单题编辑混排
     const bankPanelStart = modal.indexOf('editor-bank-panel');
@@ -604,15 +614,15 @@ test('题库设置:按作用对象分块,「删除题库」独占最底部的危
 
 test('编辑器:题目页的顺序 = 工具行 → 筛选面板 → 列表 → 批量栏(👤 2026-09-12 重构)', () => {
     const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('id="question-card-modal"'));
-    const order = ['editor-toolbar', 'editor-filter-panel', 'editor-list-block', 'editor-bulk-bar', 'editor-empty']
+    const order = ['editor-toolbar', 'editor-filter-panel', 'editor-list-block', 'editor-empty']
         .map(k => modal.indexOf(k));
-    assert.ok(order.every(i => i > -1), '五个区块都要存在:' + JSON.stringify(order));
+    assert.ok(order.every(i => i > -1), '四个区块都要存在:' + JSON.stringify(order));
     assert.deepStrictEqual([...order].sort((a, b) => a - b), order,
-        '顺序必须是:工具行 → 筛选面板 → 列表 → 批量栏 → 空态');
+        '顺序必须是:工具行(含批量栏)→ 筛选面板 → 列表 → 空态');
     // 题目表单**不在**题目页里了:整块搬进编辑卡片(列表只负责选,编辑只发生在卡片里)
     assert.ok(!modal.includes('id="editor-form"'), '表单不该还留在题库编辑器里');
-    assert.ok(modal.indexOf('editor-bulk-bar') > modal.indexOf('editor-list-block'),
-        '批量栏跟在列表后面 —— 选完就近操作,不用回头找按钮');
+    assert.ok(modal.indexOf('editor-bulk-bar') < modal.indexOf('editor-list-block'),
+        '批量栏在**列表之前**(它就在工具行里,不再是一条占高度的底栏)');
     // 题号导航行与底栏都已取消(👤 要求):列表本身就是导航
     assert.ok(!modal.includes('editor-nav-row'), '「上一题/下一题」导航行应已取消');
     assert.ok(!modal.includes('editor-foot'), '底栏应已取消');
@@ -652,9 +662,11 @@ test('编辑器:列表 = 复选框 + 序号 + 题干 + 徽章;动作只在选中
     // ① 每行一个**真正的** checkbox(👤 要求:要有复选框)
     assert.ok(/box\.type = 'checkbox'/.test(bank), '列表行应有 checkbox 输入');
     assert.ok(/q-row-check/.test(bank), '复选框要有自己的类(手机档要放大它)');
-    // ② 点整行即勾选:行元素是 <label> 包住复选框(不用去戳 13px 的小方块)
-    assert.ok(/createElement\('label'\)/.test(bank), '行应为 label,点整行即勾选');
-    assert.ok(!/row\.addEventListener\('click'/.test(bank), '别再挂 click —— label 的原生行为已会转成 change(双触发会勾一下又取消)');
+    // ② **只有复选框能选中**(👤 要求):行是普通 div,行上不挂任何监听
+    const rowRegion = bank.slice(bank.indexOf('// 行 = 普通容器'), bank.indexOf('editorQuestionList.appendChild(row)'));
+    assert.ok(/const row = document\.createElement\('div'\)/.test(rowRegion), '行应是普通 div(不是 label)');
+    assert.ok(!/row\.addEventListener/.test(rowRegion), '行本身不许绑事件 —— 点题干不该选中');
+    assert.ok(/box\.addEventListener\('change'/.test(rowRegion), '选中入口只有复选框的 change');
     // ③ 徽章:题型 / 待补 / 缺解析 / AI / 历史(它同时是筛选面板的视觉词典)
     assert.ok(/function rowBadges/.test(bank), '应有行内徽章渲染');
     for (const k of ['q-row-badges', 'q-badge']) assert.ok(bank.includes(k), `缺 ${k} 样式类`);

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=1051">
+    <link rel="stylesheet" href="styles.css?v=1052">
 </head>
 <body>
     <div class="container">
@@ -395,14 +395,24 @@ A：选项A  B：选项B
                          题目表单已整块搬进「编辑卡片」(#question-card-modal)——
                          列表只负责"看和选",编辑只发生在卡片里,一屏只干一件事。 -->
                     <section class="editor-panel editor-question-panel">
-                        <!-- 工具行:筛选(点开面板)+ 去重 + 计数 -->
+                        <!-- 工具行:筛选(点开悬浮面板)+ 去重;选中题目后,批量动作就出现在它们后面
+                             (👤 要求:编辑栏放到筛选/去重后面 —— 全页只有这一行"控制器")。
+                             ⚠️ 这里**不再显示"共 N 题"**:标签页上的「编辑题目 N」已经写着同一个数,
+                             同一屏两处计数是噪音,还占着这一行最宝贵的位置(👤 要求删掉)。 -->
                         <div class="editor-toolbar">
                             <button type="button" id="editor-filter-toggle" class="list-tool" aria-expanded="false" aria-controls="editor-filter-panel">
                                 <span aria-hidden="true">⚙</span> 筛选<span id="editor-filter-count" class="list-tool-count hidden"></span><span class="list-tool-caret" aria-hidden="true">▾</span>
                             </button>
                             <button type="button" id="editor-dedup-btn" class="list-tool" title="按题干+选项查重，保留最早导入的版本">去重</button>
-                            <span id="editor-list-count" class="editor-panel-count editor-toolbar-count"></span>
-                        </div>
+
+                            <!-- 选中 ≥1 才出现(👤 要求):计数 + 全选/取消 + 编辑/删除 -->
+                            <div id="editor-bulk-bar" class="bulk-bar hidden">
+                                <span id="editor-bulk-count" class="bulk-count"></span>
+                                <button type="button" id="editor-bulk-all" class="bulk-btn">全选</button>
+                                <button type="button" id="editor-bulk-clear" class="bulk-btn">取消选择</button>
+                                <button type="button" id="editor-bulk-edit" class="bulk-btn primary">✎ 编辑</button>
+                                <button type="button" id="editor-bulk-delete" class="bulk-btn danger">🗑 删除</button>
+                            </div>
 
                         <!-- 筛选面板(点「筛选」才展开;组内任一、组间同时) -->
                         <div id="editor-filter-panel" class="filter-panel hidden">
@@ -442,22 +452,12 @@ A：选项A  B：选项B
                                 <button type="button" id="editor-filter-clear" class="filter-clear">清除筛选</button>
                             </div>
                         </div>
+                        </div>
 
-                        <!-- 题目列表:每行 = 复选框 + 序号 + 题干 + 标签徽章;点整行即勾选 -->
+                        <!-- 题目列表:每行 = 复选框 + 序号 + 题干 + 标签徽章(只有复选框能选中) -->
                         <div class="editor-list-block">
                             <!-- 列表容器内含末尾的「＋」(👤 要求:新增入口就是列表末尾那一行) -->
                             <div id="editor-question-list" class="editor-question-list"></div>
-                        </div>
-
-                        <!-- 选中后的批量操作栏(选 ≥1 才出现,👤 要求) -->
-                        <div id="editor-bulk-bar" class="bulk-bar hidden">
-                            <span id="editor-bulk-count" class="bulk-count"></span>
-                            <div class="bulk-actions">
-                                <button type="button" id="editor-bulk-all" class="bulk-btn">全选</button>
-                                <button type="button" id="editor-bulk-clear" class="bulk-btn">取消选择</button>
-                                <button type="button" id="editor-bulk-edit" class="bulk-btn primary">✎ 编辑</button>
-                                <button type="button" id="editor-bulk-delete" class="bulk-btn danger">🗑 删除</button>
-                            </div>
                         </div>
 
                         <p id="editor-empty" class="empty-message hidden">该题库暂无题目，点列表末尾的「＋」添加</p>
@@ -612,6 +612,6 @@ A：选项A  B：选项B
         </p>
     </div>
 
-    <script type="module" src="src/main.js?v=1051"></script>
+    <script type="module" src="src/main.js?v=1052"></script>
 </body>
 </html>
