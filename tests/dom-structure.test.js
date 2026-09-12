@@ -764,32 +764,59 @@ test('版本记录住在「题库设置」里,且每条都能删(👤 2026-09-11
     assert.ok(/#editor-bank-admin|editor-bank-admin/.test(bank), '版本面板应挂在题库设置容器里');
 });
 
-test('题库页头部:导出全部在「＋ 创建题库」左边(👤 2026-09-12)', () => {
+test('题库页头部:标题 + 一行三键(导出题库 / ＋ 创建题库 / 🗑 回收站)(👤 2026-09-12)', () => {
     const banksSection = html.slice(html.indexOf('id="banks-section"'), html.indexOf('<!-- 创建题库模态框'));
     const header = banksSection.slice(banksSection.indexOf('banks-header'), banksSection.indexOf('banks-list'));
     const exportIdx = header.indexOf('export-all-btn');
     const createIdx = header.indexOf('create-bank-btn');
     const recIdx = header.indexOf('recycle-bin');
-    assert.ok(exportIdx > -1, '「导出全部」应在题库页头部');
-    assert.ok(exportIdx < createIdx, '「导出全部」应在「＋ 创建题库」**左边**');
-    assert.ok(createIdx < recIdx, '回收站仍在创建按钮右侧(不因搬家而乱序)');
-    // 与回收站同一套"描边胶囊"外观,主键仍是实心的「＋ 创建题库」
-    const cls = (header.match(/id="export-all-btn"[^>]*class="([^"]*)"/) || [])[1] || '';
-    assert.ok(cls.split(/\s+/).includes('header-tool'), '导出全部应用 .header-tool(与回收站同款)');
-    const pill = cssNoComments.match(/\n\.banks-header \.header-tool,\n\.recycle-pop > summary \{([^}]*)\}/);
-    assert.ok(pill, '「导出全部」与「🗑 回收站」应共用同一条描边胶囊规则');
-    assert.ok(/border\s*:\s*1px/.test(pill[1]) && /border-radius\s*:\s*999px/.test(pill[1]), '胶囊 = 描边 + 全圆角');
-    // 靠右的 auto 边距必须挂在**这一组的第一个**(导出全部)上,挂到创建按钮上会把两者顶开一道缝
-    assert.ok(/\.banks-header #export-all-btn\s*\{\s*margin-left\s*:\s*auto/.test(cssNoComments),
-        'auto 边距应在导出全部上(它才是右侧那组的排头)');
-    assert.ok(!/\.banks-header #create-bank-btn\s*\{[^}]*margin-left\s*:\s*auto/.test(cssNoComments),
-        '创建按钮不该再带 auto 边距');
-    // 手机档:胶囊键也要够得着
-    assert.ok(/\.banks-header \.header-tool,\s*\n\s*\.recycle-pop > summary \{ min-height: 40px/.test(cssNoComments),
-        '手机档应把胶囊键放大到 40px');
-    // 导出全部**离开**了题库设置(那条守卫在设置页的用例里),这里再钉一次反向
+    assert.ok(exportIdx > -1 && createIdx > -1 && recIdx > -1, '三键都要在题库页头部');
+    assert.ok(exportIdx < createIdx && createIdx < recIdx, '顺序应为 导出题库 → ＋ 创建题库 → 🗑 回收站');
+    // ① 三键同属一个容器:窄屏整组一起换行,不会被拆散到两行去
+    const groupStart = header.indexOf('banks-header-actions');
+    assert.ok(groupStart > -1 && groupStart < exportIdx, '三键应包在 .banks-header-actions 里');
+    const group = header.slice(groupStart, header.indexOf('</div>', header.lastIndexOf('recycle-list')));
+    for (const id of ['export-all-btn', 'create-bank-btn', 'recycle-bin']) {
+        assert.ok(group.includes(id), `${id} 应在同一个动作组里`);
+    }
+    // ② 三键同一套外形(同高/同圆角/同字号),只有创建键是实心的
+    const cls = (id) => ((header.match(new RegExp(`id="${id}"[^>]*class="([^"]*)"`)) || [])[1] || '');
+    assert.ok(cls('export-all-btn').split(/\s+/).includes('header-tool'), '导出题库应用 .header-tool');
+    assert.ok(cls('recycle-toggle').split(/\s+/).includes('header-tool'), '回收站也用同一套 .header-tool');
+    assert.ok(cls('create-bank-btn').split(/\s+/).includes('header-cta'), '＋ 创建题库应用 .header-cta');
+    const pill = cssNoComments.match(/\n\.banks-header \.header-tool,\n\.banks-header \.header-cta \{([^}]*)\}/);
+    assert.ok(pill, '三键应共用同一条外形规则(不各写一份,免得日后走散)');
+    assert.ok(/min-height\s*:\s*32px/.test(pill[1]) && /border-radius\s*:\s*999px/.test(pill[1]),
+        '三键 = 32px 高的胶囊');
+    // ⚠️ 取**最后一条** .header-cta 规则:共用外形规则的第二个选择器那一行也长这样
+    //    (`\n.banks-header .header-cta {`),只取第一条会读到共用规则(踩过)
+    const ctaRules = [...cssNoComments.matchAll(/\n\.banks-header \.header-cta \{([^}]*)\}/g)].map(m => m[1]);
+    const cta = ctaRules[ctaRules.length - 1];
+    assert.ok(/background\s*:\s*var\(--c-primary\)/.test(cta), '创建键应是唯一的实心主键');
+    const tool = cssNoComments.match(/\n\.banks-header \.header-tool:hover \{([^}]*)\}/)[1];
+    assert.ok(/background\s*:\s*var\(--c-info-bg\)/.test(tool), '描边键 hover 才染底色');
+    // ③ 靠右靠"标题吃右侧空隙",不靠挂在某个键上的 auto 边距(那会把相邻两键顶开一道缝)
+    const h3 = cssNoComments.match(/\n\.banks-header h3 \{([^}]*)\}/);
+    assert.ok(h3 && /margin\s*:\s*0 auto 0 0/.test(h3[1]), '标题应 margin-right:auto(整组自然贴右)');
+    assert.ok(!/margin-left\s*:\s*auto/.test(cssNoComments.match(/\n\.banks-header-actions \{([^}]*)\}/)[1]),
+        '动作组自己不需要 auto 边距');
+    // ④ 标签已按 👤 要求改名:不再有「导出全部」这个说法
+    assert.ok(header.includes('导出题库'), '按钮文案应是「导出题库」');
+    assert.ok(!html.includes('导出全部'), 'index.html 里不该再有「导出全部」');
+    const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
+    assert.ok(!/导出全部/.test(bank), 'bank.js 里不该再有「导出全部」的说法');
+    // ⑤ 手机档:三键放大到 40px,标题收一档给它们腾地方
+    const media = cssNoComments.slice(cssNoComments.indexOf('max-width: 768px'));
+    assert.ok(/\.banks-header \.header-tool,\s*\n\s*\.banks-header \.header-cta \{ min-height: 40px/.test(media),
+        '手机档三键应放大到 40px');
+    // 横向也要省:内边距/键间距收窄,360px 宽才排得下(见 DESIGN v23 的实测数据)
+    assert.ok(/\.banks-header \.header-tool,\s*\n\s*\.banks-header \.header-cta \{ min-height: 40px; padding: 0 9px/.test(media),
+        '手机档三键内边距应收到 9px');
+    assert.ok(/\.banks-header-actions \{ gap: 5px/.test(media), '手机档键间距应收到 5px');
+    assert.ok(/\.banks-header h3 \{ font-size: 15px/.test(media), '手机档标题应收到 15px');
+    // ⑥ 导出题库**离开**了题库设置
     const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
-    assert.ok(!modal.includes('export-all-btn'), '题库设置里不该还有「导出全部」');
+    assert.ok(!modal.includes('export-all-btn'), '题库设置里不该还有它');
 });
 
 test('回收站:在创建按钮右侧,点开是悬浮菜单(👤 2026-09-12)', () => {

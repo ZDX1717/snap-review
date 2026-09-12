@@ -2534,43 +2534,65 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
 }
 
 /* ==================== P0-1.8 信息架构:3 tab + 题库页/首页重排 ==================== */
+/* 题库页头部 = 标题 + **一行三键**(👤 要求:导出题库 / ＋ 创建题库 / 🗑 回收站 与标题同排)。
+   靠右不靠"挂在某个键上的 auto 边距"(那会把相邻两键顶开一道缝),而是标题吃满右侧空隙
+   (h3 的 margin-right:auto)—— 三个键间的 gap 恒定,整组自然贴右。 */
 .banks-header {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: wrap;           /* 窄屏:整组一起换行,组内不拆 */
     gap: 8px;
     align-items: center;
     margin-bottom: 16px;
 }
-/* 标题左、右侧那组动作靠右(👤 要求:导出全部 → 创建题库 → 回收站,自左向右)。
-   auto 边距挂在**这一组的第一个**(导出全部)上,而不是创建按钮上 —— 挂错了两者之间会被顶开一道缝。 */
-.banks-header #export-all-btn { margin-left: auto; }
+.banks-header h3 {
+    /* h3 默认自带上下外边距,这里显式归零 —— 否则它会比按钮高出一截,看着不像"同一行" */
+    margin: 0 auto 0 0;
+}
+.banks-header-actions {
+    display: flex;
+    flex-wrap: nowrap;         /* 三键要么一起在这一行,要么整组一起下去 */
+    align-items: center;
+    gap: 6px;
+}
 .recycle-menu {
     position: relative;        /* 浮层的定位锚点 */
     flex: 0 0 auto;
 }
-/* 题库页头部的次级工具键:「导出全部」与「🗑 回收站」共用同一套描边胶囊外观 ——
-   同级的两个"顺手工具"长得一样,用户才知道它俩是同一类;「＋ 创建题库」仍是唯一的实心主键。
-   (没有另写一份:直接给同一条规则加选择器,免得两处样式日后走散。) */
+/* 三键同一套外形:紧凑胶囊(同高/同圆角/同字号/同内边距)。
+   刻意比正文按钮小一号 —— 它们是"页面级工具",不该和库卡里的操作按钮一样重。 */
 .banks-header .header-tool,
-.recycle-pop > summary {
+.banks-header .header-cta {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     min-height: 32px;
-    padding: 0 10px;
+    padding: 0 11px;
     border: 1px solid var(--c-border);   /* 按钮必须显式声明 border,否则露出默认黑边 */
     border-radius: 999px;
     background: var(--c-surface);
     color: var(--c-text-secondary);
+    font-family: inherit;
     font-size: 13px;
+    line-height: 1;
     cursor: pointer;
     white-space: nowrap;
-    list-style: none;          /* 去掉默认的三角(自己控制外观) */
+    list-style: none;          /* 回收站是 <summary>,去掉默认三角 */
 }
 .recycle-pop > summary::-webkit-details-marker { display: none; }
-.banks-header .header-tool:hover,
-.recycle-pop > summary:hover {
+.banks-header .header-tool:hover {
     border-color: var(--c-primary);
     color: var(--c-primary);
+    background: var(--c-info-bg);
+}
+/* 「＋ 创建题库」是这一行**唯一**的实心主键:外形与另两键一致,只靠填充色区分主次 */
+.banks-header .header-cta {
+    border-color: var(--c-primary);
+    background: var(--c-primary);
+    color: #fff;
+}
+.banks-header .header-cta:hover {
+    background: var(--c-primary-deep);
+    border-color: var(--c-primary-deep);
 }
 .recycle-pop[open] > summary {
     border-color: var(--c-primary);
@@ -2608,17 +2630,20 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
         right: 0;
         min-width: min(320px, 92vw);
     }
+    /* 手机档:三键统一放大到 **40px 高**(触摸下限),但左右内边距收到 9px、键间距收到 5px ——
+       高度要够、横向要省。实测(2026-09-12):11px/6px 时 360px 宽会差 5px 放不下而换行,
+       收到 9px/5px 后 360px 宽也能和标题并排(320px 才会整组换行)。 */
+    .banks-header-actions { gap: 5px; }
     .banks-header .header-tool,
-    .recycle-pop > summary { min-height: 40px; }
+    .banks-header .header-cta { min-height: 40px; padding: 0 9px; }
 }
 /* 导入卡在首页:去双栏遗留,全宽。
    注意:**不要再给它 margin-top** —— 曾写 24px,叠加在 main 的顶部呼吸位之上,
    成了"导入题库卡片上方多一块空白"(👤 反馈)。顶部间距统一由 --pad-top 控制。 */
 @media (max-width: 768px) {
-    .banks-header .action-btn.small {
-        padding: 7px 10px;
-        font-size: 13px;
-    }
+    /* 手机档把标题也收一档,给三键腾出同一行的空间(360px 宽也能并排) */
+    .banks-header h3 { font-size: 15px; }
+    .banks-header { gap: 6px; }
 }
 
 /* 回收站条目 */
@@ -2787,7 +2812,7 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     font-weight: 600;
     color: var(--c-text-muted);
 }
-/* 动作行:按钮**按内容宽 + 统一下限**(不是撑满整行 —— 一颗"导出全部"拉满 728px
+/* 动作行:按钮**按内容宽 + 统一下限**(不是撑满整行 —— 一颗"清空错题本"拉满 728px
    会在设置页里显得像个主操作,而它只是一次偶尔的数据导出)。桌面一行装得下就并排,
    装不下自动换行。 */
 .admin-btn-row {
