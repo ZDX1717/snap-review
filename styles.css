@@ -970,10 +970,13 @@ h3 {
 
 /* 卡片内的控件改成"半透明白",跟着卡片底色自动适配 ——
    写死 --c-panel-bg 会在彩色底上突兀,而每个色配一套按钮色是维护地狱。 */
-.bank-item[data-color] .bank-card-foot .foot-toggle {
+/* ⚠️ 只覆盖**未展开**的那颗:`:not(.open)` 不能省 ——
+   展开态(.open)必须是"实心主色 + 白字";若被这条半透明白底盖住,就成了**白字压在白底上**,
+   浅色卡片上完全看不见(👤 反馈:"点错题/收藏后字体与背景区分不开")。 */
+.bank-item[data-color] .bank-card-foot .foot-toggle:not(.open) {
     background: rgba(255, 255, 255, 0.62);
 }
-html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
+html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle:not(.open) {
     background: rgba(255, 255, 255, 0.08);
 }
 

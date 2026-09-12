@@ -478,6 +478,28 @@ test('错题/收藏的渲染只有一处(库卡内嵌面板),不得再有独立�
     }
 });
 
+test('配色卡片的脚部按钮:展开态必须实心主色 + 白字(👤 反馈:点开后字和背景分不开)', () => {
+    // 根因:为"适配任意底色"给配色卡片的脚部键加了半透明白底,但那条覆盖**连 .open 一起盖了** ——
+    // 展开态本来要变成实心主色 + 白字,结果成了"白字压在半透明白底上",浅色卡片上完全看不见。
+    const lightAt = cssNoComments.indexOf('.bank-item[data-color] .bank-card-foot .foot-toggle');
+    assert.ok(lightAt > -1, '应有"配色卡片脚部键"的覆盖规则');
+    for (const m of cssNoComments.matchAll(/\n\.bank-item\[data-color\] \.bank-card-foot \.foot-toggle([^{]*)\{/g)) {
+        assert.ok(/:not\(\.open\)/.test(m[1]), '这条覆盖必须带 :not(.open),否则会盖掉展开态的主色底');
+    }
+    for (const m of cssNoComments.matchAll(/\nhtml\[data-theme="dark"\] \.bank-item\[data-color\] \.bank-card-foot \.foot-toggle([^{]*)\{/g)) {
+        assert.ok(/:not\(\.open\)/.test(m[1]), '暗色那条同样要带 :not(.open)');
+    }
+    // 展开态:实心主色 + 白字(含 <b> 里的计数)
+    const openRule = cssNoComments.match(/\n\.bank-card-foot \.foot-toggle\.open \{([^}]*)\}/)[1];
+    assert.ok(/background\s*:\s*var\(--c-primary\)/.test(openRule), '展开态应是实心主色');
+    assert.ok(/color\s*:\s*#fff/.test(openRule), '展开态应是白字');
+    assert.ok(/color\s*:\s*#fff/.test(cssNoComments.match(/\n\.bank-card-foot \.foot-toggle\.open b \{([^}]*)\}/)[1]),
+        '展开态里的计数 <b> 也要白字');
+    // 未展开态:配色卡片用半透明白底(适配任意底色),灰卡用面板底色
+    const base = cssNoComments.match(/\n\.bank-card-foot \.foot-toggle \{([^}]*)\}/)[1];
+    assert.ok(/background\s*:\s*var\(--c-panel-bg\)/.test(base), '默认(灰卡)用面板底色');
+});
+
 test('题库卡不得再出现左侧主色装饰条(👤 2026-09-11 改成配色底)', () => {
     // 历史:库卡曾是 `border-left: 4px solid var(--c-primary)`,👤 要求改成"低饱和彩色底+框"。
     // 这条守卫防止旧样式被顺手恢复 —— 那种 4px 主色竖条是上一代的视觉语言。
