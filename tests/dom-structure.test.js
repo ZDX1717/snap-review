@@ -522,6 +522,10 @@ test('编辑器:题目级操作与题库级操作彻底分开', () => {
     const qPanelStart = modal.indexOf('editor-question-panel');
     const qPanel = modal.slice(qPanelStart, modal.indexOf('editor-bank-panel'));
     assert.ok(!qPanel.includes('bank-delete-btn'), '「删除题库」不得出现在题目编辑页(防误点)');
+    // 👤 要求删掉「当前题库:xxx」那行:库名在编辑器标题栏已经写着,同一屏再挂一遍是噪音
+    // (它原来还是"改名后不刷新"的现场 —— 保留它就等于把旧名字留在屏幕上)
+    assert.ok(!html.includes('editor-bank-name-current'), '「当前题库:xxx」那行应已从 HTML 删除');
+    assert.ok(!bankPanel.includes('当前题库'), '题库设置页不该再有「当前题库」字样');
 });
 
 test('编辑器:题目页的顺序 = 动作行 → 题号列表 → 题目表单(👤 定调)', () => {

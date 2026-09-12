@@ -59,7 +59,6 @@ const editorBody = document.querySelector('.editor-body');
 const editorTabQuestion = document.getElementById('editor-tab-question');
 const editorTabBank = document.getElementById('editor-tab-bank');
 const editorTabQuestionCount = document.getElementById('editor-tab-question-count');
-const editorBankNameCurrent = document.getElementById('editor-bank-name-current');
 const bankColorNote = document.getElementById('bank-color-note');
 const editorAiAnswerNote = document.getElementById('editor-ai-answer-note');
 const lastImportInfo = document.getElementById('last-import-info');
@@ -2361,11 +2360,10 @@ export function renderBankEditor() {
     addRow.addEventListener('click', () => editorAddQuestion());
     editorQuestionList.appendChild(addRow);
 
-    // 头部进度与列表计数(手机上列表是收起的,进度必须常显 —— 它是"我在第几题"的唯一线索)
+    // 头部进度与列表计数(列表常显,进度与计数是"我在第几题"的第一眼线索)
     const shown = questions.filter(q => !pendingOnly || !q.answer).length;
     if (editorListCount) editorListCount.textContent = pendingOnly ? `待补 ${shown}` : `共 ${questions.length} 题`;
     if (editorTabQuestionCount) editorTabQuestionCount.textContent = pendingOnly ? `待补 ${shown}` : `${questions.length}`;
-    if (editorBankNameCurrent) editorBankNameCurrent.textContent = state.editBankName || '';
 
     if (questions.length === 0 || !questions[state.editIndex]) {
         editorForm.classList.add('hidden');
