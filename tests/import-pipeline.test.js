@@ -202,16 +202,21 @@ test('覆盖模式(overwrite)清空目标后导入', () => {
 // ==================== 多题库导出/导入往返(👤 2026-09-12)====================
 // 本文件的 loadApp 在模块顶层(共享实例),故这里不另开 describe/before —— 直接复用 run/elements/sandbox。
 
-// 抓住「导出题库」真正写出去的那段文本:替换 Blob / createObjectURL / a.click 三个出口
-function captureExport() {
+// 抓住「导出题库」真正写出去的那段文本 + 文件名:替换 Blob / createObjectURL / a.click 三个出口
+function captureExport(call = 'exportAllBanks()') {
     let text = null;
+    let filename = null;
     const origCreate = sandbox.document.createElement;
     sandbox.Blob = class { constructor(parts) { text = String(parts.join('')); } };
     sandbox.URL.createObjectURL = () => 'blob:test';
     sandbox.URL.revokeObjectURL = () => {};
-    sandbox.document.createElement = (tag) => { const el = origCreate(tag); el.click = () => {}; return el; };
-    try { run('exportAllBanks()'); } finally { sandbox.document.createElement = origCreate; }
-    return text;
+    sandbox.document.createElement = (tag) => {
+        const el = origCreate(tag);
+        el.click = () => { filename = el.download; };
+        return el;
+    };
+    try { run(call); } finally { sandbox.document.createElement = origCreate; }
+    return { text, filename };
 }
 
 test('导出:逐库写分节标题;解析回来仍是分好的多库', () => {
@@ -220,12 +225,26 @@ test('导出:逐库写分节标题;解析回来仍是分好的多库', () => {
         '乙库': [{ content: '乙一', type: '单选', options: { A: '甲', B: '乙' }, answer: 'B' },
                  { content: '乙二', type: '判断', options: { A: '正确', B: '错误' }, answer: 'A' }]
     }`);
-    const text = captureExport();
+    const { text } = captureExport();
     assert.ok(text && text.includes('题库：甲库') && text.includes('题库：乙库'), '导出内容应含两个分节标题');
     const names = JSON.parse(run(`JSON.stringify(splitBankSections(${JSON.stringify(text)}).map(s => s.name))`));
     assert.deepStrictEqual(names, ['甲库', '乙库'], '解析回来应仍是两个库');
     const counts = JSON.parse(run(`JSON.stringify(splitBankSections(${JSON.stringify(text)}).map(s => parseQuestionsText(s.text).length))`));
     assert.deepStrictEqual(counts, [1, 2], '每节的题数要对得上');
+});
+
+test('导出文件名带时间戳(👤 要求):同一天导多次也分得清', () => {
+    run(`questionBanks = { '甲库': [{ content: '甲一', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A' }] }`);
+    const all = captureExport('exportAllBanks()').filename;
+    const one = captureExport(`exportBank('甲库')`).filename;
+    // 形如 所有题库-20260912-1523.txt / 甲库-20260912-1523.txt
+    assert.ok(/^所有题库-\d{8}-\d{4}\.txt$/.test(all), '导出题库的文件名应带时间戳,实际:' + all);
+    assert.ok(/^甲库-\d{8}-\d{4}\.txt$/.test(one), '导出本库的文件名应带时间戳,实际:' + one);
+    // 时间戳就是"当下":年月日时分,且两位补零(排序友好)
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+    assert.ok(all.includes(stamp), `时间戳应是当前时刻(${stamp}),实际:${all}`);
 });
 
 test('导入:多库文件自动切库,默认"按题库分别导入"', () => {

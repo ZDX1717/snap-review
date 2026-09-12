@@ -1365,6 +1365,16 @@ export function deleteBank(bankName) {
 
 
 
+// 导出文件名 = 名字 + 时间戳(👤 要求)。
+// 为什么:`所有题库.txt` 同一天导两次,浏览器只会给你 `(1)(2)` 这种含糊后缀,
+// 过几天回头看根本分不清哪份是哪份;时间戳让文件名自带"这是一次快照"的信息。
+// 格式:所有题库-20260912-1523.txt(纯数字 + 连字符,Windows / macOS / 安卓都不挑;时间戳按本地时间)。
+function exportFileName(base) {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    return `${base}-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.txt`;
+}
+
 // 导出单个题库
 export function exportBank(bankName) {
     const questions = state.questionBanks[bankName];
@@ -1374,7 +1384,7 @@ export function exportBank(bankName) {
     }
 
     const content = formatQuestionsForExport(questions);
-    downloadFile(`${bankName}.txt`, content);
+    downloadFile(exportFileName(bankName), content);
 }
 
 
@@ -1403,7 +1413,7 @@ export function exportAllBanks() {
         return;
     }
 
-    downloadFile('所有题库.txt', allContent);
+    downloadFile(exportFileName('所有题库'), allContent);
 }
 
 
