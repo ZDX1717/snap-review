@@ -1614,17 +1614,22 @@ export function editorRenderForm() {
     if (editorAiAnswerNote) editorAiAnswerNote.textContent = '';
     if (bankColorNote) bankColorNote.textContent = '';
     renderBankColorPicker();
-    // 换题时收起「题库设置」:它和"改这一道题"不是一回事,展开着最容易误点删除题库
-    // 版本记录挂在「题库设置」里(👤 定调):它与配色/重命名一样属于整库设置,不属于某一道题
-    const bankAdmin = document.getElementById('editor-bank-admin');
+    // 版本记录挂在「题库设置」块里(👤 定调):它与配色/重命名一样属于整库设置,不属于某一道题
     const bankName = state.editBankName;
-    if (bankAdmin && bankName) {
+    // 版本面板挂在**宿主容器**里(#editor-versions-host,位于「错题本」与「危险操作」两块之间)。
+    // 不能直接挂在 #editor-bank-admin 末尾:那会跑到危险区下面去 —— 而 DOM 只有 appendChild,
+    // 没有"插到某个兄弟前面"的便捷写法(insertBefore 在测试桩里也没有)。
+    if (bankName) {
+        const host = document.getElementById('editor-versions-host')
+            || document.getElementById('editor-bank-admin');
         // ⚠️ 用 removeChild 而不是 el.remove():vm 测试桩的元素桩没有 remove 方法,
         //    用它会直接 TypeError(踩过)。这里只摘掉上一次渲染的版本面板,其余兄弟节点保留。
-        const prev = bankAdmin.querySelector('.bank-versions-panel');
-        if (prev) bankAdmin.removeChild(prev);
-        const verPanel = renderVersionsForBank(state.editBankName);
-        if (verPanel) bankAdmin.appendChild(verPanel);
+        if (host) {
+            const prev = host.querySelector('.bank-versions-panel');
+            if (prev) host.removeChild(prev);
+            const verPanel = renderVersionsForBank(bankName);
+            if (verPanel) host.appendChild(verPanel);
+        }
     }
     const q = currentEditBank()[state.editIndex];
     if (!q) return;

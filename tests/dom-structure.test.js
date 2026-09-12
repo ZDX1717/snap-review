@@ -528,6 +528,79 @@ test('编辑器:题目级操作与题库级操作彻底分开', () => {
     assert.ok(!bankPanel.includes('当前题库'), '题库设置页不该再有「当前题库」字样');
 });
 
+test('题库设置:按作用对象分块,「删除题库」独占最底部的危险区(👤 2026-09-12 重新规划)', () => {
+    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
+    const panelStart = modal.indexOf('editor-bank-panel');
+    const panel = modal.slice(panelStart, modal.indexOf('</section>', panelStart));
+    // ① 结构 = 若干块,每块 = 小标题 + 该块自己的控件;标题连顺序就是这份信息架构。
+    //    ⚠️ 位置一律取**标题标签**的下标,不能拿关键词 indexOf 去搜 —— 说明性注释里也会提到
+    //       「危险操作」,搜串会得到"注释的位置"(踩过)。
+    const marks = [...panel.matchAll(/<h4 class="admin-block-title">([^<]+)<\/h4>/g)]
+        .map(m => ({ k: m[1], i: m.index }));
+    const order = marks.concat([{ k: '版本记录', i: panel.indexOf('editor-versions-host') }])
+        .sort((a, b) => a.i - b.i).map(x => x.k);
+    assert.deepStrictEqual(order, ['卡片配色', '本库', '全部题库', '错题本', '版本记录', '危险操作'],
+        '块的顺序应为 配色 → 本库 → 全部题库 → 错题本 → 版本记录 → 危险操作');
+    assert.ok(marks.length >= 5, '设置页至少要分五块');
+    for (const m of marks) assert.ok(m.i > -1 && m.k.trim(), '每块都要有小标题');
+
+    // ② 版本记录宿主夹在「错题本」与「危险操作」之间(标题由 JS 渲染,故不在 marks 里)
+    const hostAt = panel.indexOf('editor-versions-host');
+    assert.ok(hostAt > -1 && hostAt < panel.indexOf('admin-danger-block'), '版本记录块应在危险区**之前**');
+
+    // ③ 「删除题库」独占危险区,与任何日常动作都不在同一块里(👤 反复强调防误点)
+    const dangerAt = panel.indexOf('admin-danger-block');
+    assert.ok(dangerAt > -1, '应有危险区');
+    const danger = panel.slice(dangerAt);
+    assert.ok(danger.includes('bank-delete-btn'), '「删除题库」应在危险区里');
+    assert.ok(!/bank-rename-btn|bank-export-btn|export-all-btn|clear-errors-btn|bank-color-picker/.test(danger),
+        '危险区里不得混进日常动作');
+    assert.ok(!panel.slice(0, dangerAt).includes('bank-delete-btn'),
+        '日常动作块里不得出现「删除题库」');
+    assert.ok(!/bank-delete-btn/.test(panel.slice(0, panel.lastIndexOf('admin-block-title'))), '危险区必须是最后一块');
+
+    // ④ 设置页按钮统一用 .admin-btn(尺寸/形状由设置页自己定,不再借主操作区的 .action-btn)
+    for (const [id, isDanger] of [['bank-rename-btn', false], ['bank-export-btn', false],
+        ['export-all-btn', false], ['clear-errors-btn', true], ['bank-delete-btn', true]]) {
+        const m = panel.match(new RegExp(`id="${id}"[^>]*class="([^"]*)"`));
+        assert.ok(m, `${id} 应在设置页里`);
+        assert.ok(m[1].split(/\s+/).includes('admin-btn'), `${id} 应用 .admin-btn`);
+        assert.strictEqual(m[1].split(/\s+/).includes('danger'), isDanger, `${id} 的危险态标记不对`);
+    }
+    assert.ok(!/action-btn/.test(panel), '设置页不该再混用 .action-btn(尺寸散在两套样式里最难维护)');
+
+    // ⑤ 版本记录挂在宿主里,而不是直接挂在容器末尾 —— 否则它会被 appendChild 甩到危险区下面
+    const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
+    assert.ok(/editor-versions-host/.test(bank), '版本面板应挂进 #editor-versions-host');
+    assert.ok(!/bankAdmin\.appendChild\(verPanel\)/.test(bank), '不该再直接挂在 #editor-bank-admin 末尾');
+    assert.ok(panel.indexOf('editor-versions-host') < dangerAt, '版本记录块应在危险区**之前**');
+
+    // ⑥ 样式:块/标题/动作行/按钮四件套齐备;桌面 40px、手机 44px
+    for (const sel of ['.admin-block', '.admin-block-title', '.admin-btn-row', '.admin-btn']) {
+        assert.ok(cssNoComments.includes(sel), `缺 ${sel} 样式`);
+    }
+    const row = cssNoComments.match(/\.admin-btn-row\s*\{([^}]*)\}/)[1];
+    assert.ok(/display\s*:\s*flex/.test(row) && /flex-wrap\s*:\s*wrap/.test(row),
+        '动作行应是可换行的 flex(装不下就换行,不做横向滚动)');
+    const btn = cssNoComments.match(/\.admin-btn\s*\{([^}]*)\}/)[1];
+    assert.ok(/min-height\s*:\s*40px/.test(btn), '桌面档设置按钮 40px');
+    assert.ok(/border-radius/.test(btn) && /border\s*:\s*1px/.test(btn), '设置按钮为描边圆角方框');
+    // 桌面档按钮**不撑满整行**:按内容宽 + 统一下限(否则单颗按钮会拉成 700px 宽的"主操作")
+    assert.ok(/flex\s*:\s*0 0 auto/.test(btn) && /min-width\s*:\s*150px/.test(btn),
+        '桌面档按钮应按内容宽 + 统一下限,不撑满整行');
+    const dangerBtn = cssNoComments.match(/\.admin-btn\.danger\s*\{([^}]*)\}/)[1];
+    assert.ok(/--c-danger/.test(dangerBtn), '危险按钮要用危险色令牌');
+    // 手机档:要注意样式表里有多处 @media(max-width:768px),而设置页的规则在文件后段 ——
+    // 只取"第一处媒体查询之后的片段"再 match 会匹到桌面档那条(踩过),故对所有同名规则求存在性。
+    const rules = (re) => [...String(cssNoComments).matchAll(re)].map(m => m[1]);
+    assert.ok(rules(/\.admin-btn\s*\{([^}]*)\}/g).some(b => /min-height\s*:\s*44px/.test(b)),
+        '手机档设置按钮应 ≥44px');
+    assert.ok(rules(/\.admin-btn\s*\{([^}]*)\}/g).some(b => /flex\s*:\s*1 1/.test(b)),
+        '手机档按钮应改为填满整行(拇指友好)');
+    assert.ok(rules(/\.admin-field select\s*\{([^}]*)\}/g).some(b => /min-height\s*:\s*44px[\s\S]*font-size\s*:\s*16px/.test(b)),
+        '手机档下拉应 44px 且字号 ≥16px(防 iOS 聚焦缩放)');
+});
+
 test('编辑器:题目页的顺序 = 动作行 → 题号列表 → 题目表单(👤 定调)', () => {
     const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
     const order = ['editor-action-row', 'editor-list-block', 'id="editor-form"']
@@ -632,7 +705,7 @@ test('编辑器:手机上可点元素达标(≥44px 触达)', () => {
     const media = cssNoComments.slice(cssNoComments.indexOf('max-width: 768px'));
     const block = media.slice(media.indexOf('.editor-body'));
     for (const sel of ['.editor-option-actions .action-btn', '.editor-nav-row .action-btn',
-        '.editor-foot .action-btn', '.editor-head-actions .action-btn', '.bank-admin-row .action-btn',
+        '.editor-foot .action-btn', '.editor-head-actions .action-btn', '.admin-btn',
         '.bank-color-swatch', '.editor-close-x']) {
         assert.ok(block.includes(sel), `手机档缺 ${sel} 的触达规则`);
     }

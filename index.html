@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=1047">
+    <link rel="stylesheet" href="styles.css?v=1048">
 </head>
 <body>
     <div class="container">
@@ -461,29 +461,61 @@ A：选项A  B：选项B
                     </section>
 
                     <!-- ========== ② 题库设置 ========== -->
+                    <!-- 排版(👤 2026-09-12 重新规划):按**作用对象**分块,一块一个小标题 ——
+                         卡片配色 → 本库 → 全部题库 → 错题本 → 版本记录 → 危险操作。
+                         分块不是为了好看:每块只回答一个问题,用户不必在一排混排按钮里找"哪个是删库"。
+                         「删除题库」单独进最底部的危险区 —— 离日常动作越远越好(👤 反复强调防误点)。 -->
                     <section class="editor-panel editor-bank-panel">
                         <div class="bank-admin" id="editor-bank-admin">
-                            <div class="bank-admin-row bank-color-row">
-                                <span class="bank-color-label">卡片配色</span>
+                            <div class="admin-block">
+                                <h4 class="admin-block-title">卡片配色</h4>
                                 <div id="bank-color-picker" class="bank-color-picker" role="group" aria-label="题库卡配色"></div>
-                                <span id="bank-color-note" class="meta-note"></span>
+                                <p id="bank-color-note" class="meta-note"></p>
                             </div>
-                            <div class="bank-admin-row">
-                                <button id="bank-rename-btn" class="action-btn small secondary">重命名</button>
-                                <button id="bank-export-btn" class="action-btn small secondary">导出本库</button>
-                                <button id="bank-delete-btn" class="action-btn small secondary">删除题库</button>
+
+                            <div class="admin-block">
+                                <h4 class="admin-block-title">本库</h4>
+                                <div class="admin-btn-row">
+                                    <button id="bank-rename-btn" class="admin-btn">重命名</button>
+                                    <button id="bank-export-btn" class="admin-btn">导出本库</button>
+                                </div>
                             </div>
-                            <div class="bank-admin-row">
-                                <button id="export-all-btn" class="action-btn small secondary">导出全部</button>
-                                <button id="clear-errors-btn" class="action-btn small secondary">清空错题本</button>
-                                <label class="inline-label">移出规则
+
+                            <div class="admin-block">
+                                <h4 class="admin-block-title">全部题库</h4>
+                                <div class="admin-btn-row">
+                                    <button id="export-all-btn" class="admin-btn">导出全部</button>
+                                </div>
+                            </div>
+
+                            <div class="admin-block">
+                                <h4 class="admin-block-title">错题本</h4>
+                                <div class="admin-field">
+                                    <label for="mastery-threshold-select">移出规则</label>
                                     <select id="mastery-threshold-select">
                                         <option value="0">不移出</option>
                                         <option value="1">答对 1 次</option>
                                         <option value="2" selected>答对 2 次</option>
                                         <option value="3">答对 3 次</option>
                                     </select>
-                                </label>
+                                </div>
+                                <p class="meta-note">连续答对 N 次后自动移出该题;此设置对所有题库生效。</p>
+                                <div class="admin-btn-row">
+                                    <button id="clear-errors-btn" class="admin-btn danger">清空错题本</button>
+                                </div>
+                            </div>
+
+                            <!-- 版本记录由 renderVersionsForBank() 挂进这个宿主(它自带小标题与说明)。
+                                 用宿主容器而不是直接挂在 #editor-bank-admin 上:JS 只有 appendChild,
+                                 挂在末尾就会跑到「危险操作」下面去。 -->
+                            <div id="editor-versions-host"></div>
+
+                            <div class="admin-block admin-danger-block">
+                                <h4 class="admin-block-title">危险操作</h4>
+                                <p class="meta-note">删除后该库的题目、错题与收藏一起进回收站,可以恢复。</p>
+                                <div class="admin-btn-row">
+                                    <button id="bank-delete-btn" class="admin-btn danger">删除题库</button>
+                                </div>
                             </div>
                         </div>
                     </section>
@@ -512,6 +544,6 @@ A：选项A  B：选项B
         </p>
     </div>
 
-    <script type="module" src="src/main.js?v=1047"></script>
+    <script type="module" src="src/main.js?v=1048"></script>
 </body>
 </html>

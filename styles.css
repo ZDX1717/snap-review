@@ -2717,14 +2717,6 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
 }
 
 /* 题库卡配色色板(编辑器内):每个色块直接用**卡片同款**底+框,所见即所得 */
-.bank-color-row {
-    align-items: center;
-    gap: 8px;
-}
-.bank-color-label {
-    font-size: 13px;
-    color: var(--c-text-secondary);
-}
 .bank-color-picker {
     display: flex;
     flex-wrap: wrap;
@@ -2766,23 +2758,118 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     background: var(--c-info-bg);
 }
 
-/* 编辑器内:题库设置与管理区 */
+/* ---------- 题库设置:分块排版(👤 2026-09-12 重新规划) ----------
+   一块 = 一个小标题 + 该块自己的控件。块的顺序按"作用对象"排:
+   配色 → 本库 → 全部题库 → 错题本 → 版本记录 → 危险操作(最后,且单独染色)。
+   块与块之间只用一条浅分隔线,不再给整页加外框:设置页里 6 条边框会变成栅栏。 */
 .bank-admin {
-    border-top: 1px solid var(--c-border-light);
-    margin-top: 12px;
-    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
 }
-.bank-admin h4 {
+.admin-block {
+    padding: 14px 0;
+    border-top: 1px solid var(--c-border-light);
+}
+.admin-block:first-child {
+    border-top: none;
+    padding-top: 4px;
+}
+.admin-block-title {
     margin: 0 0 8px;
     font-size: 13px;
-    color: var(--c-text-muted);
     font-weight: 600;
+    color: var(--c-text-muted);
 }
-.bank-admin-row {
+/* 动作行:按钮**按内容宽 + 统一下限**(不是撑满整行 —— 一颗"导出全部"拉满 728px
+   会在设置页里显得像个主操作,而它只是一次偶尔的数据导出)。桌面一行装得下就并排,
+   装不下自动换行。 */
+.admin-btn-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
+}
+/* 设置页的按钮:比主操作区小一号(这里是"偶尔来一次"的地方),圆角方框 + 悬停染主色 */
+.admin-btn {
+    display: inline-flex;
     align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;      /* 桌面:宽度跟着文案走(手机档才改成填满整行) */
+    min-width: 150px;    /* 同一行几个按钮宽度一致,不会因为"重命名"三个字比"导出本库"窄而参差 */
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    background: var(--c-surface);
+    color: var(--c-text-secondary);
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+.admin-btn:hover {
+    border-color: var(--c-primary);
+    color: var(--c-primary);
+    background: var(--c-info-bg);
+}
+/* 危险动作:描边红 + 红字(不用实心红 —— 设置页里实心红按钮太吵,但也不能混进普通按钮里认不出来) */
+.admin-btn.danger {
+    border-color: var(--c-danger);
+    color: var(--c-danger-text);
+}
+.admin-btn.danger:hover {
+    background: var(--c-danger-bg);
+}
+/* 危险区:整块淡红底 + 红标题,与上面几块一眼分开(👤 反复强调防误点) */
+.admin-danger-block {
+    margin: 8px 0 4px;
+    padding: 14px;
+    border: 1px solid var(--c-danger-bg);
+    border-radius: 8px;
+    background: var(--c-danger-soft);
+}
+.admin-danger-block .admin-block-title {
+    color: var(--c-danger-text);
+}
+/* 设置项:文案在控件**左边**(与编辑器表单同一口诀),窄屏整体换行不横向滚动 */
+.admin-field {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.admin-field > label {
+    flex: 0 0 auto;
+    font-size: 13px;
+    color: var(--c-text-secondary);
+}
+.admin-field select {
+    flex: 0 1 200px;
+    min-height: 40px;   /* 与同一块的按钮等高,基线才对得齐 */
+    padding: 0 8px;
+    border: 1px solid var(--c-border);
+    border-radius: 6px;
+    background: var(--c-surface);
+    color: var(--c-text);
+    font-family: inherit;
+    font-size: 14px;
+}
+/* 块里的说明文字:浏览器给 <p> 的默认上下边距在这个紧凑排版里太大,统一收一道 */
+.admin-block .meta-note,
+#editor-versions-host .meta-note {
+    margin: 0 0 10px;
+    line-height: 1.5;
+}
+/* 版本记录在设置页里也是一个块:去掉卡片态底色/圆角,只留与其它块一致的分隔线 */
+#editor-versions-host .bank-versions-panel {
+    margin: 0;
+    padding: 14px 0;
+    border-top: 1px solid var(--c-border-light);
+    border-radius: 0;
+    background: none;
+}
+#editor-versions-host:empty {
+    display: none;   /* 没挂上面板时不占一条空分隔线 */
 }
 
 /* 库卡四象限布局(👤 定稿) */
@@ -3249,7 +3336,10 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     .editor-nav-row .action-btn,
     .editor-foot .action-btn,
     .editor-head-actions .action-btn,
-    .bank-admin-row .action-btn {
+    /* 设置页按钮:手机档改成**填满整行**(拇指友好 —— 手机上一行两颗各占一半,单颗独占一行),
+       并覆盖桌面档的 40px(手机上 40 是下限里偏紧的一档)。 */
+    .admin-btn {
+        flex: 1 1 140px;
         min-height: 44px;
         padding: 0 14px;
     }
@@ -3282,10 +3372,11 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
         height: 40px;
         font-size: 18px;
     }
-    .bank-admin-row select {
+    .admin-field select {
         min-height: 44px;
-        font-size: 16px;
+        font-size: 16px;   /* ≥16px 防 iOS 聚焦缩放 */
     }
+    .admin-danger-block { padding: 12px; }
     /* 复选框:label 整行可点(单点 13px 的方框太苛刻),方框本身也放大到 20px */
     #edit-bank-modal .inline-label {
         display: inline-flex;
