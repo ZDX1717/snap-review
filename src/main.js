@@ -131,7 +131,6 @@ const editBankTitle = document.getElementById('edit-bank-title');
 const editorQuestionList = document.getElementById('editor-question-list');
 const editorForm = document.getElementById('editor-form');
 const editorEmpty = document.getElementById('editor-empty');
-const editorAddBtn = document.getElementById('editor-add-btn');
 const editorStem = document.getElementById('editor-stem');
 const editorType = document.getElementById('editor-type');
 const editorAnswer = document.getElementById('editor-answer');
@@ -150,7 +149,7 @@ const editorAnalysis = document.getElementById('editor-analysis');
 const editorPendingOnly = document.getElementById('editor-pending-only');
 const editorHistRow = document.getElementById('editor-hist-row');
 const bankRenameBtn = document.getElementById('bank-rename-btn');
-const bankDedupBtn = document.getElementById('bank-dedup-btn');
+const bankDedupBtn = document.getElementById('editor-dedup-btn');   // 去重已移到题目列表上方(👤 要求)
 const bankExportBtn = document.getElementById('bank-export-btn');
 const bankDeleteBtn = document.getElementById('bank-delete-btn');
 
@@ -318,7 +317,6 @@ function setupEventListeners() {
     if (clearErrorsBtn) clearErrorsBtn.addEventListener('click', clearErrors);
 
     // 题库编辑器
-    editorAddBtn.addEventListener('click', editorAddQuestion);
     editorAiAnswerBtn.addEventListener('click', editorAiAnswer);
     // 头部:题号列表开合 / 新增 / 关闭(与底部「关闭」同一处理路径,不另写一套)
     editorHeadCloseBtn.addEventListener('click', editorClose);

@@ -2273,6 +2273,17 @@ export function renderBankEditor() {
         editorQuestionList.appendChild(row);
     });
 
+    // 列表末尾的「＋」(👤 要求):新增题目不再是动作行里的按钮,而是列表的最后一行 ——
+    // 位置本身就在说"往这里再加一道"。始终可见,故"只看待补"筛选后也能加题。
+    const addRow = document.createElement('button');
+    addRow.type = 'button';
+    addRow.className = 'editor-list-add';
+    addRow.title = '新增题目';
+    addRow.setAttribute('aria-label', '新增题目');
+    addRow.textContent = '＋';
+    addRow.addEventListener('click', () => editorAddQuestion());
+    editorQuestionList.appendChild(addRow);
+
     // 头部进度与列表计数(手机上列表是收起的,进度必须常显 —— 它是"我在第几题"的唯一线索)
     const shown = questions.filter(q => !pendingOnly || !q.answer).length;
     if (editorListCount) editorListCount.textContent = pendingOnly ? `待补 ${shown}` : `共 ${questions.length} 题`;

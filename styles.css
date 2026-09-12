@@ -1470,6 +1470,29 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
 }
 .editor-list-caret { display: inline-block; transition: transform 0.15s; }
 
+/* 列表末尾的「＋」:新增题目这一行本身(👤 要求:按钮变成列表末尾的加号) */
+.editor-list-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 40px;
+    margin-top: 4px;
+    border: 1px dashed var(--c-border);   /* 虚线 = "这里还能再加一行" */
+    border-radius: 6px;
+    background: none;
+    color: var(--c-text-muted);
+    font-family: inherit;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+.editor-list-add:hover {
+    border-color: var(--c-primary);
+    color: var(--c-primary);
+    background: var(--c-info-bg);
+}
+
 /* 题号列表项:左边正文可点选,右边一个小 ✕ 直接删(👤 要求:能增能减) */
 .editor-list-row {
     display: flex;
@@ -3111,6 +3134,7 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     /* 零散控件也要够得着:色块、AI 补答案、关闭 ✕、移出规则下拉、复选框 */
     .bank-color-swatch { min-height: 44px; padding: 0 12px; }
     .editor-list-del { min-width: 44px; font-size: 14px; }
+    .editor-list-add { min-height: 44px; }
     .editor-tab { min-height: 44px; }
     .editor-list-toggle { min-height: 44px; font-size: 14px; }
     /* 左标签在手机上收窄一档:文案仍完整,字段能多出一列字的宽度 */

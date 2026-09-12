@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=1041">
+    <link rel="stylesheet" href="styles.css?v=1042">
 </head>
 <body>
     <div class="container">
@@ -382,7 +382,7 @@ A：选项A  B：选项B
                         <div class="editor-action-row">
                             <label class="inline-label editor-pending-label"><input type="checkbox" id="editor-pending-only"> 只看待补答案</label>
                             <div class="editor-action-buttons">
-                                <button id="editor-add-btn" class="action-btn secondary">＋ 新增题目</button>
+                                <button id="editor-dedup-btn" class="action-btn small secondary" title="按题干+选项查重，保留最早导入的版本">去重</button>
                                 <button id="editor-save-btn" class="action-btn">保存本题</button>
                             </div>
                         </div>
@@ -390,6 +390,8 @@ A：选项A  B：选项B
                         <!-- 题号列表:常显不收起(👤 要求);每行自带删除键 -->
                         <div class="editor-list-block">
                             <p class="editor-panel-title">题目列表 <span id="editor-list-count" class="editor-panel-count"></span></p>
+                            <!-- 列表容器内含末尾的「＋」(👤 要求:新增按钮变成列表末尾的加号) ——
+                                 由 renderBankEditor 把加号追加在最后一项之后,不单独占一行 -->
                             <div id="editor-question-list" class="editor-question-list"></div>
                         </div>
 
@@ -459,7 +461,6 @@ A：选项A  B：选项B
                             </div>
                             <div class="bank-admin-row">
                                 <button id="bank-rename-btn" class="action-btn small secondary">重命名</button>
-                                <button id="bank-dedup-btn" class="action-btn small secondary">去重</button>
                                 <button id="bank-export-btn" class="action-btn small secondary">导出本库</button>
                                 <button id="bank-delete-btn" class="action-btn small secondary">删除题库</button>
                             </div>
@@ -502,6 +503,6 @@ A：选项A  B：选项B
         </p>
     </div>
 
-    <script type="module" src="src/main.js?v=1041"></script>
+    <script type="module" src="src/main.js?v=1042"></script>
 </body>
 </html>

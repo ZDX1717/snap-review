@@ -499,11 +499,17 @@ test('编辑器:题目级操作与题库级操作彻底分开', () => {
     assert.ok(!modal.includes('editor-foot'), '底栏应已取消');
     const actionRow = modal.slice(modal.indexOf('editor-action-row'), modal.indexOf('editor-list-block'));
     assert.ok(actionRow.includes('editor-save-btn'), '「保存本题」应在题目列表上方的动作行里');
-    assert.ok(actionRow.includes('editor-add-btn'), '「新增题目」应在同一动作行');
     assert.ok(actionRow.includes('editor-pending-only'), '「只看待补答案」也在这行');
+    // 去重从「题库设置」搬到了题目列表上方(👤 要求:它作用于整库,但要在改题时随手可用)
+    assert.ok(actionRow.includes('editor-dedup-btn'), '「去重」应在题目列表上方的动作行里');
+    assert.ok(!modal.includes('bank-dedup-btn'), '「去重」不应再留在题库设置里');
+    // 新增题目不再是动作行的按钮,而是**题号列表末尾的加号**(👤 要求)
+    assert.ok(!actionRow.includes('editor-add-btn'), '「新增题目」按钮应已从动作行移除');
+    const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
+    assert.ok(/editor-list-add/.test(bank), '列表末尾应渲染一个加号按钮');
+    assert.ok(/editorQuestionList.appendChild\(addRow\)/.test(bank), '加号必须追加在列表最后');
     // 删除某一题:只在题号列表里(每行一个 ✕),不再有「删除本题」按钮
     assert.ok(!modal.includes('editor-delete-btn'), '「删除本题」按钮应已移除(改用列表内删除)');
-    const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
     assert.ok(/editor-list-del/.test(bank), '题号列表每行应有删除键');
     assert.ok(/deleteQuestionAt/.test(bank), '应有按下标删题的函数');
     // 题库级动作仍在独立的「题库设置」标签页里,不与单题编辑混排
