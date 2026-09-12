@@ -616,6 +616,30 @@ test('编辑器:手机上可点元素达标(≥44px 触达)', () => {
     assert.ok(/#edit-bank-modal \.inline-label/.test(block), '复选框应让 label 整行可点');
 });
 
+test('编辑器表单:文案在输入框左边,且判断题为 A/B 口径(👤 定调)', () => {
+    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
+    const form = modal.slice(modal.indexOf('id="editor-form"'), modal.indexOf('editor-empty'));
+    // ① 每个字段 = 「左文案 + 右字段容器」
+    const fields = [...form.matchAll(/<div class="form-group editor-field[^"]*">([\s\S]*?)(?=<div class="form-group editor-field|<\/div>\s*<p id="editor-empty")/g)];
+    assert.ok(fields.length >= 4, `应至少有 4 个字段组,实际 ${fields.length}`);
+    for (const f of fields) {
+        assert.ok(/editor-field-body/.test(f[1]), '每个字段都要有右字段容器 editor-field-body');
+    }
+    // ② 布局靠 CSS 的 flex 实现(标签定宽 → 文案在左)
+    const fieldCss = cssNoComments.match(/\.editor-field\s*\{([^}]*)\}/)[1];
+    assert.ok(/display\s*:\s*flex/.test(fieldCss), '字段应为 flex(左文案 + 右字段)');
+    const labelCss = cssNoComments.match(/\.editor-field > label,\s*\n?\.editor-field > \.form-label\s*\{([^}]*)\}/)[1];
+    assert.ok(/width\s*:/.test(labelCss), '左文案应定宽,才能多行对齐');
+    // ③ 「选项」文案已删(👤 要求)
+    assert.ok(!/>选项</.test(form), '「选项」标题文案应已删除');
+    // ④ 判断题按 A/B 口径写,不再写「对/错」
+    const note = form.match(/class="meta-note">([^<]+)</)[1];
+    assert.ok(/ABD/.test(note), '多选题写法应写明(如 ABD)');
+    assert.ok(/A=正确/.test(note) && /B=错误/.test(note),
+        '判断题应写明 A=正确、B=错误,实际:' + note);
+    assert.ok(!/判断题填「对」/.test(note), '不该再让用户填「对/错」');
+});
+
 test('答题卡抽屉在 <main> 之外(公理:浮层不受 section 显隐牵连)', () => {
     const mainEnd = html.indexOf('</main>');
     const pos = html.indexOf('id="answer-card-drawer"');

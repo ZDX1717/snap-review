@@ -3009,13 +3009,29 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
 }
 .editor-foot-actions { display: flex; gap: 8px; }
 
-/* ---------- 题目内容区:答案紧邻题干,次要字段折叠 ---------- */
-.form-label {
-    display: block;
-    margin-bottom: 6px;
+/* ---------- 题目内容区:文案在**输入框左边**,字段占剩余宽度(👤 要求) ---------- */
+/* 一行一个字段:左标签定宽(对齐),右字段自适应。
+   ⚠️ 用 flex + 固定标签宽而不是表格:窄屏可以整体换行,不必横向滚动。 */
+.editor-field {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+.editor-field > label,
+.editor-field > .form-label {
+    flex: 0 0 auto;
+    width: 4.5em;              /* 容下"题目解释""题型与答案";对齐全靠它 */
+    padding-top: 8px;          /* 与第一行输入文字基线对齐 */
     color: var(--c-text-secondary);
     font-size: 14px;
+    line-height: 1.3;
 }
+.editor-field-body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+/* 选项区没有文案:占满整宽 */
+.editor-field-plain > .editor-field-body { flex: 1 1 100%; }
 .editor-answer-row {
     display: flex;
     gap: 8px;
@@ -3097,6 +3113,9 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     .editor-list-del { min-width: 44px; font-size: 14px; }
     .editor-tab { min-height: 44px; }
     .editor-list-toggle { min-height: 44px; font-size: 14px; }
+    /* 左标签在手机上收窄一档:文案仍完整,字段能多出一列字的宽度 */
+    .editor-field > label,
+    .editor-field > .form-label { width: 4em; font-size: 13px; padding-top: 12px; }
     #editor-add-btn { min-height: 44px; }
     .editor-ai-answer-row .action-btn,
     .editor-option-actions .action-btn { min-height: 44px; }
