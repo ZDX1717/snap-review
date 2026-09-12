@@ -1465,13 +1465,23 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
 /* ---------- 题目列表工具行 + 筛选面板(👤 2026-09-12 重构)----------
    工具行 = 筛选(点开面板)+ 去重 + 计数。三个都是"小工具",统一做成 32px 描边胶囊:
    与库卡/内容区的大按钮拉开层级,一眼看出"这是列表的控制器,不是内容"。 */
+/* 工具行的外层:**sticky 悬浮**(👤 要求:列表滚动时这一行一直贴在顶上)+ 筛选悬浮面板的定位锚。
+   sticky 本身就是"已定位"元素,绝对定位的子元素以它为包含块,所以面板挂在这里是对的;
+   ⚠️ 面板**不能**放进 .editor-toolbar 里 —— 手机档工具行要横向滚动(overflow-x:auto),
+      滚动容器会把绝对定位的面板裁掉。 */
+.editor-toolbar-wrap {
+    position: sticky;
+    top: 0;
+    z-index: 20;                /* 压在列表之上、筛选面板(60)之下 */
+    margin: -4px 0 6px;         /* 负上边距:贴住滚动区顶部时不留缝 */
+    padding: 4px 0 6px;
+    background: var(--c-surface);
+}
 .editor-toolbar {
-    position: relative;         /* 筛选悬浮面板的定位锚 */
     display: flex;
     align-items: center;
     gap: 6px;
     flex-wrap: wrap;
-    margin-bottom: 8px;
 }
 .list-tool {
     display: inline-flex;
@@ -3567,6 +3577,21 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     .editor-body {
         padding: 12px 12px 16px;
     }
+    /* 手机档:工具行**只允许一行**(👤 要求:「🗑 删除」必须和筛选/去重同一行)——
+       挤不下时横向滑动,而不是把批量栏甩到第二行。外边距收紧,把宽度让给按钮。 */
+    .editor-toolbar {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        gap: 5px;
+    }
+    .editor-toolbar::-webkit-scrollbar { display: none; }
+    .editor-toolbar .list-tool,
+    .editor-toolbar .bulk-btn { flex: 0 0 auto; padding: 0 8px; }
+    .bulk-bar { flex: 0 0 auto; margin-left: 2px; gap: 5px; }
+    .bulk-count { font-size: 11px; }
+
     /* 手机档:列表**取消自己的滚动**(👤 反馈"列表太矮、下面一大片空白")——
        原来它被卡在 46vh 的小框里,框下留白;现在让 .editor-body 当唯一滚动容器,列表该多长就多长。 */
     .editor-question-list {

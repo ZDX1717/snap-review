@@ -517,9 +517,11 @@ test('编辑器:题目级操作与题库级操作彻底分开', () => {
     assert.ok(/editor-list-add/.test(bank), '列表末尾应渲染一个加号按钮');
     assert.ok(/editorQuestionList.appendChild\(addRow\)/.test(bank), '加号必须追加在列表最后');
     // 删除/编辑**只在选中之后**出现(👤 要求):它们在批量栏里,而批量栏整条由 .hidden 控制显隐
-    for (const id of ['editor-bulk-edit', 'editor-bulk-delete', 'editor-bulk-all', 'editor-bulk-clear']) {
+    for (const id of ['editor-bulk-delete', 'editor-bulk-all', 'editor-bulk-clear']) {
         assert.ok(toolbar.includes(id), `${id} 应随批量栏出现在工具行里`);
     }
+    // 「✎ 编辑」按钮已去掉:点题目本身就翻开编辑卡片(👤 补充逻辑),它是同一个动作的第二个入口
+    assert.ok(!toolbar.includes('editor-bulk-edit'), '批量栏里不该再有「编辑」键');
     assert.ok(/editorBulkBar\.classList\.toggle\('hidden', selCount === 0\)/.test(bankSrc),
         '批量栏整条"选中才出现" —— 没选中时这一行一个多余按钮都没有');
     assert.ok(!modal.includes('editor-delete-btn'), '「删除本题」按钮应已移除(改用批量删除)');
@@ -665,7 +667,7 @@ test('编辑器:列表 = 复选框 + 序号 + 题干 + 徽章;动作只在选中
     // ② **只有复选框能选中**(👤 要求):行是普通 div,行上不挂任何监听
     const rowRegion = bank.slice(bank.indexOf('// 行 = 普通容器'), bank.indexOf('editorQuestionList.appendChild(row)'));
     assert.ok(/const row = document\.createElement\('div'\)/.test(rowRegion), '行应是普通 div(不是 label)');
-    assert.ok(!/row\.addEventListener/.test(rowRegion), '行本身不许绑事件 —— 点题干不该选中');
+    // 行**要**绑 click,但只用来"选中这道题并打开编辑卡片",绝不是"勾选"(👤 补充逻辑)
     assert.ok(/box\.addEventListener\('change'/.test(rowRegion), '选中入口只有复选框的 change');
     // ③ 徽章:题型 / 待补 / 缺解析 / AI / 历史(它同时是筛选面板的视觉词典)
     assert.ok(/function rowBadges/.test(bank), '应有行内徽章渲染');
@@ -678,11 +680,14 @@ test('编辑器:列表 = 复选框 + 序号 + 题干 + 徽章;动作只在选中
     assert.ok(/pushBankVersion\(state\.editBankName, '批量删除前'/.test(bulkDel.slice(0, 900)),
         '删 ≥2 道要先存一版(可回退)');
     assert.ok(/targets\.length >= 2/.test(bulkDel.slice(0, 900)), '单删不占版本槽(每库只有 3 个)');
-    // ⑤ 编辑只对"恰好 1 道"有效
-    const bulkEdit = bank.slice(bank.indexOf('export function editorBulkEdit'));
-    assert.ok(/sel\.length !== 1/.test(bulkEdit.slice(0, 400)), '编辑只对"恰好选中 1 道"生效');
-    // ⑥ 桩里也得有的方法:checkbox 的 change 由测试直接驱动
-    assert.ok(/editorBulkEditBtn\.disabled = selCount !== 1/.test(bank), '多选时「编辑」按钮应禁用(状态即规则)');
+    // ⑤ 点题目 = 选中该题并翻开编辑卡片;复选框只负责圈选(两条通道各管一件事)
+    assert.ok(/row\.addEventListener\('click'/.test(rowRegion), '行要能点(点题目即选中该题)');
+    assert.ok(/openQuestionCard\(idx\)/.test(rowRegion), '点题目应直接打开它的编辑卡片');
+    assert.ok(/contains\('q-row-check'\)\) return/.test(rowRegion), '点复选框不算"点题目"(否则勾选会顺手掀开卡片)');
+    // ⑥ 「只看勾选」= 复选框喂给筛选器的范围条件
+    assert.ok(/FILTER_GROUPS = \['type', 'status', 'ai', 'marks', 'scope'\]/.test(bank), '筛选分组应含 scope');
+    assert.ok(/focusChecked/.test(bank) && /isSelected\(q\)/.test(bank), 'visibleQuestions 应按"是否勾选"再收一遍');
+    assert.ok(/afterFilterChange\(group === 'scope'\)/.test(bank), '切「只看勾选」时不许清空勾选集(它就是这条条件的输入)');
     // ⑦ 手机档:复选框与批量按钮都要够得着
     const media = cssNoComments.slice(cssNoComments.indexOf('max-width: 768px'));
     assert.ok(/\.q-row-check/.test(media), '手机档应放大行内复选框');

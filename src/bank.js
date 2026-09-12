@@ -65,7 +65,6 @@ const editorFilterCount = document.getElementById('editor-filter-count');
 const editorFilterClear = document.getElementById('editor-filter-clear');
 const editorBulkBar = document.getElementById('editor-bulk-bar');
 const editorBulkCount = document.getElementById('editor-bulk-count');
-const editorBulkEditBtn = document.getElementById('editor-bulk-edit');
 const questionCardModal = document.getElementById('question-card-modal');
 const questionCardTitle = document.getElementById('question-card-title');
 const questionCardPrev = document.getElementById('question-card-prev');
@@ -1532,7 +1531,7 @@ export function editorNavigate(delta) {
 //   ① 列表只负责"看与选":每行 = 复选框 + 序号 + 题干 + 标签徽章;点整行即勾选(不用去戳 13px 的小方块)。
 //   ② 动作只在**选中之后**出现(批量操作栏):没选中时界面上就一个多余按钮都没有。
 //   ③ 编辑一律进**卡片**(题干/题型/答案/选项/解释/解析)—— 列表不再兼任编辑器,一屏只干一件事。
-const FILTER_GROUPS = ['type', 'status', 'ai', 'marks'];
+const FILTER_GROUPS = ['type', 'status', 'ai', 'marks', 'scope'];
 
 // 筛选项定义(键 → 判定)。新增一个筛选维度 = 在这里加一行 + HTML 里加一个 chip。
 const FILTER_STATUS = {
@@ -1576,8 +1575,12 @@ export function activeFilterCount() {
 // 筛选后的可见题目 = [{ q, idx }]。idx 是题库里的**真实下标**(定位/删除都靠它,
 // 列表显示序号也用它 —— 筛过之后仍能让用户对上"这是第几题")。
 export function visibleQuestions() {
+    // 「只看勾选」的范围条件单独判:`questionMatchesFilter` 是纯函数(只认题目自身),
+    // 而"勾选集"在 state 里 —— 混进去会让那个纯函数变成"要传一整个世界"的函数。
+    const focusChecked = (state.editorFilter.scope || []).indexOf('checked') !== -1;
     return currentEditBank()
         .map((q, idx) => ({ q, idx }))
+        .filter(({ q }) => (focusChecked ? isSelected(q) : true))
         .filter(({ q }) => questionMatchesFilter(q, state.editorFilter));
 }
 
@@ -1602,20 +1605,21 @@ function setFilterValue(group, value, force) {
 // 切一个筛选条件(force 给定时 = 直接置位)
 export function editorToggleFilter(group, value, force) {
     const on = setFilterValue(group, value, force);
-    afterFilterChange();
+    afterFilterChange(group === 'scope');
     return on;
 }
 
 export function editorClearFilter() {
     FILTER_GROUPS.forEach(g => { state.editorFilter[g] = []; });
     syncPendingAlias();
-    afterFilterChange();
+    afterFilterChange(true);   // 清筛选不等于清勾选:勾选是用户的"圈选",筛选项才是临时的
 }
 
 // 筛选一变:① 清空多选 —— 绝不让"看不见的题"留在选中集里(否则批量删除会删掉屏幕外的东西);
 //          ② 把当前题收窄到还看得见的那一道,编辑卡片不会停在"筛没了"的题上。
-function afterFilterChange() {
-    state.editorSelected.length = 0;
+function afterFilterChange(keepSelection) {
+    // 切「只看勾选」时**保留**勾选集:勾选集正是这条筛选条件的输入,清掉等于把条件清空
+    if (!keepSelection) state.editorSelected.length = 0;
     const vis = visibleQuestions();
     if (!vis.some(v => v.idx === state.editIndex)) state.editIndex = vis.length ? vis[0].idx : 0;
     renderBankEditor();
@@ -1663,18 +1667,6 @@ function pruneSelection() {
 }
 
 // ---- 批量动作 ----
-// 编辑:只有**恰好选中 1 道**才有意义。多选时按钮禁用(状态即规则),这里再兜一次并说明原因。
-export function editorBulkEdit() {
-    const sel = state.editorSelected;
-    if (sel.length !== 1) {
-        alert(sel.length > 1 ? '多选时无法编辑:一次只能编辑 1 道题(先「取消选择」再单独勾选)' : '请先选中 1 道题');
-        return false;
-    }
-    const idx = currentEditBank().indexOf(sel[0]);
-    if (idx === -1) return false;
-    return openQuestionCard(idx);
-}
-
 // 批量删除:选中几道删几道。
 // ⚠️ **≥2 道时先存一版**:一次删多道是"一下手就难回头"的操作;单删保留"确认即删"——
 //    每库只有 3 个版本槽,删一道也存一版会把槽位挤爆(与去重的存版纪律一致:只在真会大改时存)。
@@ -2537,6 +2529,8 @@ export function renderBankEditor() {
         box.setAttribute('aria-label', `选择第 ${idx + 1} 题`);
         // 唯一的选中入口。用 change(而不是 click):键盘空格、脚本置位都能走到
         box.addEventListener('change', () => { editorToggleSelect(q, box.checked); });
+        // 复选框只负责**圈选**(喂给"只看勾选"筛选与批量删除),它不该顺带把编辑卡片掀开
+        box.addEventListener('click', (e) => { if (e && e.stopPropagation) e.stopPropagation(); });
         row.appendChild(box);
 
         const no = document.createElement('span');
@@ -2550,6 +2544,16 @@ export function renderBankEditor() {
         row.appendChild(text);
 
         row.appendChild(rowBadges(q));
+        // **点题目 = 选中这道题**(👤 补充逻辑):选中 = 设为当前题 + 直接翻开它的编辑卡片。
+        // 复选框留给"圈选/筛选",两条通道各管一件事:
+        //   点题干 → 我要改这一道(原地进卡片)
+        //   勾复选框 → 我要圈出一批(只看勾选 / 批量删除)
+        row.addEventListener('click', (e) => {
+            const t = e && e.target;
+            if (t && t.classList && t.classList.contains('q-row-check')) return;   // 点复选框不算"点题目"
+            if (!editorGuard()) return;
+            openQuestionCard(idx);
+        });
         editorQuestionList.appendChild(row);
     });
 
@@ -2582,16 +2586,25 @@ export function renderBankEditor() {
         chip.classList.toggle('active', on);
         chip.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
+    // 「只看勾选」这条条件的输入就是勾选集:数量写进文案,没勾选时禁用(点它只会得到空列表)
+    const scopeChip = document.getElementById('editor-filter-scope');
+    if (scopeChip) {
+        const n = state.editorSelected.length;
+        scopeChip.textContent = n ? `只看勾选的 ${n} 题` : '只看勾选(先勾题)';
+        scopeChip.disabled = n === 0;
+        if (n === 0 && (state.editorFilter.scope || []).indexOf('checked') !== -1) {
+            scopeChip.classList.remove('active');
+            scopeChip.setAttribute('aria-pressed', 'false');
+        }
+    }
 
     // ---------- 批量操作栏:没选中就一个按钮都不出现(👤 要求) ----------
     const selCount = state.editorSelected.length;
     if (editorBulkBar) editorBulkBar.classList.toggle('hidden', selCount === 0);
     if (editorBulkCount) editorBulkCount.textContent = selCount ? `已选 ${selCount} 题` : '';
-    // 编辑只能针对 1 道:多选时禁用(按钮状态即规则,比点了再弹提示更早告诉用户)
-    if (editorBulkEditBtn) {
-        editorBulkEditBtn.disabled = selCount !== 1;
-        editorBulkEditBtn.title = selCount === 1 ? '编辑选中的这道题' : '一次只能编辑 1 道题';
-    }
+    // 勾選集是"圈选":它同时是「只看勾选」筛选条件的输入和批量删除的目标。
+    // ⚠️ 这里刻意**不再放「编辑」按钮** —— 点题目本身就会翻开编辑卡片(👤 补充逻辑),
+    //    再放一个编辑键是同一个动作的第二个入口,只会占掉这一行的宽度(👤 正抱怨删除被挤到第二行)。
 
     // ---------- 空态:分两种 —— "库里没题"和"筛没了",说法不同(不然用户以为题目丢了) ----------
     if (questions.length === 0) {

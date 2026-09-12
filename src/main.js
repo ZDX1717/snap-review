@@ -8,7 +8,7 @@ import { addToErrorBook, clearErrors, deleteError, updateErrorStreak } from './e
 import { toggleFavorite } from './favorites.js';
 import { advanceNext, backToQuizOptions, closeAnswerCard, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, isAnswerCardOpen, jumpToQuestion, openAnswerCard, readQuizSource, renderAnswerCard, resetGradingState, shouldAutoNext, shouldConfirmAnswer, syncNextButtonLabel, markEndButtonReady, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleAnswerCard, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
 import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorGuard, editorTogglePendingOnly, editorToggleFilter, editorClearFilter, editorSelectAllVisible, editorClearSelection,
-    editorBulkEdit, editorBulkDelete, openQuestionCard, closeQuestionCard, saveQuestionCard, editorCardNavigate,
+    editorBulkDelete, openQuestionCard, closeQuestionCard, saveQuestionCard, editorCardNavigate,
     questionMatchesFilter, visibleQuestions, activeFilterCount, isSelected, editorToggleSelect, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback,
     previewAiAnswerFill,
     bankColorOf,
@@ -152,7 +152,6 @@ const editorFilterPanel = document.getElementById('editor-filter-panel');
 const editorFilterClear = document.getElementById('editor-filter-clear');
 const editorBulkAll = document.getElementById('editor-bulk-all');
 const editorBulkClear = document.getElementById('editor-bulk-clear');
-const editorBulkEditBtn = document.getElementById('editor-bulk-edit');
 const editorBulkDeleteBtn = document.getElementById('editor-bulk-delete');
 const editorSaveBtn = document.getElementById('editor-save-btn');
 const questionCardClose = document.getElementById('question-card-close');
@@ -382,7 +381,6 @@ function setupEventListeners() {
     editorFilterClear.addEventListener('click', () => editorClearFilter());
     editorBulkAll.addEventListener('click', () => editorSelectAllVisible());
     editorBulkClear.addEventListener('click', () => editorClearSelection());
-    editorBulkEditBtn.addEventListener('click', () => editorBulkEdit());
     editorBulkDeleteBtn.addEventListener('click', () => editorBulkDelete());
     // 编辑卡片:保存/取消/关闭/上一题/下一题
     editorSaveBtn.addEventListener('click', () => saveQuestionCard());
@@ -659,7 +657,6 @@ if (typeof window === 'undefined') {
         editorClearFilter,
         editorSelectAllVisible,
         editorClearSelection,
-        editorBulkEdit,
         editorBulkDelete,
         openQuestionCard,
         closeQuestionCard,

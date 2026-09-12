@@ -294,10 +294,9 @@ test('列表:每行一个复选框,勾选后批量栏出现(👤 要求:选中�
     assert.strictEqual(app.run('editorSelected.length'), 1, '勾选应记进选中集');
     assert.ok(!app.elements['editor-bulk-bar'].classList.contains('hidden'), '选中后批量栏应出现');
     assert.strictEqual(app.elements['editor-bulk-count'].textContent, '已选 1 题');
-    // 再勾一行 → 2 题;「编辑」此时禁用(一次只能编辑 1 道)
+    // 再勾一行 → 2 题(复选框是"圈选",可以圈多道)
     clickCheck(listRows(app)[1]);
     assert.strictEqual(app.run('editorSelected.length'), 2);
-    assert.strictEqual(app.elements['editor-bulk-edit'].disabled, true, '多选时「编辑」应禁用');
     assert.strictEqual(app.elements['editor-bulk-count'].textContent, '已选 2 题');
     // 取消选择 → 批量栏收回
     app.run('editorClearSelection()');
@@ -397,19 +396,30 @@ test('批量删除:取消确认则一道不删', async () => {
     assert.strictEqual(app.run(`questionBanks['T'].length`), 2, '点了取消就不许动数据');
 });
 
-test('批量编辑:只对"恰好选中 1 道"生效;点了就开编辑卡片并把字段填好', async () => {
-    const app = await loadApp();
-    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('第一题', 'A'))}, ${JSON.stringify(Q('第二题', 'B'))}] };
-        editBankName = 'T'; editIndex = 0; renderBankEditor();
-        editorSelected.push(currentEditBank()[0], currentEditBank()[1])`);
-    assert.strictEqual(app.run('editorBulkEdit()'), false, '多选时不该编辑');
-    assert.ok(app.alerts.some(a => /一次只能编辑 1 道/.test(a)), '要给一句人话说明为什么不行');
-    app.run('editorSelected.length = 0; editorSelected.push(currentEditBank()[1])');
-    assert.strictEqual(app.run('editorBulkEdit()'), true);
-    assert.strictEqual(app.run('editIndex'), 1, '卡片应停在选中的那道题上');
-    assert.strictEqual(app.elements['editor-stem'].value, '第二题', '卡片字段应已填入这道的题干');
-    assert.strictEqual(app.elements['editor-answer'].value, 'B');
-    assert.strictEqual(app.elements['question-card-title'].textContent, '第 2 / 2 题');
+test('复选框 = 圈选:喂给「只看勾选」筛选器,数量实时写在 chip 上', async () => {
+    const app = await loadApp({ confirmResult: true });
+    app.run(`questionBanks = { 'T': [${JSON.stringify(Q('甲', 'A'))}, ${JSON.stringify(Q('乙', ''))}, ${JSON.stringify(Q('丙', 'A'))}] };
+        editBankName = 'T'; editIndex = 0; renderBankEditor();`);
+    const chip = app.elements['editor-filter-scope'];
+    assert.ok(chip, '筛选面板里应有「只看勾选」这条范围条件');
+    assert.strictEqual(chip.disabled, true, '一道没勾时它应禁用(点它只会得到空列表)');
+    assert.ok(/先勾题/.test(chip.textContent), '禁用时的文案要说清"先勾题",实际:' + chip.textContent);
+    // 勾两道
+    app.run(`editorSelected.push(currentEditBank()[0], currentEditBank()[2]); renderBankEditor()`);
+    assert.strictEqual(chip.disabled, false);
+    assert.strictEqual(chip.textContent, '只看勾选的 2 题', '数量直接写在 chip 上');
+    // 打开这条条件:列表只剩勾选的两道
+    app.run(`editorToggleFilter('scope', 'checked')`);
+    assert.strictEqual(app.run('visibleQuestions().length'), 2);
+    assert.deepStrictEqual(JSON.parse(app.run(`JSON.stringify(visibleQuestions().map(v => v.q.content))`)), ['甲', '丙']);
+    // ⚠️ 切这条条件**不能**把勾选集清掉(它就是这条条件的输入)
+    assert.strictEqual(app.run('editorSelected.length'), 2, '切「只看勾选」不该清空勾选');
+    // 再叠一个条件(组间同时)
+    app.run(`editorToggleFilter('status', 'pending')`);
+    assert.strictEqual(app.run('visibleQuestions().length'), 0, '甲/丙都有答案,叠加"待补"后为空');
+    // 关掉范围条件 → 回到全部
+    app.run(`editorToggleFilter('scope', 'checked', false); editorClearFilter()`);
+    assert.strictEqual(app.run('visibleQuestions().length'), 3);
 });
 
 test('编辑卡片:保存落到正确的那道题;有未保存修改时关闭要先问一句', async () => {
@@ -512,17 +522,26 @@ test('重命名:改的不是编辑器里那一库时,不碰编辑器的状态', 
     assert.strictEqual(app.run(`currentBankName`), '默认题库', '当前选中的库不是被改名那一库,不该被牵连');
 });
 
-test('列表:点题干不选中 —— 只有复选框能选中(👤 要求)', async () => {
+test('列表:点题目 = 选中并翻开编辑卡片;点复选框 = 圈选(两条通道各管一件事)', async () => {
     const app = await loadApp();
     app.run(`questionBanks = { 'T': [${JSON.stringify(Q('第一题', 'A'))}, ${JSON.stringify(Q('第二题', 'A'))}] };
         editBankName = 'T'; editIndex = 0; renderBankEditor();`);
-    const row = listRows(app)[0];
-    assert.strictEqual(row._listeners.click, undefined, '行本身不许有点击监听(点题干不该选中)');
-    assert.strictEqual(app.run('editorSelected.length'), 0);
-    // 模拟"点题干":在旧实现里它是 <label>,点哪儿都等于勾选;现在必须毫无反应
-    clickCheck(listRows(app)[0]);
-    assert.strictEqual(app.run('editorSelected.length'), 1, '只有点复选框才选中');
-    assert.strictEqual(app.run('editorSelected[0].content'), '第一题', '选中的必须是勾选的那一行');
+    // ① 点题目(题干)→ 设为当前题 + 打开编辑卡片
+    const card = app.elements['question-card-modal'];
+    const row = listRows(app)[1];
+    assert.strictEqual(typeof row._listeners.click, 'function', '行必须绑 click(点题目即选中该题)');
+    row._listeners.click({ target: { classList: { contains: () => false } } });
+    assert.strictEqual(app.run('editIndex'), 1, '点题目应把这道题设为当前题');
+    assert.strictEqual(app.elements['editor-stem'].value, '第二题', '卡片字段应填的是这一道');
+    assert.ok(!card.classList.contains('hidden'), '点题目应翻开编辑卡片');
+    assert.strictEqual(app.run('editorSelected.length'), 0, '点题目**不该**顺带圈选(那是复选框的事)');
+    // ② 点复选框 → 只圈选:不改变当前题,也不掀开卡片
+    app.run(`editIndex = 0; questionCardModal.classList.add('hidden')`);
+    clickCheck(listRows(app)[1]);
+    assert.strictEqual(app.run('editorSelected.length'), 1);
+    assert.strictEqual(app.run('editorSelected[0].content'), '第二题');
+    assert.strictEqual(app.run('editIndex'), 0, '点复选框不该改变当前题');
+    assert.ok(card.classList.contains('hidden'), '点复选框不该掀开编辑卡片');
 });
 
 test('筛选面板:悬浮;点面板外面自动收起,点面板里面不收起', async () => {
