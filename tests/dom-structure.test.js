@@ -539,9 +539,11 @@ test('题库设置:按作用对象分块,「删除题库」独占最底部的危
         .map(m => ({ k: m[1], i: m.index }));
     const order = marks.concat([{ k: '版本记录', i: panel.indexOf('editor-versions-host') }])
         .sort((a, b) => a.i - b.i).map(x => x.k);
-    assert.deepStrictEqual(order, ['卡片配色', '本库', '全部题库', '错题本', '版本记录', '危险操作'],
-        '块的顺序应为 配色 → 本库 → 全部题库 → 错题本 → 版本记录 → 危险操作');
-    assert.ok(marks.length >= 5, '设置页至少要分五块');
+    assert.deepStrictEqual(order, ['卡片配色', '本库', '错题本', '版本记录', '危险操作'],
+        '块的顺序应为 配色 → 本库 → 错题本 → 版本记录 → 危险操作');
+    assert.ok(marks.length >= 4, '设置页至少要分四块');
+    // 「导出全部」已搬到题库页(👤 要求):设置页里不该再有一整块只为它存在
+    assert.ok(!panel.includes('export-all-btn'), '「导出全部」不该还留在题库设置里');
     for (const m of marks) assert.ok(m.i > -1 && m.k.trim(), '每块都要有小标题');
 
     // ② 版本记录宿主夹在「错题本」与「危险操作」之间(标题由 JS 渲染,故不在 marks 里)
@@ -561,7 +563,7 @@ test('题库设置:按作用对象分块,「删除题库」独占最底部的危
 
     // ④ 设置页按钮统一用 .admin-btn(尺寸/形状由设置页自己定,不再借主操作区的 .action-btn)
     for (const [id, isDanger] of [['bank-rename-btn', false], ['bank-export-btn', false],
-        ['export-all-btn', false], ['clear-errors-btn', true], ['bank-delete-btn', true]]) {
+        ['clear-errors-btn', true], ['bank-delete-btn', true]]) {
         const m = panel.match(new RegExp(`id="${id}"[^>]*class="([^"]*)"`));
         assert.ok(m, `${id} 应在设置页里`);
         assert.ok(m[1].split(/\s+/).includes('admin-btn'), `${id} 应用 .admin-btn`);
@@ -760,6 +762,34 @@ test('版本记录住在「题库设置」里,且每条都能删(👤 2026-09-11
     assert.ok(pushIdx > zeroIdx, 'pushBankVersion 必须在"确认有重复"之后(否则空点一次也存版)');
     // ⑤ 设置页里挂载(而不是库卡)
     assert.ok(/#editor-bank-admin|editor-bank-admin/.test(bank), '版本面板应挂在题库设置容器里');
+});
+
+test('题库页头部:导出全部在「＋ 创建题库」左边(👤 2026-09-12)', () => {
+    const banksSection = html.slice(html.indexOf('id="banks-section"'), html.indexOf('<!-- 创建题库模态框'));
+    const header = banksSection.slice(banksSection.indexOf('banks-header'), banksSection.indexOf('banks-list'));
+    const exportIdx = header.indexOf('export-all-btn');
+    const createIdx = header.indexOf('create-bank-btn');
+    const recIdx = header.indexOf('recycle-bin');
+    assert.ok(exportIdx > -1, '「导出全部」应在题库页头部');
+    assert.ok(exportIdx < createIdx, '「导出全部」应在「＋ 创建题库」**左边**');
+    assert.ok(createIdx < recIdx, '回收站仍在创建按钮右侧(不因搬家而乱序)');
+    // 与回收站同一套"描边胶囊"外观,主键仍是实心的「＋ 创建题库」
+    const cls = (header.match(/id="export-all-btn"[^>]*class="([^"]*)"/) || [])[1] || '';
+    assert.ok(cls.split(/\s+/).includes('header-tool'), '导出全部应用 .header-tool(与回收站同款)');
+    const pill = cssNoComments.match(/\n\.banks-header \.header-tool,\n\.recycle-pop > summary \{([^}]*)\}/);
+    assert.ok(pill, '「导出全部」与「🗑 回收站」应共用同一条描边胶囊规则');
+    assert.ok(/border\s*:\s*1px/.test(pill[1]) && /border-radius\s*:\s*999px/.test(pill[1]), '胶囊 = 描边 + 全圆角');
+    // 靠右的 auto 边距必须挂在**这一组的第一个**(导出全部)上,挂到创建按钮上会把两者顶开一道缝
+    assert.ok(/\.banks-header #export-all-btn\s*\{\s*margin-left\s*:\s*auto/.test(cssNoComments),
+        'auto 边距应在导出全部上(它才是右侧那组的排头)');
+    assert.ok(!/\.banks-header #create-bank-btn\s*\{[^}]*margin-left\s*:\s*auto/.test(cssNoComments),
+        '创建按钮不该再带 auto 边距');
+    // 手机档:胶囊键也要够得着
+    assert.ok(/\.banks-header \.header-tool,\s*\n\s*\.recycle-pop > summary \{ min-height: 40px/.test(cssNoComments),
+        '手机档应把胶囊键放大到 40px');
+    // 导出全部**离开**了题库设置(那条守卫在设置页的用例里),这里再钉一次反向
+    const modal = html.slice(html.indexOf('id="edit-bank-modal"'), html.indexOf('<!-- 答题卡抽屉'));
+    assert.ok(!modal.includes('export-all-btn'), '题库设置里不该还有「导出全部」');
 });
 
 test('回收站:在创建按钮右侧,点开是悬浮菜单(👤 2026-09-12)', () => {

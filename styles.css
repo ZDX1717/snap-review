@@ -2541,12 +2541,17 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     align-items: center;
     margin-bottom: 16px;
 }
-/* 回收站:标题右侧那一行的最右;点开是悬浮菜单,不占页面流(👤 要求) */
-.banks-header #create-bank-btn { margin-left: auto; }   /* 标题左、两个动作靠右 */
+/* 标题左、右侧那组动作靠右(👤 要求:导出全部 → 创建题库 → 回收站,自左向右)。
+   auto 边距挂在**这一组的第一个**(导出全部)上,而不是创建按钮上 —— 挂错了两者之间会被顶开一道缝。 */
+.banks-header #export-all-btn { margin-left: auto; }
 .recycle-menu {
     position: relative;        /* 浮层的定位锚点 */
     flex: 0 0 auto;
 }
+/* 题库页头部的次级工具键:「导出全部」与「🗑 回收站」共用同一套描边胶囊外观 ——
+   同级的两个"顺手工具"长得一样,用户才知道它俩是同一类;「＋ 创建题库」仍是唯一的实心主键。
+   (没有另写一份:直接给同一条规则加选择器,免得两处样式日后走散。) */
+.banks-header .header-tool,
 .recycle-pop > summary {
     display: inline-flex;
     align-items: center;
@@ -2562,6 +2567,7 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     list-style: none;          /* 去掉默认的三角(自己控制外观) */
 }
 .recycle-pop > summary::-webkit-details-marker { display: none; }
+.banks-header .header-tool:hover,
 .recycle-pop > summary:hover {
     border-color: var(--c-primary);
     color: var(--c-primary);
@@ -2602,6 +2608,7 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
         right: 0;
         min-width: min(320px, 92vw);
     }
+    .banks-header .header-tool,
     .recycle-pop > summary { min-height: 40px; }
 }
 /* 导入卡在首页:去双栏遗留,全宽。
