@@ -1016,3 +1016,24 @@ test('答题卡样式不得写死像素宽度(宽度走档位令牌)', () => {
     assert.ok(!/max-width\s*:\s*\d+px/.test(drawer), '抽屉不得写死 max-width 像素');
     assert.ok(/var\(--pad-x\)/.test(drawer), '抽屉左右内边距应复用 --pad-x(与三页统一内边距一致)');
 });
+
+test('导出/导入:多题库分节(👤 2026-09-12:导出别混成一块,导入要自动认出多库)', () => {
+    // ① 导出:每个题库前一行分节标题,且**导出与导入共用同一个字符串来源**(bankSectionHeader)
+    const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
+    assert.ok(/bankSectionHeader\(bankName\)/.test(bank), '「导出题库」应逐库写分节标题');
+    const parser = readFileSync(path.join(root, 'src', 'parser.js'), 'utf8');
+    assert.ok(/export function bankSectionHeader/.test(parser), '分节标题应有单一来源');
+    assert.ok(/export function splitBankSections/.test(parser), '导入侧应有分节切分函数');
+    // ② 分节标记必须先于 TITLE_RE 判定(否则它会被当成"一道题的标题",各库的题混成一库)
+    const secIdx = parser.indexOf('BANK_SECTION_RE');
+    assert.ok(secIdx > -1, '应有分节标记正则');
+    assert.ok(/splitBankSections/.test(bank) && /state\.previewBanks/.test(bank), '导入入口应用切分结果');
+    assert.ok(/previewBankMode/.test(bank), '应有多题库导入方式(分开 / 合并)');
+    // ③ 预览里的横幅 + 方式单选 + 「导入到」整行可隐藏
+    const modal = html.slice(html.indexOf('id="import-preview-modal"'), html.indexOf('<!-- AI 设置模态框'));
+    for (const id of ['preview-multi-banner', 'preview-multi-text', 'preview-target-row', 'preview-overwrite-label']) {
+        assert.ok(modal.includes(id), `导入预览应含 ${id}`);
+    }
+    assert.ok((modal.match(/name="preview-bank-mode"/g) || []).length === 2, '应有两个导入方式单选');
+    assert.ok(/value="separate"/.test(modal) && /value="merge"/.test(modal), '两个方式:分开 / 合并');
+});

@@ -198,3 +198,106 @@ test('覆盖模式(overwrite)清空目标后导入', () => {
     assert.strictEqual(bank[0].content, '覆盖后的题');
 });
 
+
+// ==================== 多题库导出/导入往返(👤 2026-09-12)====================
+// 本文件的 loadApp 在模块顶层(共享实例),故这里不另开 describe/before —— 直接复用 run/elements/sandbox。
+
+// 抓住「导出题库」真正写出去的那段文本:替换 Blob / createObjectURL / a.click 三个出口
+function captureExport() {
+    let text = null;
+    const origCreate = sandbox.document.createElement;
+    sandbox.Blob = class { constructor(parts) { text = String(parts.join('')); } };
+    sandbox.URL.createObjectURL = () => 'blob:test';
+    sandbox.URL.revokeObjectURL = () => {};
+    sandbox.document.createElement = (tag) => { const el = origCreate(tag); el.click = () => {}; return el; };
+    try { run('exportAllBanks()'); } finally { sandbox.document.createElement = origCreate; }
+    return text;
+}
+
+test('导出:逐库写分节标题;解析回来仍是分好的多库', () => {
+    run(`questionBanks = {
+        '甲库': [{ content: '甲一', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A' }],
+        '乙库': [{ content: '乙一', type: '单选', options: { A: '甲', B: '乙' }, answer: 'B' },
+                 { content: '乙二', type: '判断', options: { A: '正确', B: '错误' }, answer: 'A' }]
+    }`);
+    const text = captureExport();
+    assert.ok(text && text.includes('题库：甲库') && text.includes('题库：乙库'), '导出内容应含两个分节标题');
+    const names = JSON.parse(run(`JSON.stringify(splitBankSections(${JSON.stringify(text)}).map(s => s.name))`));
+    assert.deepStrictEqual(names, ['甲库', '乙库'], '解析回来应仍是两个库');
+    const counts = JSON.parse(run(`JSON.stringify(splitBankSections(${JSON.stringify(text)}).map(s => parseQuestionsText(s.text).length))`));
+    assert.deepStrictEqual(counts, [1, 2], '每节的题数要对得上');
+});
+
+test('导入:多库文件自动切库,默认"按题库分别导入"', () => {
+    const text = ['# ===== 题库：甲库 =====', '题目：甲一', 'A：甲', 'B：乙', '答案：A', '类型：单选',
+        '# ===== 题库：乙库 =====', '题目：乙一', 'A：甲', 'B：乙', '答案：B', '类型：单选'].join('\n');
+    elements['paste-input'].value = text;
+    run('parsePastedText()');
+    assert.strictEqual(run('previewBanks.length'), 2, '应认出两个库');
+    assert.deepStrictEqual(JSON.parse(run('JSON.stringify(previewBanks.map(b => b.name + ":" + b.count))')),
+        ['甲库:1', '乙库:1'], '每库题数要对');
+    assert.strictEqual(run('previewBankMode'), 'separate', '默认按题库分开导入');
+    assert.deepStrictEqual(JSON.parse(run('JSON.stringify(previewData.map(d => d.bank))')), ['甲库', '乙库'],
+        '每道题都记着自己属于哪个库');
+});
+
+test('确认导入:分开建库、逐库记账(撤销有据可依)', () => {
+    run(`questionBanks = {}; bankVersions = {}`);
+    const text = ['# ===== 题库：甲库 =====', '题目：甲一', 'A：甲', 'B：乙', '答案：A', '类型：单选',
+        '# ===== 题库：乙库 =====', '题目：乙一', 'A：甲', 'B：乙', '答案：B', '类型：单选',
+        '题目：乙二', 'A：正确', 'B：错误', '答案：A', '类型：判断'].join('\n');
+    elements['paste-input'].value = text;
+    run('parsePastedText()');
+    // 这个桩实例是共享的,前面用例也会记批次 → 只看**这一次**新增的那几条
+    const beforeCount = JSON.parse(store.get('importBatches') || '[]').length;
+    run('commitPreviewImport()');
+    assert.deepStrictEqual(Object.keys(JSON.parse(run('JSON.stringify(questionBanks)'))).sort(), ['乙库', '甲库'], '两个库都要建出来');
+    assert.strictEqual(run(`questionBanks['甲库'].length`), 1);
+    assert.strictEqual(run(`questionBanks['乙库'].length`), 2, '乙库两道题都要进乙库');
+    assert.strictEqual(run('currentBankName'), '甲库', '导入后停在第一个库');
+    // 直接读落盘(localStorage 里就是 importBatches),免得再往测试钩子里挂一个 storage 函数
+    const batches = JSON.parse(store.get('importBatches') || '[]').slice(beforeCount).map(b => b.bank);
+    assert.deepStrictEqual(batches, ['甲库', '乙库'], '逐库记账:撤销才撤得掉');
+    run('undoLastImport()');
+    assert.strictEqual(run(`questionBanks['乙库'].length`), 0);
+    assert.strictEqual(run(`questionBanks['甲库'].length`), 1, '别的库不许被牵连');
+});
+
+test('改成"全部并入一个题库"时,回到旧的单库导入行为', () => {
+    run(`questionBanks = { '总库': [] }; importBatches = []`);
+    const text = ['# ===== 题库：甲库 =====', '题目：甲一', 'A：甲', 'B：乙', '答案：A', '类型：单选',
+        '# ===== 题库：乙库 =====', '题目：乙一', 'A：甲', 'B：乙', '答案：B', '类型：单选'].join('\n');
+    elements['paste-input'].value = text;
+    run('parsePastedText(); setPreviewBankMode("merge")');
+    assert.strictEqual(run('previewBankMode'), 'merge');
+    elements['preview-target-bank'].value = '总库';
+    run('commitPreviewImport()');
+    assert.strictEqual(run(`questionBanks['总库'].length`), 2, '两库的题合并到目标库');
+    assert.strictEqual(run(`!!questionBanks['甲库']`), false, '合并模式下不该另建库');
+});
+
+test('分开导入 + 覆盖同名库:先存一版(可回退)', () => {
+    run(`questionBanks = { '甲库': [{ content: '旧题', type: '单选', options: { A: '甲', B: '乙' }, answer: 'A' }] };
+        bankVersions = {}; importBatches = []`);
+    const text = ['# ===== 题库：甲库 =====', '题目：新题', 'A：甲', 'B：乙', '答案：A', '类型：单选',
+        '# ===== 题库：乙库 =====', '题目：乙一', 'A：甲', 'B：乙', '答案：B', '类型：单选'].join('\n');
+    elements['paste-input'].value = text;
+    run('parsePastedText()');
+    elements['preview-overwrite'].checked = true;
+    run('commitPreviewImport()');
+    elements['preview-overwrite'].checked = false;
+    assert.strictEqual(run(`questionBanks['甲库'].length`), 1, '覆盖后只剩新题');
+    assert.strictEqual(run(`questionBanks['甲库'][0].content`), '新题');
+    const vers = JSON.parse(run(`JSON.stringify((loadBankVersions()['甲库'] || []).map(v => v.action))`));
+    assert.deepStrictEqual(vers, ['覆盖导入前'], '覆盖前应存一版');
+    assert.strictEqual(run(`(loadBankVersions()['乙库'] || []).length`), 0, '乙库是新库,不该凭空存版');
+});
+
+test('单库文件(没有分节标记)仍走原来的单库流程', () => {
+    run(`questionBanks = { '总库': [] }; previewBanks = []; previewBankMode = 'merge'`);
+    elements['paste-input'].value = ['题目：单库题', 'A：甲', 'B：乙', '答案：A', '类型：单选'].join('\n');
+    run('parsePastedText()');
+    assert.strictEqual(run('previewBanks.length'), 0, '没有标记就不该冒出多库');
+    assert.strictEqual(run('previewBankMode'), 'merge');
+    assert.strictEqual(run('previewData.length'), 1);
+});

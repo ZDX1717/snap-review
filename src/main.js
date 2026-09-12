@@ -1,15 +1,16 @@
 import { buildAiNotes } from './ai.js';
 import { state } from './state.js';
 import { applyTheme, initTheme, setThemeSetting } from './theme.js';
-import { buildCardCells, finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey, shuffleArray, splitInlineOptions } from './parser.js';
+import { buildCardCells, finalizeQuestion, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey, shuffleArray, splitInlineOptions, splitBankSections, bankSectionHeader } from './parser.js';
 import { deleteBankVersion, loadAutoNextSetting, loadBankVersions, loadCollapsedBanks, loadFromLocalStorage, loadMasterySetting, pushBankVersion, saveAutoNextSetting, saveCollapsedBanks, saveMasterySetting, saveToLocalStorage, recordImportBatch } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { addToErrorBook, clearErrors, deleteError, updateErrorStreak } from './errorbook.js';
 import { toggleFavorite } from './favorites.js';
 import { advanceNext, backToQuizOptions, closeAnswerCard, collectUserAnswer, displayQuestion, endQuiz, finishExam, getSourcePool, isAnswerCardOpen, jumpToQuestion, openAnswerCard, readQuizSource, renderAnswerCard, resetGradingState, shouldAutoNext, shouldConfirmAnswer, syncNextButtonLabel, markEndButtonReady, nextQuestion, prevQuestion, renderAnswerReview, showQuizResult, showQuizStatus, showSection, startQuiz, submitAnswer, toggleAnswerCard, toggleFavoriteCurrent, updateFavoriteButton } from './quiz.js';
-import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorGuard, editorTogglePendingOnly, editorToggleFilter, editorClearFilter, editorSelectAllVisible, editorClearSelection,
+import { commitPreviewImport, createNewBank, currentEditBank, dedupBank, deleteBank, editBank, editorAddQuestion, editorClose, editorCollectOptions, editorGuard, editorTogglePendingOnly, editorToggleFilter, editorClearFilter, setPreviewBankMode, editorSelectAllVisible, editorClearSelection,
     editorBulkDelete, openQuestionCard, closeQuestionCard, saveQuestionCard, editorCardNavigate,
-    questionMatchesFilter, visibleQuestions, activeFilterCount, isSelected, editorToggleSelect, setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback,
+    questionMatchesFilter, visibleQuestions, activeFilterCount, isSelected, editorToggleSelect,
+    setPreviewView, editorMutateOptions, openAiSettings, aiProviderChanged, testAiConnection, saveAiSettings, previewAiFallback,
     previewAiAnswerFill,
     bankColorOf,
         switchEditorTab,
@@ -103,6 +104,9 @@ const undoImportBtn = document.getElementById('undo-import-btn');
 const previewSkipDupes = document.getElementById('preview-skip-dupes');
 const previewList = document.getElementById('preview-list');
 const previewTargetBankSelect = document.getElementById('preview-target-bank');
+const previewBankModeInputs = Array.prototype.slice.call(document.querySelectorAll('input[name="preview-bank-mode"]'));
+const recycleBinDetails = document.getElementById('recycle-bin');
+const recycleMenu = document.querySelector('.recycle-menu');
 const previewOverwrite = document.getElementById('preview-overwrite');
 const previewConfirmBtn = document.getElementById('preview-confirm-btn');
 const previewCancelBtn = document.getElementById('preview-cancel-btn');
@@ -353,6 +357,16 @@ function setupEventListeners() {
         }
     });
     editorHistRow.addEventListener('click', editorHistClick);
+    // 回收站是个 <details> 悬浮菜单:点它外面应收起(👤 要求)。
+    // 点击落在 .recycle-menu 里(摘要或面板)时不处理 —— 摘要的原生开合自己会管这件事。
+    document.addEventListener('click', (e) => {
+        if (!recycleBinDetails || !recycleBinDetails.open) return;
+        const t = e && e.target;
+        let p = t;
+        while (p) { if (p === recycleMenu) return; p = p.parentNode; }   // 桩里没有 contains,用 parentNode 走
+        if (t === recycleMenu) return;
+        recycleBinDetails.open = false;
+    });
 
     // 题目列表重构(👤 2026-09-12):筛选面板 / 批量操作栏 / 编辑卡片
     // 筛选按钮只负责开合面板;chip 的选中态由 renderBankEditor 统一回写(单一数据源 = state.editorFilter)
@@ -379,6 +393,10 @@ function setupEventListeners() {
         chip.addEventListener('click', () => editorToggleFilter(chip.dataset.filter, chip.dataset.value));
     });
     editorFilterClear.addEventListener('click', () => editorClearFilter());
+    // 多题库导入:切「按题库分别导入 / 全部并入一个题库」
+    previewBankModeInputs.forEach(inp => {
+        inp.addEventListener('change', () => { if (inp.checked) setPreviewBankMode(inp.value); });
+    });
     editorBulkAll.addEventListener('click', () => editorSelectAllVisible());
     editorBulkClear.addEventListener('click', () => editorClearSelection());
     editorBulkDeleteBtn.addEventListener('click', () => editorBulkDelete());
@@ -663,6 +681,9 @@ if (typeof window === 'undefined') {
         saveQuestionCard,
         editorCardNavigate,
         questionMatchesFilter,
+        splitBankSections,
+        bankSectionHeader,
+        setPreviewBankMode,
         visibleQuestions,
         activeFilterCount,
         isSelected,

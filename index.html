@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Zquiz · 期末周刷题</title>
-    <link rel="stylesheet" href="styles.css?v=1054">
+    <link rel="stylesheet" href="styles.css?v=1055">
 </head>
 <body>
     <div class="container">
@@ -289,6 +289,18 @@ A：选项A  B：选项B
         <div id="import-preview-modal" class="modal hidden">                    <div class="modal-content modal-lg">
                 <h3>导入预览</h3>
                 <p id="preview-summary" class="preview-summary"></p>
+                <!-- 多题库文件(导出题库生成的分节文件):顶部横幅说清查到几个库、怎么导 -->
+                <div id="preview-multi-banner" class="preview-multi-banner hidden">
+                    <p id="preview-multi-text" class="preview-multi-text"></p>
+                    <div class="preview-multi-modes">
+                        <label class="inline-label">
+                            <input type="radio" name="preview-bank-mode" value="separate" checked> 📚 按题库分别导入
+                        </label>
+                        <label class="inline-label">
+                            <input type="radio" name="preview-bank-mode" value="merge"> 全部并入一个题库
+                        </label>
+                    </div>
+                </div>
                 <div class="preview-toolbar">
                     <span class="tool-group">
                         <span class="tool-label">看</span>
@@ -314,9 +326,9 @@ A：选项A  B：选项B
                 </div>
                 <div id="preview-list" class="preview-list"></div>
                 <div class="preview-import-row">
-                    <span>导入到：</span>
-                    <select id="preview-target-bank" class="bank-select"></select>
-                    <label class="inline-label">
+                    <span id="preview-target-row"><span>导入到：</span>
+                    <select id="preview-target-bank" class="bank-select"></select></span>
+                    <label class="inline-label" id="preview-overwrite-label">
                         <input type="checkbox" id="preview-overwrite"> 覆盖目标题库
                     </label>
                     <label class="inline-label">
@@ -620,6 +632,6 @@ A：选项A  B：选项B
         </p>
     </div>
 
-    <script type="module" src="src/main.js?v=1054"></script>
+    <script type="module" src="src/main.js?v=1055"></script>
 </body>
 </html>

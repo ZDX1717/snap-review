@@ -12,6 +12,41 @@ export const JUDGE_QUESTION_RE = /^判断题\s*[:：]\s*(.*)$/;
 
 export const TITLE_RE = /^#\s*(.*)$/;
 
+// 多题库文件的分节标记。导出「导出题库」时逐库加一行:
+//   # ===== 题库：甲 =====
+// 兼容三种写法(老版本只写 `# 题库：甲`,用户手写可能用全角冒号/多个等号):
+//   # 题库：甲 / ## 题库:甲 / ===== 题库：甲 =====
+// ⚠️ 它必须**先于** TITLE_RE 判定,否则这行会被当成"一道题的标题",
+//    于是所有题库的题混成一库(👤 反馈的正是这个)。
+export const BANK_SECTION_RE = /^\s*#*\s*[=＝\-—]{0,8}\s*题库\s*[：:]\s*(.+?)\s*[=＝\-—]{0,8}\s*$/;
+
+// 导出「导出题库」时用的分节标题。导出与导入**共用这一个来源** ——
+// 各写各的字符串,迟早会一边改了一边没改(那时导出的文件导不回来)。
+export function bankSectionHeader(name) {
+    return `# ===== 题库：${name} =====`;
+}
+
+// 把整份文本按分节标记切成 [{ name, text }]。**没有标记时返回 [](保持旧的单库导入路径不变)**。
+export function splitBankSections(content) {
+    const lines = String(content).replace(/\r\n?/g, '\n').split('\n');
+    const sections = [];
+    let cur = null;
+    for (const line of lines) {
+        const m = line.match(BANK_SECTION_RE);
+        if (m) {
+            const name = m[1].trim();
+            cur = { name, lines: [] };
+            sections.push(cur);
+            continue;
+        }
+        if (cur) cur.lines.push(line);
+        // 标记之前的内容**丢弃**:那只能是文件头注释之类的噪音
+    }
+    return sections
+        .filter(s => s.name)
+        .map(s => ({ name: s.name, text: s.lines.join('\n') }));
+}
+
 // "(AI 生成)" 后缀:导出时给 AI 拟的答案/解析加的来源标记(P1-1.5),
 // 解析器必须认它,否则"导出 → 再导入"会丢答案/解析(自己写的格式自己读不回 = 数据损失)。
 // 捕获组 2 = 'AI 生成' 或 undefined,用于把来源标记一起带回来。

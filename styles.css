@@ -1291,6 +1291,33 @@ html[data-theme="dark"] .bank-item[data-color] .bank-card-foot .foot-toggle {
     white-space: nowrap;
 }
 
+/* 多题库导入横幅:说清"这个文件里有几个库、要怎么导"(👤 要求:导入时自动认出多题库) */
+.preview-multi-banner {
+    margin: 0 0 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--c-primary);
+    border-radius: 8px;
+    background: var(--c-info-bg);
+}
+.preview-multi-text {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--c-primary);
+}
+.preview-multi-modes {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+/* 预览条目上的库名徽章:让用户能核对"切分对不对",而不是盲信 */
+.badge.bank-badge {
+    border-color: var(--c-primary);
+    color: var(--c-primary);
+    background: var(--c-info-bg);
+}
+
 .preview-import-row {
     display: flex;
     align-items: center;

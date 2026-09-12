@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { finalizeQuestion, formatAnswerForDisplay, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey } from './parser.js';
+import { finalizeQuestion, formatAnswerForDisplay, formatQuestionsForExport, normalizeAnswerString, parseQuestionsText, questionDedupKey, splitBankSections, bankSectionHeader, BANK_SECTION_RE } from './parser.js';
 import { deleteBankVersion, renameBankVersions, saveToLocalStorage, loadImportBatches, saveImportBatches, recordImportBatch, loadOverwriteSnapshot, clearOverwriteSnapshot, loadBankVersions, pushBankVersion, loadCollapsedBanks, saveCollapsedBanks } from './storage.js';
 import { downloadFile, hideModal, showModal } from './dom.js';
 import { docxToText } from './docx.js';
@@ -36,6 +36,12 @@ const previewSelectAll = document.getElementById('preview-select-all');
 const previewSkipDupes = document.getElementById('preview-skip-dupes');
 const previewList = document.getElementById('preview-list');
 const previewTargetBankSelect = document.getElementById('preview-target-bank');
+// 多题库导入(👤 要求:导出分库、导入自动认出来)
+const previewMultiBanner = document.getElementById('preview-multi-banner');
+const previewMultiBannerText = document.getElementById('preview-multi-text');
+const previewTargetRow = document.getElementById('preview-target-row');
+const previewOverwriteLabel = document.getElementById('preview-overwrite-label');
+const previewModeInputs = Array.prototype.slice.call(document.querySelectorAll('input[name="preview-bank-mode"]'));
 const previewOverwrite = document.getElementById('preview-overwrite');
 const editBankModal = document.getElementById('edit-bank-modal');
 const editBankTitle = document.getElementById('edit-bank-title');
@@ -286,7 +292,16 @@ export function parsePastedText() {
     // 来源:文件填框的用文件名,纯粘贴用"粘贴导入"(撤销记录展示用)
     previewSourceLabel = pendingSourceLabel || '粘贴导入';
     pendingSourceLabel = '';
-    const importedQuestions = parseQuestionsText(text);
+    const sections = splitBankSections(text);
+    // ⚠️ 顺序要紧:先按分节标记切库,再逐节解析。否则 `# ===== 题库：甲 =====` 会被当成题目标题,
+    //    所有库的题混进同一库(👤 反馈的 bug)。
+    const multi = sections.length >= 2;
+    const sectionsData = multi
+        ? sections.map(sec => ({ name: sec.name, questions: parseQuestionsText(sec.text) }))
+        : [];
+    const importedQuestions = multi
+        ? sectionsData.flatMap(sec => sec.questions.map(q => ({ q, bank: sec.name })))
+        : parseQuestionsText(text);
     if (importedQuestions.length === 0) {
         showImportStatus('没有解析出有效题目。试试上方「复制官方提示词」用 AI 整理', 'error');
         return;
@@ -294,7 +309,16 @@ export function parsePastedText() {
     const aiSource = aiSourcedContent;
     aiSourcedContent = false;
     updatePreviewTargetBanks();
-    openImportPreview(importedQuestions, aiSource);
+    if (multi) {
+        // 只有真的解析出东西的库才算数(空节不进清单)
+        const kept = sectionsData.filter(sec => sec.questions.length > 0);
+        openImportPreview(importedQuestions.map(x => x.q), aiSource, {
+            banks: kept.map(sec => ({ name: sec.name, count: sec.questions.length })),
+            assign: importedQuestions.map(x => x.bank),
+        });
+    } else {
+        openImportPreview(importedQuestions, aiSource);
+    }
 }
 
 
@@ -707,13 +731,30 @@ export function cancelPreviewAi() {
     }
 }
 
-export function openImportPreview(questions, aiSource = false) {
+export function openImportPreview(questions, aiSource = false, meta) {
     state.previewFilterWarned = false; // 新一批导入重置筛选
     // 预览防呆:缺答案/选项不足/低置信度(conf ≤ 0.6)的题默认不勾选,用户确认后可手动勾回
     // aiSource:整批来自 AI 接口整理 → 逐题 🤖 生成标记(AI 动过要留痕)
-    state.previewData = questions.map(q => ({ q, include: (q.confidence || 0) > 0.6, warnings: [], aiNote: aiSource ? 'AI 生成' : '' }));
+    // meta.banks/assign:「导出题库」那种**带分节标记**的文件 → 每个题库归到哪个库(list)
+    state.previewData = questions.map((q, i) => ({
+        q,
+        include: (q.confidence || 0) > 0.6,
+        warnings: [],
+        aiNote: aiSource ? 'AI 生成' : '',
+        bank: meta && meta.assign ? meta.assign[i] : null,
+    }));
+    state.previewBanks = (meta && meta.banks) || [];
+    // 多题库文件默认**按题库分开导入**(👤 要的就是这个);单库文件没有这回事
+    state.previewBankMode = state.previewBanks.length >= 2 ? 'separate' : 'merge';
     renderPreview();
     showModal(importPreviewModal);
+}
+
+// 切换「按题库分别导入 / 全部并入一个题库」
+export function setPreviewBankMode(mode) {
+    if (!state.previewBanks || state.previewBanks.length < 2) return;
+    state.previewBankMode = mode === 'merge' ? 'merge' : 'separate';
+    renderPreview();
 }
 
 
@@ -736,6 +777,22 @@ export function updatePreviewTargetBanks() {
 
 
 export function renderPreview() {
+    // 多题库文件:顶部横幅说清查到了几个库、怎么导;「导入到」下拉在"分开导入"时没有意义 → 隐藏
+    const banks = state.previewBanks || [];
+    const multi = banks.length >= 2;
+    const separate = multi && state.previewBankMode === 'separate';
+    if (previewMultiBanner) {
+        previewMultiBanner.classList.toggle('hidden', !multi);
+        if (multi) {
+            const list = banks.map(b => `${b.name}(${b.count} 题)`).join(' · ');
+            previewMultiBannerText.textContent = `检测到 ${banks.length} 个题库:${list}`;
+            Array.from(previewModeInputs).forEach(inp => { inp.checked = inp.value === state.previewBankMode; });
+        }
+    }
+    if (previewTargetRow) previewTargetRow.classList.toggle('hidden', separate);
+    if (previewOverwriteLabel) {
+        previewOverwriteLabel.textContent = separate ? '覆盖同名题库(清空后导入)' : '覆盖目标题库';
+    }
     previewList.innerHTML = '';
     const bankKeys = new Set();
     Object.values(state.questionBanks).forEach(bank => (bank || []).forEach(q => bankKeys.add(questionDedupKey(q))));
@@ -789,6 +846,14 @@ export function renderPreview() {
         typeBadge.className = 'badge';
         typeBadge.textContent = q.type || '未知';
         head.appendChild(typeBadge);
+
+        // 多题库文件:每道题标出它属于哪个库 —— 用户能一眼核对"切分对不对",而不是盲信
+        if (item.bank && (state.previewBanks || []).length >= 2) {
+            const bankBadge = document.createElement('span');
+            bankBadge.className = 'badge bank-badge';
+            bankBadge.textContent = `📚 ${item.bank}`;
+            head.appendChild(bankBadge);
+        }
 
         warnings.forEach(w => {
             const b = document.createElement('span');
@@ -894,6 +959,12 @@ export function updatePreviewSummary(warnCount) {
 
 // 确认导入：收集勾选项 → 重新规范化 → 去重 → 写入目标题库
 export function commitPreviewImport() {
+    // ① 多题库 + 分开导入:每个题库各进各的库(同名追加;勾了「覆盖」则清空后导入,并逐库存版)
+    const banks = state.previewBanks || [];
+    if (banks.length >= 2 && state.previewBankMode === 'separate') {
+        commitSeparateImport();
+        return;
+    }
     let targetName = previewTargetBankSelect.value;
     if (targetName === '__new__') {
         const name = (prompt('请输入新题库名称：') || '').trim();
@@ -976,6 +1047,83 @@ export function commitPreviewImport() {
         fingerprints: finalItems.map(questionDedupKey),
         imported: finalItems.length,
     });
+    updateLastImportInfo();
+}
+
+
+// 多题库分开导入:一个文件里的每个题库各自入库。
+// ⚠️ 逐库都走同一套纪律:覆盖前存版、批内去重、与目标库去重(勾了"跳过重复题")、逐库记账(撤销才有据可依)。
+function commitSeparateImport() {
+    const overwrite = previewOverwrite.checked;
+    const skipDupes = previewSkipDupes.checked;
+
+    // 先按库分组(只收勾选的题),组内按原顺序
+    const groups = [];
+    const byName = new Map();
+    for (const item of state.previewData) {
+        if (!item.include) continue;
+        const name = item.bank || '未命名题库';
+        if (!byName.has(name)) { const g = { name, items: [] }; byName.set(name, g); groups.push(g); }
+        byName.get(name).items.push(item);
+    }
+    if (groups.length === 0) {
+        alert('没有勾选任何题目');
+        return;
+    }
+
+    const summary = [];
+    const touched = [];
+    for (const g of groups) {
+        const items = [];
+        const seen = new Set();
+        for (const item of g.items) {
+            const finalized = finalizeQuestion(JSON.parse(JSON.stringify(item.q)));
+            if (!finalized) continue;
+            if (item.aiNote) finalized.aiSource = 'ai';
+            else if (item.histAI) pushHistMark(finalized, 'ai');
+            const key = questionDedupKey(finalized);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            items.push(finalized);
+        }
+        if (items.length === 0) continue;
+        const existing = state.questionBanks[g.name] || [];
+        const kept = skipDupes && !overwrite
+            ? items.filter(q => !new Set(existing.map(questionDedupKey)).has(questionDedupKey(q)))
+            : items;
+        if (kept.length === 0) { summary.push(`${g.name} 0 题(全重复)`); continue; }
+        if (overwrite && existing.length > 0) pushBankVersion(g.name, '覆盖导入前', existing);
+        state.questionBanks[g.name] = overwrite ? kept : existing.concat(kept);
+        touched.push(g.name);
+        summary.push(`${g.name} ${kept.length} 题`);
+        recordImportBatch({
+            time: new Date().toISOString(),
+            source: previewSourceLabel,
+            bank: g.name,
+            fingerprints: kept.map(questionDedupKey),
+            imported: kept.length,
+        });
+    }
+
+    if (touched.length === 0) {
+        alert('没有可导入的题目（均与目标题库重复）');
+        return;
+    }
+
+    // 停在第一个导入的库上,用户接着就能看到结果
+    state.isAllBanksView = false;
+    state.currentBankName = touched[0];
+    state.questionBank = state.questionBanks[touched[0]];
+    saveToLocalStorage();
+    updateBankSelect();
+    questionBankSelect.value = touched[0];
+    updateBanksList();
+
+    hideModal(importPreviewModal);
+    hideFileNotice();
+    fileInput.value = '';
+    pasteInput.value = '';
+    showImportStatus(`成功导入 ${touched.length} 个题库:${summary.join(' · ')}`, 'success');
     updateLastImportInfo();
 }
 
@@ -1242,7 +1390,9 @@ export function exportAllBanks() {
     bankNames.forEach(bankName => {
         const questions = state.questionBanks[bankName];
         if (questions && questions.length > 0) {
-            allContent += `# 题库：${bankName}\n\n`;
+            // 分节标记:**人一眼看得出边界,导入时能自动认出每个题库**(见 splitBankSections)。
+            // 旧写法 `# 题库：X` 会被解析器当成"一道题的标题",于是各库的题混成一库(👤 反馈的根因)。
+            allContent += bankSectionHeader(bankName) + '\n\n';
             allContent += formatQuestionsForExport(questions);
             allContent += '\n\n';
         }

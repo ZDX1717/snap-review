@@ -29,6 +29,9 @@ export const state = {
     // 导入预览
     previewData: [],
     previewFilterWarned: false,
+    // 多题库导入(带分节标记的文件):[{name,count}];mode = 'separate'(按库分开) | 'merge'(全部并一库)
+    previewBanks: [],
+    previewBankMode: 'merge',
     // 题库编辑器
     editBankName: null,
     editIndex: 0,
