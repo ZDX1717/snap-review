@@ -668,6 +668,39 @@ test('版本记录住在「题库设置」里,且每条都能删(👤 2026-09-11
     assert.ok(/#editor-bank-admin|editor-bank-admin/.test(bank), '版本面板应挂在题库设置容器里');
 });
 
+test('回收站:在创建按钮右侧,点开是悬浮菜单(👤 2026-09-12)', () => {
+    const banksSection = html.slice(html.indexOf('id="banks-section"'), html.indexOf('<!-- 创建题库模态框'));
+    // ① 同一行,且回收站在创建按钮**之后**(右侧)
+    const header = banksSection.slice(banksSection.indexOf('banks-header'), banksSection.indexOf('banks-list'));
+    const createIdx = header.indexOf('create-bank-btn');
+    const recIdx = header.indexOf('recycle-bin');
+    assert.ok(createIdx > -1 && recIdx > -1, '创建按钮与回收站都应在题库页头部那一行');
+    assert.ok(createIdx < recIdx, '回收站应在「＋ 创建题库」右侧');
+    // ② 回收站不再是页面流里的折叠块,而是 details + 悬浮面板
+    assert.ok(/class="recycle-pop"/.test(header), '回收站应带 recycle-pop 类');
+    assert.ok(/recycle-pop-panel/.test(header), '应有悬浮面板容器');
+    // ③ 面板是绝对定位的浮层
+    // ⚠️ 不能直接 match(\.recycle-pop-panel\s*\{…\}):它前面紧挨着一个注释块,
+    //    注释里的 > 和 : 会被正则先吃到(踩过)。先确认选择器存在,再从它的位置往后取本规则。
+    // ⚠️ 用行首锚定 '\n.recycle-pop-panel {':直接 indexOf('.recycle-pop-panel {') 会命中
+    //    **嵌套在别的选择器里**的那条(.recycle-pop:not([open]) > .recycle-pop-panel { display:none }),
+    //    于是读到的是"面板应该隐藏"而不是布局(踩过第二次)。
+    const sel = '\n.recycle-pop-panel {';
+    const at = cssNoComments.indexOf(sel);
+    assert.ok(at > -1, '缺 .recycle-pop-panel 规则');
+    const panel = cssNoComments.slice(at + sel.length, cssNoComments.indexOf('}', at));
+    assert.ok(/position\s*:\s*absolute/.test(panel), '面板应绝对定位(悬浮,不占文档流)');
+    assert.ok(/z-index\s*:/.test(panel), '面板应有 z-index(压在库卡之上)');
+    // ④ 闭合时必须显式隐藏 —— 不能赌 details 的默认行为
+    //    (实测本机 chromium 上闭合的 details 仍会渲染 children)
+    assert.ok(/\.recycle-pop:not\(\[open\]\)\s*>\s*\.recycle-pop-panel\s*\{[^}]*display\s*:\s*none/.test(cssNoComments),
+        '闭合态必须显式 display:none');
+    // ⑤ 计数写在独立的 span 里(整条 summary 重写会冲掉图标与结构)
+    const bank = readFileSync(path.join(root, 'src', 'bank.js'), 'utf8');
+    assert.ok(/recycleCount\.textContent/.test(bank), '计数应只更新 recycle-count 这个 span');
+    assert.ok(!/binWrap\.querySelector\('summary'\)\.textContent/.test(bank), '不该再整条重写 summary');
+});
+
 test('答题卡抽屉在 <main> 之外(公理:浮层不受 section 显隐牵连)', () => {
     const mainEnd = html.indexOf('</main>');
     const pos = html.indexOf('id="answer-card-drawer"');

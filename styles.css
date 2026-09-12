@@ -2510,6 +2510,69 @@ body, .container, .operation-card, .modal-content, .quiz-container, nav {
     align-items: center;
     margin-bottom: 16px;
 }
+/* 回收站:标题右侧那一行的最右;点开是悬浮菜单,不占页面流(👤 要求) */
+.banks-header #create-bank-btn { margin-left: auto; }   /* 标题左、两个动作靠右 */
+.recycle-menu {
+    position: relative;        /* 浮层的定位锚点 */
+    flex: 0 0 auto;
+}
+.recycle-pop > summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--c-border);   /* 按钮必须显式声明 border,否则露出默认黑边 */
+    border-radius: 999px;
+    background: var(--c-surface);
+    color: var(--c-text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    list-style: none;          /* 去掉默认的三角(自己控制外观) */
+}
+.recycle-pop > summary::-webkit-details-marker { display: none; }
+.recycle-pop > summary:hover {
+    border-color: var(--c-primary);
+    color: var(--c-primary);
+}
+.recycle-pop[open] > summary {
+    border-color: var(--c-primary);
+    color: var(--c-primary);
+    background: var(--c-info-bg);
+}
+/* ⚠️ 显式控制开合,不依赖 `<details>` 的默认行为:
+   实测(2026-09-12)在本机 chromium 上,闭合的 details 仍会把 children 渲染出来
+   (open=false 但面板有 44px 高、文字可读)—— 这是原生 details 的 content-visibility 没生效。
+   所以自己用 [open] 选择器控制显隐,行为才确定。 */
+.recycle-pop:not([open]) > .recycle-pop-panel { display: none; }
+
+/* 悬浮面板:绝对定位在触发器下方,贴右边对齐;本身可滚,不撑高页面 */
+.recycle-pop-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 60;               /* 要压在库卡之上 */
+    width: min(360px, 86vw);
+    max-height: 60vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+    padding: 8px 12px;
+    text-align: left;
+}
+/* 手机档:浮层贴屏宽,别缩成一条窄柱 */
+@media (max-width: 768px) {
+    .recycle-pop-panel {
+        width: auto;
+        left: auto;
+        right: 0;
+        min-width: min(320px, 92vw);
+    }
+    .recycle-pop > summary { min-height: 40px; }
+}
 /* 导入卡在首页:去双栏遗留,全宽。
    注意:**不要再给它 margin-top** —— 曾写 24px,叠加在 main 的顶部呼吸位之上,
    成了"导入题库卡片上方多一块空白"(👤 反馈)。顶部间距统一由 --pad-top 控制。 */

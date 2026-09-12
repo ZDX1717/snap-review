@@ -51,6 +51,7 @@ const editorRemoveOption = document.getElementById('editor-remove-option');
 const editorExplanation = document.getElementById('editor-explanation');
 const editorAnalysis = document.getElementById('editor-analysis');
 const editorSaveBtn = document.getElementById('editor-save-btn');
+const recycleCount = document.getElementById('recycle-count');
 const editorAiAnswerBtn = document.getElementById('editor-ai-answer-btn');
 const bankColorPicker = document.getElementById('bank-color-picker');
 // 编辑器重构后新增的元素(👤 2026-09-11)
@@ -2171,7 +2172,9 @@ export function renderRecycleBin() {
     if (!list || !binWrap) return;
     const bin = loadRecycledBanks();
     const entries = Object.entries(bin).sort((a, b) => (b[1].deletedAt || '').localeCompare(a[1].deletedAt || ''));
-    binWrap.querySelector('summary').textContent = `🗑 回收站 (${entries.length})`;
+    // 计数只改**独立的 span**:整条 summary 重写会把里面的图标/结构一起冲掉
+    // (而且 summary 现在是悬浮菜单的触发器,文本结构要稳住)
+    if (recycleCount) recycleCount.textContent = `(${entries.length})`;
     list.innerHTML = '';
     if (entries.length === 0) {
         list.innerHTML = '<p class="empty-message">回收站为空</p>';
